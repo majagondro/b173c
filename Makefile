@@ -1,6 +1,9 @@
 CC := gcc
-CFLAGS := -ggdb -Wall -Wextra -std=c99
+CFLAGS := -g -Wall -Wpedantic -Wextra -Wdeclaration-after-statement
 LDFLAGS :=
+
+CFLAGS += $(shell sdl2-config --cflags)
+LDFLAGS += $(shell sdl2-config --libs)
 
 SRC_DIR := src
 OBJ_DIR := obj

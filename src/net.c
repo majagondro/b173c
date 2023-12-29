@@ -75,6 +75,7 @@ void net_init(void)
 
 static bool net_read_packet(void);
 
+bool logged_in = false;
 void net_process(float dt)
 {
 	static float timeout = 0.0f;
@@ -100,6 +101,10 @@ void net_process(float dt)
 	/* read and handle incoming packets */
 	while(net_read_packet()) {
 
+	}
+
+	if(logged_in) {
+		net_write_0x0C((float)(rand()%360), (float)(rand()%180)-90.0f, false);
 	}
 }
 

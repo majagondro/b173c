@@ -1,4 +1,5 @@
 #include "net_internal.h"
+#include "game/world.h"
 
 void skip_metadata(void);
 
@@ -20,10 +21,12 @@ HANDLER(PKT_KEEP_ALIVE, void)
 	net_write_0x00(); // ping pong :-)
 }
 
+extern bool logged_in;
 HANDLER(PKT_LOGIN_REQUEST, int ent_id, string16 unused, long seed, byte dimension)
 {
 	printf("HELLO WORLD!!! i am %d of world %ld in dimension %hhd!!\n", ent_id, seed, dimension);
 	B_free(unused);
+	logged_in = true;
 }
 
 HANDLER(PKT_HANDSHAKE, string16 conn_hash)
@@ -176,12 +179,19 @@ HANDLER(PKT_ENTITY_METADATA, int ent_id, ...)
 
 HANDLER(PKT_PRE_CHUNK, int chunk_x, int chunk_z, bool load)
 {
-
+	if(load)
+		world_prepare_chunk(chunk_x, chunk_z);
+	else
+		world_delete_chunk(chunk_x, chunk_z);
 }
 
 HANDLER(PKT_MAP_CHUNK, int x, short y, int z, byte size_x, byte size_y, byte size_z, int data_size, byte *data)
 {
-
+	int sx, sy, sz;
+	sx = size_x + 1;
+	sy = size_y + 1;
+	sz = size_z + 1;
+	world_load_region_data(x, y, z, sx, sy, sz, data_size, (u_byte *) data);
 }
 
 HANDLER(PKT_MULTI_BLOCK_CHANGE, int chunk_x, int chunk_z, short array_size, short *coord_array, byte *id_array, byte *metadata_array)
@@ -198,7 +208,7 @@ HANDLER(PKT_BLOCK_ACTION, int x, short y, int z, byte data1, byte data2)
 {
 
 }
- // noteblock: data1 = instrument data2 = pitch      piston: data1 = state     data2 = direction
+// noteblock: data1 = instrument data2 = pitch      piston: data1 = state     data2 = direction
 HANDLER(PKT_EXPLOSION, double x, double y, double z, float radius, int num_affected_blocks, struct ni_off_coord *affected_blocks)
 {
 

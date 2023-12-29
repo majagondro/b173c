@@ -2,13 +2,19 @@ CC := gcc
 CFLAGS := -g -Wall -Wpedantic -Wextra -Wdeclaration-after-statement
 LDFLAGS :=
 
-CFLAGS += $(shell sdl2-config --cflags)
-LDFLAGS += $(shell sdl2-config --libs)
+# add SDL2
+CFLAGS += $(shell pkg-config --cflags sdl2)
+LDFLAGS += $(shell pkg-config --libs sdl2)
+# add zlib
+CFLAGS += $(shell pkg-config --cflags zlib)
+LDFLAGS += $(shell pkg-config --libs zlib)
 
 SRC_DIR := src
 OBJ_DIR := obj
 BUILD_DIR := build
 TARGET := $(BUILD_DIR)/b173c
+
+CFLAGS += -I$(SRC_DIR)
 
 SRC_FILES := $(shell find $(SRC_DIR)/ -type f -name "*.c")
 HDR_FILES := $(shell find $(SRC_DIR)/ -type f -name "*.h")

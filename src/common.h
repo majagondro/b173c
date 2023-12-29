@@ -21,4 +21,6 @@ void *_B_malloc(size_t sz, const char *file, int line);
 #define B_malloc(size) _B_malloc(size, __FILE__, __LINE__)
 #define B_free(p) free(p), p = NULL
 
+void con_printf(char *text, ...);
+
 #endif

@@ -170,6 +170,8 @@ HANDLER(PKT_DISCONNECT, string16 reason);
                             PACKET WRITERS
 *********************************************************************/
 
+void net_write_packets(void);
+
 // macro trickery so the packet IDS get properly expanded
 // so we get
 //    void net_write_0x00(void)

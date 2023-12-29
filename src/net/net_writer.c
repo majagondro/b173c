@@ -1,4 +1,29 @@
 #include "net_internal.h"
+#include "client/client.h"
+#include "vid/console.h"
+
+void net_write_packets(void)
+{
+	static bool sent_handshake = false;
+
+	if(cl.state == cl_disconnected && sent_handshake) {
+		sent_handshake = false;
+		return;
+	}
+
+	if(cl.state == cl_connecting && !sent_handshake) {
+		// send handshake once
+		con_printf("awaiting handshake...\n");
+		net_write_0x02(c16("player"));
+		sent_handshake = true;
+	}
+
+	if(cl.state != cl_connected)
+		return;
+
+	net_write_0x0D(cl.game.pos[0], cl.game.pos[1], cl.game.pos[1] + 0.2f, cl.game.pos[2], cl.game.rot[1]+180.0f, cl.game.rot[0], false);
+	//net_write_0x0C(cl.game.rot[1], cl.game.rot[0], false);
+}
 
 // macro trickery so the packet IDS get properly expanded
 // so we get

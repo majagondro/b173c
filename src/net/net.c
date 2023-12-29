@@ -8,18 +8,24 @@
 #include "common.h"
 #include "net.h"
 #include "net_internal.h"
-
-#define ADDR(ip, port) ((struct sockaddr *)&(struct sockaddr_in){.sin_port = htons(port),.sin_addr.s_addr = inet_addr(ip),.sin_family = AF_INET})
-
-/*
- * note to self:
- * disconnect socket by connecting to addr.sa_family = AF_UNSPEC
- */
+#include "client/client.h"
+#include "vid/console.h"
+#include <setjmp.h>
+#include <SDL_timer.h>
+#include <signal.h>
 
 static bool init_ok = false;
+static bool cmds_reg = false;
+static bool should_disconnect = false;
+
 static bool read_ok = false;
+static size_t total_read = 0;
+static byte read_buffer[32*1024] = {0};
+jmp_buf read_abort;
 
 static int sockfd = -1;
+
+#define perror(desc) con_printf("%s: %s\n", desc, strerror(errno))
 
 static void setblocking(int fd, bool blocking)
 {
@@ -41,6 +47,10 @@ static void setblocking(int fd, bool blocking)
 	}
 }
 
+void disconnect_f(void);
+void connect_f(void);
+void say_f(void);
+
 void net_init(void)
 {
 	/* do not reinitialize */
@@ -49,63 +59,87 @@ void net_init(void)
 
 	/* open ipv4 tcp stream socket */
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		net_shutdown(); // deinit
 		perror("socket");
+		net_shutdown(); // deinit
 		return;
 	}
 
 	/* set socket to nonblocking */
 	setblocking(sockfd, false);
 
+	/* register connection commands */
+	if(!cmds_reg) {
+		cmd_register("connect", connect_f);
+		cmd_register("disconnect", disconnect_f);
+		cmd_register("say", say_f);
+		cmds_reg = true;
+	}
+
+	init_ok = true;
+}
+
+void net_connect(const char *ipaddr, int port)
+{
+	struct sockaddr_in addr = {0};
+	if(ipaddr != NULL) {
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(port);
+		addr.sin_addr.s_addr = inet_addr(ipaddr);
+	} else {
+		/* disconnect */
+		addr.sin_family = AF_UNSPEC;
+	}
+
+	if(!init_ok)
+		net_init();
+
+	cl.state = cl_disconnected;
 
 	/* connect to server */
 	// set socket to blocking for this because its easier this way
 	setblocking(sockfd, true);
-	if(connect(sockfd, ADDR("192.168.1.18", 25565), sizeof(struct sockaddr_in)) < 0) {
-		net_shutdown(); // deinit
+	if(connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		perror("connect");
+		net_shutdown(); // deinit
 		return;
 	}
 	setblocking(sockfd, false);
 
-	init_ok = true;
-
-	net_write_0x02(c16("player"));
+	if(ipaddr != NULL) {
+		cl.state = cl_connecting;
+	}
 }
 
 static bool net_read_packet(void);
 
-bool logged_in = false;
-void net_process(float dt)
+void net_process(void)
 {
-	static float timeout = 0.0f;
-	static float keepalive_timer = 1.0f;
-
 	/* do not do anything if not properly initialized */
 	if(!init_ok)
 		return;
 
-	/* keepalive timer */
-	keepalive_timer -= dt;
-	if(keepalive_timer <= 0.0f) {
-		net_write_0x00();
-		keepalive_timer = 1.0f;
-	}
-
-	/* timeout: only update X times per second */
-	timeout -= dt;
-	if(timeout > 0.0f)
-		return;
-	timeout = 0.05f;
 
 	/* read and handle incoming packets */
-	while(net_read_packet()) {
+	if(cl.state > cl_disconnected) {
+		if(setjmp(read_abort)) {
+			// not enough data to read entire packet
+			net_write_packets();
+			return;
+		}
 
+		while(net_read_packet());
+
+		net_write_packets();
 	}
 
-	if(logged_in) {
-		net_write_0x0C((float)(rand()%360), (float)(rand()%180)-90.0f, false);
+	/* disconnect if requested */
+	if(should_disconnect) {
+		net_connect(NULL, 0);
+		cl.state = cl_disconnected;
+		net_write_packets(); // reset handshake flag
+		should_disconnect = false;
 	}
+
 }
 
 static bool net_read_packet(void)
@@ -113,11 +147,16 @@ static bool net_read_packet(void)
 	u_byte packet_id;
 	int i;
 
-	packet_id = net_read_byte();
-	if(!read_ok)
-		return false;
+	/* consume the old bytes */
+	if(read_ok)
+		read(sockfd, read_buffer, total_read);
+	total_read = 0;
 
-	// printf("  packet 0x%hhx (%hhd)\n", packet_id, packet_id);
+	/* try to read a packet */
+	packet_id = net_read_byte();
+	if(!read_ok) {
+		return false;
+	}
 
 	switch(packet_id) {
 		case PKT_KEEP_ALIVE:
@@ -366,7 +405,7 @@ static bool net_read_packet(void)
 				cz = net_read_int();
 			short sz = net_read_short();
 
-			short *b1 = B_malloc(sz * 2);
+			short *b1 = B_malloc(sz * sizeof(short));
 			byte *b2 = B_malloc(sz);
 			byte *b3 = B_malloc(sz);
 
@@ -543,7 +582,7 @@ static bool net_read_packet(void)
 			net_handle_0xFF(net_read_string16());
 			break;
 		default:
-			printf("unknown packet_id %hhd (0x%hhx)! shutting down network...\n", packet_id, packet_id);
+			con_printf("unknown packet_id %hhd (0x%hhx)!\n", packet_id, packet_id);
 			net_shutdown();
 			return false;
 	}
@@ -553,17 +592,20 @@ static bool net_read_packet(void)
 void net_shutdown(void)
 {
 	init_ok = false;
+	con_printf("net shutting down...\n");
 
-	setblocking(sockfd, true);
-	net_write_0xFF(c16("Quitting"));
 
 	/* close socket */
+	setblocking(sockfd, true);
 	if(sockfd != -1) {
 		if(close(sockfd) < 0) {
 			perror("close");
-			// :-(
+			// :|
 		}
+		sockfd = -1;
 	}
+
+	cl.state = cl_disconnected;
 }
 
 void net_read_buf(void *dest, size_t n)
@@ -573,24 +615,28 @@ void net_read_buf(void *dest, size_t n)
 	if(!init_ok || !dest || n == 0)
 		return;
 
-	read_ok = true;
-	n_read = read(sockfd, dest, n);
+	n_read = recv(sockfd, read_buffer, total_read+n, MSG_PEEK);
 	if(n_read == 0) {
 		// EOF
 		read_ok = false;
+		longjmp(read_abort, 1);
 	} else if(n_read == -1) {
 		read_ok = false;
 		// EAGAIN is a common when using non-blocking sockets
 		// it just means no data is currently available
 		if(errno != EAGAIN) {
-			net_shutdown();
-			perror("net_read_buf");
-			return;
+			longjmp(read_abort, 1);
 		} else {
 			// what do :-(((((
 		}
-	} else if((size_t) n_read != n) {
-		printf("net_read_buf: read only %ld/%lu bytes!!!!!!\n", n_read, n);
+	} else if((size_t) n_read - total_read != n) {
+		read_ok = false;
+		total_read = n_read;
+		longjmp(read_abort, 1);
+	} else {
+		read_ok = true;
+		memcpy(dest, read_buffer + total_read, n);
+		total_read = n_read;
 	}
 }
 
@@ -653,9 +699,9 @@ string8 net_read_string8(void)
 	short len;
 
 	len = net_read_short();
-	s = B_malloc(len);
+	s = B_malloc(len+1);
 	net_read_buf(s, len);
-	s[len-1] = 0;
+	s[len] = 0;
 
 	return s; // you take care of it now ;-)
 }
@@ -663,12 +709,16 @@ string8 net_read_string8(void)
 string16 net_read_string16(void)
 {
 	string16 s;
-	short size;
+	short size, len;
+	int i;
 
-	size = net_read_short() * 2;
+	len = net_read_short();
+	size = (len + 1) * sizeof(char16);
 	s = B_malloc(size);
-	net_read_buf(s, size);
-	s[size / 2 - 1] = 0;
+	for(i = 0; i < len; i++) {
+		s[i] = SDL_Swap16(net_read_short());
+	}
+	s[len] = 0;
 
 	return s; // you take care of it now ;-)
 }
@@ -677,25 +727,24 @@ void net_write_buf(const void *buf, size_t n)
 {
 	ssize_t n_written;
 
-	if(!init_ok || !buf || n == 0)
+	if(!init_ok || !buf || n == 0 || cl.state == cl_disconnected)
 		return;
 
-
-	n_written = write(sockfd, buf, n);
+	n_written = send(sockfd, buf, n, MSG_NOSIGNAL);
 	if(n_written == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
 			// is this right?
-			printf("net_write_buf: operation WILL block\n");
+			con_printf("net_write_buf: operation WILL block\n");
 			setblocking(sockfd, true);
 			net_write_buf(buf, n);
 			setblocking(sockfd, false);
 		} else {
-			net_shutdown();
 			perror("net_write_buf");
+			net_shutdown();
 			return;
 		}
 	} else if((size_t) n_written != n) {
-		printf("net_write_buf: wrote only %ld/%lu bytes! gonna block!\n", n_written, n);
+		con_printf("net_write_buf: wrote only %ld/%lu bytes! gonna block!\n", n_written, n);
 		setblocking(sockfd, true);
 		write(sockfd, (byte *)buf + n_written, n - n_written);
 		setblocking(sockfd, false);
@@ -739,7 +788,7 @@ void net_write_double(double v)
 {
 	union {
 		double d;
-		int l;
+		long l;
 	} u;
 	u.d = v;
 	net_write_long(u.l);
@@ -798,5 +847,107 @@ void skip_metadata(void)
 				net_read_int();
 				break;
 		}
+	}
+}
+
+static int powi(int b, int e)
+{
+	int r = 1;
+	while(e-- > 0)
+		r *= b;
+	return r;
+}
+
+void connect_f(void)
+{
+	char *addrstr;
+	int port = 25565;
+	int i, len, part, d, n;
+
+	if(cmd_argc() != 2) {
+		con_printf("usage: %s ip[:port]\n", cmd_argv(0));
+	}
+
+	addrstr = cmd_argv(1);
+
+	if(cl.state >= cl_connecting) {
+		con_printf("disconnect first\n");
+		return;
+	}
+
+	n = 0;
+	len = strlen(addrstr);
+	for(i = 0; i < len; i++) {
+		if(addrstr[i] == '.') {
+			if(n > 4)
+				goto invalid_ip;
+		} else if(addrstr[i] == ':') {
+			if(n != 4 || i == len - 1)
+				goto invalid_ip;
+			port = strtol(&addrstr[i+1], NULL, 10);
+			if(port < 0 || port > 65536) {
+				goto invalid_ip;
+			}
+		} else {
+			if(isdigit(addrstr[i])) {
+				part = strtol(&addrstr[i], NULL, 10);
+				i += part >= 100 ? 2 : (part >= 10 ? 1 : 0);
+				n++;
+				if(part < 0 || part > 255)
+					goto invalid_ip;
+
+			} else {
+				goto invalid_ip;
+			}
+		}
+	}
+
+	if(n != 4)
+		goto invalid_ip;
+
+	net_init();
+	net_connect(addrstr, port);
+	return;
+
+invalid_ip:
+	con_printf("invalid ip address\n");
+}
+
+void disconnect_f(void)
+{
+	if(cl.state != cl_disconnected) {
+		if(cl.state == cl_connected) {
+			// set to blocking so the packet gets sent
+			// before the socket is closed
+			setblocking(sockfd, true);
+			net_write_0xFF(c16("Quitting"));
+			setblocking(sockfd, false);
+		}
+
+		bzero(&cl.game, sizeof(cl.game));
+
+		// net_update will disconnect next update
+		cl.state = cl_disconnected;
+		should_disconnect = true;
+
+		con_show();
+	}
+}
+
+void say_f(void)
+{
+	if(cmd_argc() == 1) {
+		con_printf("usage: %s message\n", cmd_argv(0));
+	}
+
+	if(cl.state != cl_connected) {
+		con_printf("can't \"%s\", not connected\n", cmd_argv(0));
+		return;
+	}
+
+	if(!strcmp(cmd_argv(1), "respawn")) {
+		net_write_0x09(0);
+	} else {
+		net_write_0x03(c16(cmd_args(1, cmd_argc())));
 	}
 }

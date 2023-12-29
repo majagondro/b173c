@@ -1,12 +1,10 @@
 #include <zlib.h>
 #include <assert.h>
 #include "world.h"
-
-#define IDX_FROM_COORDS(x, y, z) ((((x) & 15) | (((z) & 15) << 4)) | ((y) << 8))
-
+#include "vid/console.h"
 
 struct chunk *chunks;
-
+long time = 0;
 
 void world_prepare_chunk(int chunk_x, int chunk_z)
 {
@@ -36,130 +34,143 @@ void world_delete_chunk(int chunk_x, int chunk_z)
 			else
 				prev->next = c->next;
 
-			B_free(c);
 			B_free(c->data);
+			B_free(c);
 			return;
 		}
 	}
 }
 
-static void zerr(int ret)
-{
-	fputs("zpipe: ", stderr);
-	switch(ret) {
-		case Z_ERRNO:
-			if(ferror(stdin))
-				fputs("error reading stdin\n", stderr);
-			if(ferror(stdout))
-				fputs("error writing stdout\n", stderr);
-			break;
-		case Z_STREAM_ERROR:
-			fputs("invalid compression level\n", stderr);
-			break;
-		case Z_DATA_ERROR:
-			fputs("invalid or incomplete deflate data\n", stderr);
-			break;
-		case Z_MEM_ERROR:
-			fputs("out of memory\n", stderr);
-			break;
-		case Z_VERSION_ERROR:
-			fputs("zlib version mismatch!\n", stderr);
-			break;
-		default:
-			fprintf(stderr, "other: %s\n", zError(ret));
-	}
-}
-
-int inf(u_byte *source, u_byte *dest, size_t size_in, size_t size_out)
+int inflate_data(u_byte *in, u_byte *out, size_t size_in, size_t size_out)
 {
 	int ret;
 	z_stream strm;
 
-	/* allocate inflate state */
 	strm.zalloc = Z_NULL;
 	strm.zfree = Z_NULL;
 	strm.opaque = Z_NULL;
 	strm.avail_in = 0;
 	strm.next_in = Z_NULL;
 	ret = inflateInit(&strm);
-	if (ret != Z_OK)
+	if (ret != Z_OK) {
+		con_printf("inflate_data: zlib error: %s\n", zError(ret));
 		return ret;
+	}
 
-	/* decompress until deflate stream ends or end of file */
-	do {
-		strm.avail_in = size_in;
-		strm.next_in = (u_byte *) source;
+	strm.avail_in = size_in;
+	strm.next_in = in;
+	strm.avail_out = size_out;
+	strm.next_out = out;
 
-		/* run inflate() on input until output buffer not full */
-		do {
-			strm.avail_out = size_out;
-			strm.next_out = (u_byte *) dest;
-			ret = inflate(&strm, Z_NO_FLUSH);
-			assert(ret != Z_STREAM_ERROR);  /* state not clobbered */
-			switch (ret) {
-				case Z_NEED_DICT:
-					ret = Z_DATA_ERROR;     /* and fall through */
-				case Z_DATA_ERROR:
-				case Z_MEM_ERROR:
-					(void)inflateEnd(&strm);
-					return ret;
-			}
-		} while (strm.avail_out == 0);
+	ret = inflate(&strm, Z_NO_FLUSH);
+	switch (ret) {
+		case Z_NEED_DICT:
+			ret = Z_DATA_ERROR;
+		case Z_DATA_ERROR:
+		case Z_MEM_ERROR:
+			return ret;
+	}
 
-		/* done when inflate() says it's done */
-	} while (ret != Z_STREAM_END);
+	inflateEnd(&strm);
 
-	/* clean up and return */
-	(void)inflateEnd(&strm);
 	return Z_OK;
 }
 
 void world_load_region_data(int x, short y, int z, int size_x, int size_y, int size_z, int data_size, u_byte *data)
 {
-	int local_x, local_y, local_z;
+	int xStart, yStart, zStart;
+	int xEnd, yEnd, zEnd;
+	int dataPos;
 	struct chunk_data *chunk_data;
-	z_stream strm = {0};
-	byte decomp[(size_x + 1) * (size_y + 1) * (size_z + 1) * 5 / 2];
-	int ret;
+	u_byte decomp[size_x * size_y * size_z * 5 / 2];
 
-	printf("load region %d %d %d size %d %d %d\n", x,y,z,size_x,size_y,size_z);
+	//con_printf("load region %d %d %d size %d %d %d\n", x,y,z,size_x,size_y,size_z);
 
 	// this region is always contained within a single chunk
 	// i think xd
 	if(!world_chunk_exists(x >> 4, z >> 4)) {
-		printf("world_load_region_data: chunk %d %d does not exist\n", x >> 4, z >> 4);
-		return; // todo: log?
+		//con_printf("world_load_region_data: chunk %d %d does not exist\n", x >> 4, z >> 4);
+		return;
 	}
 
 	chunk_data = world_get_chunk(x >> 4, z >> 4)->data;
-	inf(data, (u_byte *) decomp, data_size, sizeof(decomp));
+	if((dataPos = inflate_data(data, decomp, data_size, sizeof(decomp))) != Z_OK) {
+		con_printf("error while decompressing chunk data: %s\n", zError(dataPos));
+		return;
+	}
 
 
-	local_x = x & 15;
-	local_y = y & 127;
-	local_z = z & 15;
+	xStart = x & 15;
+	yStart = y & 127;
+	zStart = z & 15;
 
-	for(x = local_x; x < local_x + size_x; x++) {
-		for(z = local_z; z < local_z + size_z; z++) {
-			for(y = local_y; y < local_y + size_y; y++) {
-				int idx = y + (z * (size_y+1)) + (x * (size_y+1) * (size_z+1));
-				chunk_data->blocks[IDX_FROM_COORDS(x,y,z)] = decomp[idx];
-				//printf("%d %d %d -> %d\n", x,y,z,decomp[idx]);
-			}
+	xEnd = xStart + size_x;
+	yEnd = yStart + size_y;
+	zEnd = zStart + size_z;
+
+	dataPos = 0;
+
+	for(x = xStart; x < xEnd; ++x) {
+		for(z = zStart; z < zEnd; ++z) {
+			int index = x << 11 | z << 7 | yStart;
+			int ySize = yEnd - yStart;
+			memcpy(chunk_data->blocks + index, decomp + dataPos, ySize);
+			//System.arraycopy(data, dataPos, this.blocks, index, ySize);
+			dataPos += ySize;
 		}
 	}
 
-	printf("load ok?\n");
+	for(x = xStart; x < xEnd; ++x) {
+		for(z = zStart; z < zEnd; ++z) {
+			int index = (x << 11 | z << 7 | yStart) >> 1;
+			int ySize = (yEnd - yStart) / 2;
+			// src, srcPos, dst, dstPos, length
+			// System.arraycopy(data, dataPos, this.data.data, index, ySize);
+			dataPos += ySize;
+		}
+	}
+
+	for(x = xStart; x < xEnd; ++x) {
+		for(z = zStart; z < zEnd; ++z) {
+			int index = (x << 11 | z << 7 | yStart) >> 1;
+			int ySize = (yEnd - yStart) / 2;
+			// System.arraycopy(data, dataPos, this.blocklightMap.data, index, ySize);
+			dataPos += ySize;
+		}
+	}
+
+	for(x = xStart; x < xEnd; ++x) {
+		for(z = zStart; z < zEnd; ++z) {
+			int index = (x << 11 | z << 7 | yStart) >> 1;
+			int ySize = (yEnd - yStart) / 2;
+			// System.arraycopy(data, dataPos, this.skylightMap.data, index, ySize);
+			dataPos += ySize;
+		}
+	}
+
+	//con_printf("load ok?\n");
 
 }
 
-byte world_get_block(int x, byte y, int z)
+byte world_get_block(int x, int y, int z)
 {
 	if(!world_chunk_exists(x >> 4, z >> 4))
 		return 0;
-	if(y < 0)
+	if(y < 0 || y >= 128)
 		return 0;
 	return 1;
+}
+
+void world_set_block(int x, int y, int z, byte id)
+{
+	struct chunk *c;
+	if(!world_chunk_exists(x >> 4, z >> 4))
+		return;
+	if(y < 0 || y >= 128)
+		return;
+
+	c = world_get_chunk(x >> 4, z >> 4);
+	c->data->blocks[IDX_FROM_COORDS(x & 15, y, z & 15)] = id;
 }
 
 bool world_chunk_exists(int chunk_x, int chunk_z)
@@ -176,4 +187,45 @@ struct chunk *world_get_chunk(int chunk_x, int chunk_z)
 		}
 	}
 	return NULL;
+}
+
+void world_set_time(long t)
+{
+	time = t;
+}
+
+#define is_between(t,a,b) t >= a && t <= b
+float *world_get_sky_color(void)
+{
+	static vec3 color;
+
+	int t = time % 24000;
+
+	if(is_between(t, 14000, 22000)) {
+		// night
+		color[0] = 0.01f;
+		color[1] = 0.01f;
+		color[2] = 0.03f;
+	} else if(is_between(t, 11000, 14000)) {
+		// start of night
+		// interpolate between day (11000) and night (14000)
+		float f = (float)(t - 11000) / 3000.0f;
+		color[0] = f * 0.01f + (1.0f - f) * 0.55f;
+		color[1] = f * 0.01f + (1.0f - f) * 0.7f;
+		color[2] = f * 0.03f + (1.0f - f) * 0.9f;
+	} else if(is_between(t, 22000, 24000)) {
+		// start of day
+		// interpolate between night (22000) and day (24000)
+		float f = (float)(t - 22000) / 2000.0f;
+		color[0] = f * 0.55f + (1.0f - f) * 0.01f;
+		color[1] = f * 0.7f + (1.0f - f) * 0.01f;
+		color[2] = f * 0.9f + (1.0f - f) * 0.03f;
+	} else {
+		// day
+		color[0] = 0.55f;
+		color[1] = 0.7f;
+		color[2] = 1.0f;
+	}
+
+	return color;
 }

@@ -1,6 +1,6 @@
 CC := gcc
-CFLAGS := -g -Wall -Wpedantic -Wextra -Wdeclaration-after-statement
-LDFLAGS :=
+CFLAGS := -g -Wall -Wpedantic -Wextra -Wdeclaration-after-statement -Iinclude
+LDFLAGS := -lm
 
 # add SDL2
 CFLAGS += $(shell pkg-config --cflags sdl2)

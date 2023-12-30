@@ -30,7 +30,7 @@ static bool check_shader_compile_impl(uint h, const char *name)
 	glGetShaderiv(h, GL_COMPILE_STATUS, &ok);
 	if(!ok) {
 		glGetShaderiv(h, GL_INFO_LOG_LENGTH, &loglen);
-		log = malloc(loglen + 1);
+		log = B_malloc(loglen + 1);
 		memset(log, 0, loglen + 1);
 		glGetShaderInfoLog(h, loglen, &loglen, log);
 		con_printf("shader '%s' failed to compile: %s\n", name, log);
@@ -48,7 +48,7 @@ static uint check_program_compile(uint h, uint h_vs, uint h_fs)
 	glGetProgramiv(h, GL_LINK_STATUS, &ok);
 	if(!ok) {
 		glGetProgramiv(h, GL_INFO_LOG_LENGTH, &loglen);
-		log = malloc(loglen + 1);
+		log = B_malloc(loglen + 1);
 		memset(log, 0, loglen + 1);
 		glGetProgramInfoLog(h, loglen, &loglen, log);
 		con_printf("shader program failed to compile:\n%s\n", log);
@@ -149,6 +149,13 @@ void vid_init(void)
 
 void vid_shutdown(void)
 {
+	SDL_GL_DeleteContext(glcontext);
+	SDL_DestroyWindow(window_handle);
+
+	SDL_Quit();
+
+	world_renderer_shutdown();
+
 	glDeleteProgram(gl.shader3d);
 	glDeleteProgram(gl.shader2d);
 	SDL_DestroyWindow(window_handle);

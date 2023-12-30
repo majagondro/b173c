@@ -448,7 +448,7 @@ static bool net_read_packet(void)
 			float r = net_read_float();
 			int n = net_read_int();
 
-			b = malloc(n * sizeof(*b));
+			b = B_malloc(n * sizeof(*b));
 			for(i = 0; i < n; i++)
 				net_read_buf(&b[i], sizeof(b[i]));
 

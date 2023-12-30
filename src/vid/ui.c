@@ -80,18 +80,18 @@ static void calculate_char_widths(void)
 		bool start_set = false;
 
 		if(c == ' ') {
-			charwidths[c] = 8;
+			charwidths[c] = CON_CHAR_SIZE;
 			continue;
 		}
 
 		xe = 7;
 		xs = 0;
 
-		x = (c % 16) * 8;
-		y = (c / 16) * 8;
-		for(x2 = x; x2 < x + 8; x2++) {
+		x = (c % 16) * CON_CHAR_SIZE;
+		y = (c / 16) * CON_CHAR_SIZE;
+		for(x2 = x; x2 < x + CON_CHAR_SIZE; x2++) {
 			bool empty = true;
-			for(y2 = y; y2 < y + 8; y2++) {
+			for(y2 = y; y2 < y + CON_CHAR_SIZE; y2++) {
 				alpha_idx = (y2 * q_conchars.width + x2) * q_conchars.bytes_per_pixel + 3;
 				if(q_conchars.pixel_data[alpha_idx] > 0) {
 					empty = false;
@@ -220,14 +220,19 @@ bool ui_drawchar(u_byte c, int x, int y, bool red, int color)
 	if(red)
 		b = c + 128;
 
+	if(color >= 0) {
+		// shadow
+		ui_drawchar(c, x+1, y+1, red, -color);
+	}
+
 	if(fontcharcount > MAX_CON_CHARS - 10) {
 		con_printf("font count is @ %d!!!! not drawing any text anymore\n", fontcharcount);
 		return false;
 	}
 
-	if(x < -8 || x > ui_w)
+	if(x < -CON_CHAR_SIZE || x > ui_w)
 		return false;
-	if(y < -8 || y > ui_h)
+	if(y < -CON_CHAR_SIZE || y > ui_h)
 		return false;
 
 	fontdata[fontcharcount][0] = ((float)x) / ((float)ui_w);
@@ -245,12 +250,12 @@ void ui_drawtext(const char *text, int x, int y, bool red)
 	int color = 0xf;
 	bool read_color_code = false;
 	// skip characters outside the screen
-	while(x < -8 && *text) {
+	while(x < -CON_CHAR_SIZE && *text) {
 		x += ui_charwidth(*text);
 		text++;
 	}
 
-	if(y == -8 || y > ui_h)
+	if(y == -CON_CHAR_SIZE || y > ui_h)
 		return; // cant be seen anyway
 
 	while(*text) {
@@ -269,8 +274,6 @@ void ui_drawtext(const char *text, int x, int y, bool red)
 			text++;
 			continue;
 		}
-		if(!ui_drawchar(*text, x+1, y+1, red, -color))
-			break;
 		if(!ui_drawchar(*text, x, y, red, color))
 			break;
 		x += ui_charwidth(*text++);

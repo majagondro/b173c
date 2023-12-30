@@ -18,6 +18,7 @@ void vid_mouse_grab(bool grab);
 void vid_display_frame(void);
 
 void world_renderer_init(void);
+void world_renderer_shutdown(void);
 void world_render(void);
 
 #endif

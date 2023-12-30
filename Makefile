@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -g -Wall -Wpedantic -Wextra -Wdeclaration-after-statement -Iinclude
+CFLAGS := -ggdb3 -Wall -Wpedantic -Wextra -Wdeclaration-after-statement -Iinclude
 LDFLAGS := -lm
 
 # add SDL2

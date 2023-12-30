@@ -12,12 +12,13 @@ struct conline {
 	struct conline *next, *prev;
 } *conlines = NULL;
 
-static char input_line[257] = {0};
-static int input_line_len = 0;
+#define MAX_INPUT_LEN 256
+static char input_line[MAX_INPUT_LEN+1] = {0};
+static int input_pos = 0;
 static int history_idx = 0;
 
 static ulong flash_tick = 0;
-static u_byte flash_char = 0xdb;
+static u_byte flash_char = '|';
 static bool flash = false;
 
 bool con_opened = true;
@@ -43,7 +44,7 @@ void con_hide(void)
 
 void con_init(void)
 {
-	conlines = malloc(sizeof(*conlines));
+	conlines = B_malloc(sizeof(*conlines));
 	memset(conlines, 0, sizeof(*conlines));
 
 	cmd_init();
@@ -53,8 +54,13 @@ void con_init(void)
 
 static void con_putinc(u_byte c, bool red)
 {
-	if(input_line_len < 256) {
-		input_line[input_line_len++] = red ? REDCHAR(c) : c;
+	if(input_pos < MAX_INPUT_LEN) {
+		if(strnlen(input_line, MAX_INPUT_LEN) == MAX_INPUT_LEN) {
+			// dont
+		} else {
+			memmove(&input_line[input_pos + 1], &input_line[input_pos], MAX_INPUT_LEN - input_pos - 1);
+			input_line[input_pos++] = red ? REDCHAR(c) : c;
+		}
 	}
 }
 
@@ -70,7 +76,7 @@ static void free_excess_lines(void)
 
 	while(count-- > CONSOLE_MAX_LINES) {
 		l = l->prev;
-		free(l->next);
+		B_free(l->next);
 		l->next = NULL;
 	}
 }
@@ -89,8 +95,8 @@ static void con_submit(void)
 
 	cmd_exec((char *) input_line, false);
 
-	memset(input_line, 0, 256);
-	input_line_len = 0;
+	memset(input_line, 0, MAX_INPUT_LEN);
+	input_pos = 0;
 
 	// reset history index
 	history_idx = 0;
@@ -120,6 +126,11 @@ static struct conline *get_nth_inputted_line(int n)
 	return c;
 }
 
+static int calc_max_scroll(void)
+{
+	return 0;
+}
+
 bool con_handle_key(int key, int keymod)
 {
 	char c;
@@ -129,11 +140,7 @@ bool con_handle_key(int key, int keymod)
 	if(!con_opened)
 		return false;
 
-	if(keymod & KEYMOD_CAPSLOCK)
-		caps_strength++;
-	if(keymod & KEYMOD_SHIFT)
-		caps_strength++;
-	caps_strength %= 2;
+	caps_strength = ((keymod & KEYMOD_SHIFT) != 0) ^ ((keymod & KEYMOD_CAPSLOCK) != 0);
 
 	if(key >= KEY_A && key <= KEY_Z) {
 		if(key == KEY_V && keymod & KEYMOD_CTRL) {
@@ -159,9 +166,20 @@ bool con_handle_key(int key, int keymod)
 			if(keymod & KEYMOD_CTRL) {
 				con_putinc(127, red);
 			} else {
-				if (input_line_len > 0) {
-					input_line[--input_line_len] = 0;
+				if (input_pos > 0) {
+					if(input_pos == MAX_INPUT_LEN) {
+						input_line[input_pos - 1] = 0;
+					} else {
+						memmove(&input_line[input_pos - 1], &input_line[input_pos], MAX_INPUT_LEN - input_pos);
+					}
+					input_pos--;
 				}
+			}
+		} break;
+
+		case KEY_DELETE: {
+			if(input_pos < MAX_INPUT_LEN) {
+				memmove(&input_line[input_pos], &input_line[input_pos + 1], MAX_INPUT_LEN - input_pos);
 			}
 		} break;
 
@@ -169,17 +187,30 @@ bool con_handle_key(int key, int keymod)
 			con_submit();
 		} break;
 
-		case KEY_F1:
-		case KEY_F2: {
-			if(keymod & KEYMOD_SHIFT) {
-				if(input_line_len == 0)
-					return true;
-				input_line_len--;
-				con_putinc(input_line[input_line_len] + (key == KEY_F1 ? 1 : -1), red);
+		case KEY_HOME:
+			if(keymod & KEYMOD_CTRL) {
+				con_scroll = 0;
 			} else {
-				con_putinc(1, red);
+				input_pos = 0;
 			}
-		} break;
+			break;
+
+		case KEY_END:
+			if(keymod & KEYMOD_CTRL) {
+				con_scroll = calc_max_scroll();
+			} else {
+				input_pos = MAX_INPUT_LEN;
+			}
+			break;
+
+		case KEY_LEFT:
+			if(input_pos > 0)
+				input_pos--;
+			break;
+		case KEY_RIGHT:
+			if(input_pos < (int) strnlen(input_line, MAX_INPUT_LEN))
+				input_pos++;
+			break;
 
 		case KEY_DOWN:
 			history_idx -= 2;
@@ -192,13 +223,13 @@ bool con_handle_key(int key, int keymod)
 				if(history_idx != 0) {
 					history_idx = 0;
 					memset(input_line, 0, sizeof(input_line));
-					input_line_len = 0;
+					input_pos = 0;
 				}
 				return true;
 			}
 			strlcpy(input_line, l->line+1, 255);
-			input_line_len = strlen(input_line)-1;
-			input_line[input_line_len] = 0;
+			input_pos = strlen(input_line) - 1;
+			input_line[input_pos] = 0;
 			history_idx++;
 		} break;
 
@@ -243,7 +274,7 @@ void con_printf(char *fmt, ...)
 	va_list va;
 	size_t len = strlen(fmt) + 2048; // additional space for expansions
 
-	text = malloc(len + 1);
+	text = B_malloc(len + 1);
 	memset(text, 0, len + 1);
 	p = text;
 
@@ -255,16 +286,16 @@ void con_printf(char *fmt, ...)
 
 	while(*p != 0) {
 		if(conlines->len < 256) {
-			if(*p != '\n')
-				conlines->line[conlines->len++] = *p;
-			else // hack to fix minecraft font
+			if(*p == '\n') // the font has a symbol for \n, dont display it
 				conlines->line[conlines->len++] = ' ';
+			else
+				conlines->line[conlines->len++] = *p;
 		} else {
 			// TODO: word wrapping
 		}
 
 		if(*p == '\n') {
-			l = malloc(sizeof(*l));
+			l = B_malloc(sizeof(*l));
 			memset(l, 0, sizeof(*l));
 			add_line(l);
 			p++;
@@ -273,19 +304,15 @@ void con_printf(char *fmt, ...)
 		p++;
 	}
 
-	free(text);
+	B_free(text);
 }
 
 static void draw_input_line(int y)
 {
-	int x;
-
-	ui_printf(0, y, false, "]%s", input_line);
-
-	x = ui_charwidth(']') + ui_strwidth(input_line);
-
 	if(flash)
-		ui_drawchar(flash_char, x, y, false, 0xf);
+		ui_printf(0, y, false, "]%.*s%c%s", input_pos, input_line, flash_char, input_line + input_pos);
+	else
+		ui_printf(0, y, false, "]%s", input_line);
 
 	if(SDL_GetTicks64() - flash_tick > 400) {
 		flash = !flash;

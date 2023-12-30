@@ -16,7 +16,6 @@ extern struct gl_state gl;
 
 void world_renderer_init(void)
 {
-
 	glGenVertexArrays(1, &vao);
 	glGenBuffers(1, &vbo);
 	glBindVertexArray(vao);
@@ -112,4 +111,10 @@ void world_render(void)
 
 	B_free(blox);
 
+}
+
+void world_renderer_shutdown(void)
+{
+	glDeleteBuffers(1, &vao);
+	glDeleteBuffers(1, &vbo);
 }

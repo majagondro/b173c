@@ -38,7 +38,7 @@ float calc_frametime(void)
 	return ((float)(now - then) / (float)SDL_GetPerformanceFrequency());
 }
 
-void shutdown(void)
+void app_shutdown(void)
 {
 	net_shutdown();
 	in_shutdown();
@@ -69,14 +69,12 @@ int main(void)
 			last_time = SDL_GetTicks64();
 		}
 
-
-
 		vid_update();
 		ui_draw();
 		vid_display_frame();
 	}
 
-	shutdown();
+	app_shutdown();
 
 	return 0;
 }

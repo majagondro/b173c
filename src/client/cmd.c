@@ -348,6 +348,27 @@ bool cmd_is_stuffed(void) { return stuffed; }
 
 static int recurse_protection = 0;
 
+static bool is_color_code(char c)
+{
+	return isdigit(c) || (c >= 'a' && c <= 'f');
+}
+
+static void replace_color_codes(char *text)
+{
+	int i;
+	int len = strlen(text);
+	for(i = 0; i < len - 1; i++) {
+		if(text[i] == '&' && is_color_code(text[i+1])) {
+			if(i == 0 || (i > 0 && text[i-1] != '\\')) {
+				text[i] = '\xa7';
+			} else if((i > 0 && text[i-1] == '\\')) {
+				memmove(&text[i-1], &text[i], len - i);
+				text[len - 1] = 0;
+			}
+		}
+	}
+}
+
 void cmd_exec_impl(char *text, bool from_server)
 {
 	char *tok;
@@ -369,7 +390,8 @@ void cmd_exec_impl(char *text, bool from_server)
 	// new var because strtok modifies the string
 	totok = malloc(4096);
 	memset(totok, 0, 4096);
-	strcpy(totok, text);
+	strlcpy(totok, text, 4096);
+	replace_color_codes(totok);
 	for(tok = tokenize(totok); tok != NULL; tok = tokenize(NULL))
 		$argv[$argc++] = copystr(tok);
 	free(totok);

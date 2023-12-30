@@ -151,11 +151,16 @@ const char *shader_fragment2d = GLSL_VERSION stringify(
 		return vec4(mul,mul,mul,1);
 	}
 
+	int modulo(int a, int b)
+	{
+		return a - (b * int(floor(a / b)));
+	}
+
 	void main()
 	{
 		vec2 newuv;
 
-		newuv.x = float((FONTCHAR % 16 + UV.x) * 8) / 128.0f;
+		newuv.x = float((modulo(FONTCHAR, 16) + UV.x) * 8) / 128.0f;
 		newuv.y = float((FONTCHAR / 16 + UV.y) * 8) / 128.0f;
 
 		COLOR = texture(TEXTURE0, newuv) * get_color_from_code(FONTCOLOR);

@@ -24,7 +24,7 @@ HANDLER(PKT_KEEP_ALIVE, void)
 HANDLER(PKT_LOGIN_REQUEST, int ent_id, string16 unused, long seed, byte dimension)
 {
 	cl.state = cl_connected;
-	con_printf("connected!\n");
+	con_printf(COLOR_DGREEN "connected!\n");
 	con_hide();
 	cl.game.our_id = ent_id;
 	B_free(unused);
@@ -36,7 +36,7 @@ HANDLER(PKT_HANDSHAKE, string16 conn_hash)
 	// if conn_hash[0] == '+', auth to mojang or something
 	// nah
 	NET_WRITE(PKT_LOGIN_REQUEST, PROTOCOL_VERSION, c16("player"), 0, 0);
-	con_printf("awaiting login approval...\n");
+	con_printf(COLOR_GRAY "awaiting login approval...\n");
 	B_free(conn_hash);
 }
 

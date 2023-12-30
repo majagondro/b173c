@@ -13,7 +13,7 @@ void net_write_packets(void)
 
 	if(cl.state == cl_connecting && !sent_handshake) {
 		// send handshake once
-		con_printf("awaiting handshake...\n");
+		con_printf(COLOR_DGRAY "awaiting handshake...\n");
 		net_write_0x02(c16("player"));
 		sent_handshake = true;
 	}

@@ -5,8 +5,22 @@
 
 #define REDCHAR(c) (c + 127)
 
-#define CVAR_NONE     (0)
-#define CVAR_USERINFO (1 << 0)
+#define COLOR_BLACK "\xa7" "0"
+#define COLOR_DBLUE "\xa7" "1"
+#define COLOR_DGREEN "\xa7" "2"
+#define COLOR_DCYAN "\xa7" "3"
+#define COLOR_DRED "\xa7" "4"
+#define COLOR_DPINK "\xa7" "6"
+#define COLOR_DYELLOW "\xa7" "7"
+#define COLOR_GRAY "\xa7" "7"
+#define COLOR_DGRAY "\xa7" "8"
+#define COLOR_BLUE "\xa7" "9"
+#define COLOR_GREEN "\xa7" "a"
+#define COLOR_CYAN "\xa7" "b"
+#define COLOR_RED "\xa7" "c"
+#define COLOR_PINK "\xa7" "d"
+#define COLOR_YELLOW "\xa7" "e"
+#define COLOR_WHITE "\xa7" "f"
 
 typedef struct cvar {
 	char *name;

@@ -110,7 +110,7 @@ const char *shader_vertex2d = GLSL_VERSION stringify(
 	}
 );
 
-#define COLORCODE(cod, color) "if(code == " #cod ") return vec4(" #color ", 1);"
+#define COLORCODE(cod, color) "if(code == " #cod ") return vec4(mul,mul,mul,1) * vec4(" #color ", 1);"
 const char *shader_fragment2d = GLSL_VERSION stringify(
 
 	in vec2 UV;
@@ -123,6 +123,11 @@ const char *shader_fragment2d = GLSL_VERSION stringify(
 
 	vec4 get_color_from_code(int code)
 	{
+		float mul = 1.0f;
+		if(code < 0) {
+			code = -code;
+			mul = 0.25f;
+		}
 		float a = 170.0f / 256.0f;
 		float b = 85.0f / 256.0f;
 	)
@@ -143,7 +148,7 @@ const char *shader_fragment2d = GLSL_VERSION stringify(
 		COLORCODE(0xe, vec3(1,1,b))
 		COLORCODE(0xf, vec3(1))
 	stringify(
-		return vec4(1);
+		return vec4(mul,mul,mul,1);
 	}
 
 	void main()

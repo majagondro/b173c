@@ -255,19 +255,22 @@ void ui_drawtext(const char *text, int x, int y, bool red)
 
 	while(*text) {
 		if(read_color_code) {
-			if(isdigit(*text)) {
+			if(isdigit(*text)) // 0-9
 				color = *text - '0';
-			} else {
+			else // a-f (hopefully)
 				color = *text - 'a' + 0xa;
-			}
+			if(color < 0x0 || color > 0xf)
+				color = 0xf;
 			read_color_code = false;
-			*text++;
+			text++;
 			continue;
-		} else if(*text == (char)0xa7) {
+		} else if(*text == '\xA7') {
 			read_color_code = true;
-			*text++;
+			text++;
 			continue;
 		}
+		if(!ui_drawchar(*text, x+1, y+1, red, -color))
+			break;
 		if(!ui_drawchar(*text, x, y, red, color))
 			break;
 		x += ui_charwidth(*text++);

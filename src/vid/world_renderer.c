@@ -335,9 +335,55 @@ static void build_buffers(void)
 	}
 }
 
+float dist_to_player(struct chunk *c)
+{
+	float xd = cl.game.pos[0] - ((c->x << 4) + 8);
+	float zd = cl.game.pos[2] - ((c->z << 4) + 8);
+	return xd * xd + zd * zd;
+}
+
+struct chunk* swap(struct chunk* ptr1, struct chunk* ptr2)
+{
+	struct chunk* tmp = ptr2->next;
+	ptr2->next = ptr1;
+	ptr1->next = tmp;
+	return ptr2;
+}
+
 static void sort_chunks(void)
 {
+	struct chunk** h;
+	struct chunk *c;
+	int i, j, swapped;
+	int count = 0;
 
+	for(c = chunks; c != NULL; c = c->next)
+		count++;
+
+	for (i = 0; i <= count; i++) {
+
+		h = &chunks;
+		swapped = 0;
+
+		for (j = 0; j < count - i - 1; j++) {
+
+			struct chunk* p1 = *h;
+			struct chunk* p2 = p1->next;
+
+			if (dist_to_player(p1) < dist_to_player(p2)) {
+
+				/* update the link after swapping */
+				*h = swap(p1, p2);
+				swapped = 1;
+			}
+
+			h = &(*h)->next;
+		}
+
+		/* break if the loop ended without any swap */
+		if (swapped == 0)
+			break;
+	}
 }
 
 int wr_total_faces;
@@ -367,6 +413,7 @@ void world_render(void)
 
 	/* render opaque objects */
 
+	sort_chunks();
 	for(c = chunks; c != NULL; c = c->next) {
 		if(!c->visible)
 			continue;
@@ -395,26 +442,6 @@ void world_render(void)
 			}
 		}
 	}
-
-	/* render transparent objects */
-	/*glUniform1i(loc_mode, 1);
-	for(c = chunks; c != NULL; c = c->next) {
-		if(!c->visible)
-			continue;
-
-		for(int rb = 0; rb < 8; rb ++) {
-			struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
-			if(!r_buf || !r_buf->visible || r_buf->num_vis_faces <= 0 || !r_buf->has_transparent)
-				continue;
-
-			glBindBuffer(GL_ARRAY_BUFFER, vbo);
-			glBufferData(GL_ARRAY_BUFFER,  r_buf->num_vis_faces * sizeof(struct face), r_buf->faces, GL_DYNAMIC_DRAW);
-			glDrawArrays(GL_POINTS, 0, r_buf->num_vis_faces);
-
-			wr_total_faces += r_buf->num_vis_faces;
-			wr_draw_calls++;
-		}
-	}*/
 
 	/* done */
 	glBindVertexArray(0);

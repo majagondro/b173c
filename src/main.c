@@ -8,12 +8,11 @@
 #include "client/client.h"
 
 struct client_state cl = {0};
-
 void *_B_malloc(size_t sz, const char *file, int line)
 {
 	void *ptr;
 
-	ptr = malloc(sz);
+	ptr = calloc(sz, 1);
 
 	if(!ptr) {
 		con_printf("%s:%d (%lu): it appears that you've run out of memory. i will help"

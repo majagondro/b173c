@@ -7,17 +7,20 @@
 #define stringify(...) #__VA_ARGS__
 
 const char *shader_vertex = GLSL_VERSION stringify(
-	layout(location = 0) in vec4 VERTEX_IN;
+	layout(location=0) in vec4 VERTEX_IN;
+	/*layout(location=1) in uint sides;*/
+	/*layout(location=2) in uint block_id;*/
 
 	void main()
 	{
 		gl_Position = VERTEX_IN;
+		/*DATA = int(VERTEX_IN.w);*/
 	}
 );
 
 const char *shader_geometry = GLSL_VERSION stringify(
 	layout(points) in;
-	layout(triangle_strip, max_vertices = 4) out;
+	layout(triangle_strip, max_vertices = 24) out;
 
 	uniform mat4 VIEW;
 	uniform mat4 PROJECTION;
@@ -38,8 +41,9 @@ const char *shader_geometry = GLSL_VERSION stringify(
 
 	void main()
 	{
-		int side = modulo(int(gl_in[0].gl_Position.w), 10);
-		blockId = float(int(gl_in[0].gl_Position.w) / 10);
+		int data = int(gl_in[0].gl_Position.w);
+		int sides = data & 63;
+		blockId = data >> 6;
 		shade = 250.0f;
 
 		/* reference image for the comments */
@@ -55,51 +59,60 @@ const char *shader_geometry = GLSL_VERSION stringify(
 		/*                | -y              */
 		/*                V                 */
 
-		if(side == 0) {
+		if((sides & 32) != 0) {
 			/* z- */
 			shade = 150.0f;
 			vert(-0.5f, -0.5f, -0.5f); /* bot left */
 			vert(-0.5f, +0.5f, -0.5f); /* top left */
 			vert(+0.5f, -0.5f, -0.5f); /* bot right */
 			vert(+0.5f, +0.5f, -0.5f); /* top right */
-		} else if(side == 1) {
+			EndPrimitive();
+		}
+		if((sides & 16) != 0) {
 			/* z+ */
 			shade = 150.0f;
 			vert(-0.5f, -0.5f, +0.5f); /* bot left */
 			vert(+0.5f, -0.5f, +0.5f); /* bot right */
 			vert(-0.5f, +0.5f, +0.5f); /* top left */
 			vert(+0.5f, +0.5f, +0.5f); /* top right */
-		} else if(side == 2) {
+			EndPrimitive();
+		}
+		if((sides & 8) != 0) {
 			/* x- */
 			shade = 200.0f;
 			vert(-0.5f, -0.5f, -0.5f); /* bot right */
 			vert(-0.5f, -0.5f, +0.5f); /* bot left */
 			vert(-0.5f, +0.5f, -0.5f); /* top right */
 			vert(-0.5f, +0.5f, +0.5f); /* top left */
-		} else if(side == 3) {
+			EndPrimitive();
+		}
+		if((sides & 4) != 0) {
 			/* x+ */
 			shade = 200.0f;
 			vert(+0.5f, -0.5f, -0.5f); /* bot right */
 			vert(+0.5f, +0.5f, -0.5f); /* top right */
 			vert(+0.5f, -0.5f, +0.5f); /* bot left */
 			vert(+0.5f, +0.5f, +0.5f); /* top left */
-		} else if(side == 4) {
+			EndPrimitive();
+		}
+		if((sides & 2) != 0) {
 			/* y- */
 			shade = 250.0f;
 			vert(-0.5f, -0.5f, -0.5f); /* top */
 			vert(+0.5f, -0.5f, -0.5f); /* right */
 			vert(-0.5f, -0.5f, +0.5f); /* left */
 			vert(+0.5f, -0.5f, +0.5f); /* bottom */
-		} else if(side == 5) {
+			EndPrimitive();
+		}
+		if((sides & 1) != 0) {
 			/* y+ */
 			shade = 250.0f;
 			vert(-0.5f, +0.5f, +0.5f); /* left */
 			vert(+0.5f, +0.5f, +0.5f); /* bottom */
 			vert(-0.5f, +0.5f, -0.5f); /* top */
 			vert(+0.5f, +0.5f, -0.5f); /* right */
+			EndPrimitive();
 		}
-
-		EndPrimitive();
 	}
 );
 

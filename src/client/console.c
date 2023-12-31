@@ -329,14 +329,14 @@ static void draw_input_line(int y)
 
 void ui_draw_console(void)
 {
-	int y = ui_h / 2 - 8;
+	int y = ui_h / 2 - LINE_HEIGHT_PX;
 	struct conline *l = conlines;
 	int scroll = con_scroll;
 
 	if(!con_opened)
 		return;
 
-	draw_input_line(y + 8);
+	draw_input_line(y + LINE_HEIGHT_PX);
 
 	while(scroll-- >= 0 && l != NULL)
 		l = l->next;
@@ -347,10 +347,10 @@ void ui_draw_console(void)
 		if(l == NULL)
 			return; // only draw indicator, no lines above this
 		l = l->next;
-		y -= 8;
+		y -= LINE_HEIGHT_PX;
 	}
 
-	for(; y >= 0; y -= 8) {
+	for(; y >= 0; y -= LINE_HEIGHT_PX) {
 		if(l != NULL) {
 			ui_printf(0, y, "%s", l->line);
 			l = l->next;

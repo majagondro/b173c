@@ -13,7 +13,7 @@ static mat4 view_mat = {0};
 static mat4 proj_mat = {0};
 static u_int vao;
 static u_int vbo;
-static u_int loc_model, loc_proj, loc_view;
+static u_int loc_mode, loc_proj, loc_view;
 
 struct {
 	struct plane {
@@ -27,14 +27,9 @@ struct world_renderer {
 	bool updated;
 };
 
-void recalculate_projection_matrix(void);
+static void recalculate_projection_matrix(void);
 cvar fov = {"fov", "90.0f", recalculate_projection_matrix};
 extern cvar vid_width, vid_height;
-
-void recalculate_projection_matrix(void)
-{
-	mat_projection(proj_mat, fov.value, vid_width.value / vid_height.value, Z_NEAR, Z_FAR);
-}
 
 extern struct gl_state gl;
 
@@ -49,9 +44,7 @@ void world_renderer_init(void)
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(vec4), (void *) 0);
-	//glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2), (void *) sizeof(vec3));
 	glEnableVertexAttribArray(0);
-	//glEnableVertexAttribArray(1);
 
 	glBindVertexArray(0);
 
@@ -59,6 +52,7 @@ void world_renderer_init(void)
 
 	loc_view = glGetUniformLocation(gl.shader3d, "VIEW");
 	loc_proj = glGetUniformLocation(gl.shader3d, "PROJECTION");
+	loc_mode = glGetUniformLocation(gl.shader3d, "mode");
 }
 
 extern struct chunk *chunks;
@@ -139,7 +133,12 @@ static void update_view_matrix(void)
 	cl.game.pos[0] += 0.5;
 	cl.game.pos[1] -= 0.62f;
 	cl.game.pos[2] += 0.5;
+}
 
+static void recalculate_projection_matrix(void)
+{
+	mat_projection(proj_mat, fov.value, vid_width.value / vid_height.value, Z_NEAR, Z_FAR);
+	update_view_matrix();
 }
 
 #define make_idx(x,y,z) ((((x) & 15) << 11) | (((z) & 15) << 7) | ((y) & 127))
@@ -326,14 +325,15 @@ void world_render(void)
 
 	build_buffers();
 
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glLineWidth(3.0f);
 	glEnable(GL_CULL_FACE);
+
 	glUniformMatrix4fv(loc_view, 1, GL_FALSE, (const GLfloat *) view_mat);
 	glUniformMatrix4fv(loc_proj, 1, GL_FALSE, (const GLfloat *) proj_mat);
 
 	glBindVertexArray(vao);
 
+	/* render opaque objects */
+	glUniform1i(loc_mode, 0);
 	for(c = chunks; c != NULL; c = c->next) {
 		if(!c->visible)
 			continue;
@@ -352,8 +352,29 @@ void world_render(void)
 		}
 	}
 
+	/* render transparent objects */
+	glUniform1i(loc_mode, 1);
+	for(c = chunks; c != NULL; c = c->next) {
+		if(!c->visible)
+			continue;
 
+		for(int rb = 0; rb < 8; rb ++) {
+			struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
+			if(!r_buf || !r_buf->visible || r_buf->num_vis_faces <= 0)
+				continue;
+
+			glBindBuffer(GL_ARRAY_BUFFER, vbo);
+			glBufferData(GL_ARRAY_BUFFER,  r_buf->num_vis_faces * sizeof(struct face), r_buf->faces, GL_DYNAMIC_DRAW);
+			glDrawArrays(GL_POINTS, 0, r_buf->num_vis_faces);
+
+			wr_total_faces += r_buf->num_vis_faces;
+			wr_draw_calls++;
+		}
+	}
+
+	/* done */
 	glBindVertexArray(0);
+	glDisable(GL_CULL_FACE);
 }
 
 void world_renderer_shutdown(void)

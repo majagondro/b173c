@@ -8,22 +8,16 @@
 
 const char *shader_vertex = GLSL_VERSION stringify(
 	layout(location = 0) in vec4 VERTEX_IN;
-	//layout(location = 1) in vec2 DATA_IN;
-
-	out vec2 DATA;
 
 	void main()
 	{
 		gl_Position = VERTEX_IN;
-		DATA = vec2(0,0);
 	}
 );
 
 const char *shader_geometry = GLSL_VERSION stringify(
 	layout(points) in;
 	layout(triangle_strip, max_vertices = 4) out;
-
-	in vec2[] DATA;
 
 	uniform mat4 VIEW;
 	uniform mat4 PROJECTION;
@@ -47,9 +41,6 @@ const char *shader_geometry = GLSL_VERSION stringify(
 		int side = modulo(int(gl_in[0].gl_Position.w), 10);
 		blockId = float(int(gl_in[0].gl_Position.w) / 10);
 		shade = 250.0f;
-		/*vert(-0.5f, -0.5f, -0.5f);
-		EndPrimitive();
-		return;*/
 
 		/* reference image for the comments */
 		/* persp: looking down on a cube    */
@@ -113,6 +104,8 @@ const char *shader_geometry = GLSL_VERSION stringify(
 );
 
 const char *shader_fragment = GLSL_VERSION stringify(
+	uniform int mode;
+
 	out vec4 COLOR;
 	in flat float blockId;
 	in flat float shade;
@@ -127,8 +120,8 @@ const char *shader_fragment = GLSL_VERSION stringify(
 		} else if(blockId == 2 || blockId == 18) {
 			COLOR.rgb = vec3(0.2f, 0.5f, 0.2f);
 		} else if(blockId == 9) {
-			COLOR.rgb = vec3(0.15f, 0.15f, 0.8f);
-			COLOR.a = 0.5f;
+			COLOR.rgb = vec3(0.15f, 0.15f, 0.65f);
+			COLOR.a = 0.90f;
 		} else if(blockId == 12) {
 			COLOR.rgb = vec3(0.9f, 0.9f, 0.6f);
 		} else if(blockId == 81) {
@@ -137,6 +130,11 @@ const char *shader_fragment = GLSL_VERSION stringify(
 			COLOR.rgb = vec3(blockId / 256.0f);
 		}
 		COLOR.rgb *= shade / 256.0f;
+		if(mode == 0 && COLOR.a < 1) {
+			discard;
+		} else if(mode == 1 && COLOR.a == 1) {
+			discard;
+		}
 		//COLOR = vec4(1);
 	}
 

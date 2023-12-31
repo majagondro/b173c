@@ -3,8 +3,6 @@
 
 #include "common.h"
 
-#define REDCHAR(c) (c + 127)
-
 #define COLOR_BLACK "\xa7" "0"
 #define COLOR_DBLUE "\xa7" "1"
 #define COLOR_DGREEN "\xa7" "2"

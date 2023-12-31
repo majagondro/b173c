@@ -11,9 +11,9 @@ void ui_shutdown(void);
 void ui_draw(void);   // called before r_display_frame
 void ui_commit(void); // called in r_display_frame
 
-bool ui_drawchar(u_byte c, int x, int y, bool red, int color);
-void ui_drawtext(const char *text, int x, int y, bool red);
-void ui_printf(int x, int y, bool red, const char *fmt, ...);
+bool ui_drawchar(u_byte c, int x, int y, int color);
+void ui_drawtext(const char *text, int x, int y);
+void ui_printf(int x, int y, const char *fmt, ...);
 int ui_charwidth(u_byte c);
 int ui_strwidth(const char *text);
 

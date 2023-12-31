@@ -52,14 +52,14 @@ void con_init(void)
 	cmd_register("toggleconsole", toggleconsole_f);
 }
 
-static void con_putinc(u_byte c, bool red)
+static void con_putinc(u_byte c)
 {
 	if(input_pos < MAX_INPUT_LEN) {
 		if(strnlen(input_line, MAX_INPUT_LEN) == MAX_INPUT_LEN) {
 			// dont
 		} else {
 			memmove(&input_line[input_pos + 1], &input_line[input_pos], MAX_INPUT_LEN - input_pos - 1);
-			input_line[input_pos++] = red ? REDCHAR(c) : c;
+			input_line[input_pos++] = c;
 		}
 	}
 }
@@ -135,7 +135,6 @@ bool con_handle_key(int key, int keymod)
 {
 	char c;
 	int caps_strength;
-	bool red = keymod & KEYMOD_ALT;
 
 	if(!con_opened)
 		return false;
@@ -147,13 +146,13 @@ bool con_handle_key(int key, int keymod)
 			char *clipboard = SDL_GetClipboardText();
 			int i;
 			for(i = 0; i < (int) strlen(clipboard); i++)
-				con_putinc(clipboard[i], false);
+				con_putinc(clipboard[i]);
 			SDL_free(clipboard);
 			return true;
 		}
 
 		c = (char) ((key - KEY_A) + 'a' - (caps_strength * ('a' - 'A')));
-		con_putinc((u_byte) c, red);
+		con_putinc((u_byte) c);
 		return true;
 	}
 
@@ -164,7 +163,7 @@ bool con_handle_key(int key, int keymod)
 
 		case KEY_BACKSPACE: {
 			if(keymod & KEYMOD_CTRL) {
-				con_putinc(127, red);
+				con_putinc(127);
 			} else {
 				if (input_pos > 0) {
 					if(input_pos == MAX_INPUT_LEN) {
@@ -236,8 +235,8 @@ bool con_handle_key(int key, int keymod)
 
 		// get ready.....
 
-#define checkkey(k, c) case (k): { con_putinc(c, red); } break
-#define checkkey2(k, c_norm, c_shift) case (k): { con_putinc((char)((keymod & KEYMOD_SHIFT) ? (c_shift) : (c_norm)), red); } break
+#define checkkey(k, c) case (k): { con_putinc(c); } break
+#define checkkey2(k, c_norm, c_shift) case (k): { con_putinc((char)((keymod & KEYMOD_SHIFT) ? (c_shift) : (c_norm))); } break
 
 		checkkey(KEY_SPACE, ' ');
 		checkkey2(KEY_1, '1', '!');
@@ -311,9 +310,9 @@ void con_printf(char *fmt, ...)
 static void draw_input_line(int y)
 {
 	if(flash)
-		ui_printf(0, y, false, "]%.*s%c%s", input_pos, input_line, flash_char, input_line + input_pos);
+		ui_printf(0, y, "]%.*s%c%s", input_pos, input_line, flash_char, input_line + input_pos);
 	else
-		ui_printf(0, y, false, "]%s", input_line);
+		ui_printf(0, y, "]%s", input_line);
 
 	if(SDL_GetTicks64() - flash_tick > 400) {
 		flash = !flash;
@@ -336,7 +335,7 @@ void ui_draw_console(void)
 		l = l->next;
 
 	if(con_scroll > 0) {
-		ui_printf(0, y, false, "%s", "...");
+		ui_printf(0, y, "%s", "...");
 		l = l->next;
 		y -= 8;
 	}
@@ -344,12 +343,12 @@ void ui_draw_console(void)
 	for(; y >= 0; y -= 8) {
 		if(l != NULL) {
 			if(l->line[0] != '\0')
-				ui_printf(0, y, false, "%s", l->line);
+				ui_printf(0, y, "%s", l->line);
 			else
 				y += 8;
 			l = l->next;
 		} else {
-			ui_printf(0, y, false, "%c", ' ');
+			ui_printf(0, y, "%c", ' ');
 		}
 	}
 

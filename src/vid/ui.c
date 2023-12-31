@@ -173,16 +173,16 @@ static char *statestr(void)
 void ui_commit(void)
 {
 	if(developer.integer) {
-		ui_printf(8, ui_h - 40, false, "net: %s", statestr());
+		ui_printf(8, ui_h - 40, "net: %s", statestr());
 
-		ui_printf(8, ui_h - 32, false, "%f %f %f / %f %f %f",
+		ui_printf(8, ui_h - 32, "%f %f %f / %f %f %f",
 				  cl.game.pos[0], cl.game.pos[1], cl.game.pos[2],
 				  cl.game.rot[0], cl.game.rot[1], cl.game.rot[2]);
 
-		ui_printf(8, ui_h - 16, false, "%lu/%.0f fps", cl.fps, 1 / cl.frametime);
+		ui_printf(8, ui_h - 16, "%lu/%.0f fps", cl.fps, 1 / cl.frametime);
 
-		ui_printf(40, ui_h - 24, false, "/%d chars used", MAX_CON_CHARS);
-		ui_printf(8, ui_h - 24, false, "%4d", fontcharcount + 4);
+		ui_printf(40, ui_h - 24, "/%d chars used", MAX_CON_CHARS);
+		ui_printf(8, ui_h - 24, "%4d", fontcharcount + 4);
 	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, fontdatavbo);
@@ -209,15 +209,13 @@ int ui_strwidth(const char *text)
 	return w;
 }
 
-bool ui_drawchar(u_byte c, int x, int y, bool red, int color)
+bool ui_drawchar(u_byte c, int x, int y, int color)
 {
 	int b = c;
-	if(red)
-		b = c + 128;
 
 	if(color >= 0) {
 		// shadow
-		ui_drawchar(c, x+1, y+1, red, -color);
+		ui_drawchar(c, x+1, y+1, -color);
 	}
 
 	if(fontcharcount > MAX_CON_CHARS - 10) {
@@ -240,7 +238,7 @@ bool ui_drawchar(u_byte c, int x, int y, bool red, int color)
 	return true;
 }
 
-void ui_drawtext(const char *text, int x, int y, bool red)
+void ui_drawtext(const char *text, int x, int y)
 {
 	int color = 0xf;
 	bool read_color_code = false;
@@ -269,13 +267,13 @@ void ui_drawtext(const char *text, int x, int y, bool red)
 			text++;
 			continue;
 		}
-		if(!ui_drawchar(*text, x, y, red, color))
+		if(!ui_drawchar(*text, x, y, color))
 			break;
 		x += ui_charwidth(*text++);
 	}
 }
 
-void ui_printf(int x, int y, bool red, const char *fmt, ...)
+void ui_printf(int x, int y, const char *fmt, ...)
 {
 	va_list va;
 	char buf[4096];
@@ -284,5 +282,5 @@ void ui_printf(int x, int y, bool red, const char *fmt, ...)
 	vsnprintf(buf, 4096, fmt, va);
 	va_end(va);
 
-	ui_drawtext(buf, x, y, red);
+	ui_drawtext(buf, x, y);
 }

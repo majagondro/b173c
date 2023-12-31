@@ -23,6 +23,8 @@ struct {
 	u_byte jump : 1;
 } inkeys;
 
+cvar in_sensitivity = {"in_sensitivity", "2.5"};
+
 void forwarddown_f(void) { inkeys.forward = 1; }
 void forwardup_f(void) { inkeys.forward = 0; }
 void backdown_f(void) { inkeys.back = 1; }
@@ -200,6 +202,8 @@ void in_init(void)
 	cmd_register("+jump", jumpdown_f);
 	cmd_register("-jump", jumpup_f);
 
+	cvar_register(&in_sensitivity);
+
 	key_bind(KEY_ESCAPE, "toggleconsole");
 }
 
@@ -215,8 +219,8 @@ static void handle_mouse(int x, int y, int scroll)
 		return;
 	}
 
-	dx = ((float)(x)) * 0.022f * 2.5f;
-	dy = ((float)(y)) * 0.022f * 2.5f;
+	dx = ((float)(x)) * 0.022f * in_sensitivity.value;
+	dy = ((float)(y)) * 0.022f * in_sensitivity.value;
 
 	cl.game.rot[0] += dy;
 	cl.game.rot[1] += dx;

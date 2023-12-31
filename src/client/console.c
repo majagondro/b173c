@@ -5,6 +5,7 @@
 #include "vid/vid.h"
 
 #define CONSOLE_MAX_LINES 512
+#define LINE_HEIGHT_PX 8
 
 struct conline {
 	char line[256];
@@ -16,6 +17,7 @@ struct conline {
 static char input_line[MAX_INPUT_LEN+1] = {0};
 static int input_pos = 0;
 static int history_idx = 0;
+static int line_count = 0;
 
 bool con_opened = true;
 int con_scroll = 0;
@@ -35,8 +37,9 @@ void con_show(void)
 
 void con_hide(void)
 {
-	if(con_opened)
+	if(con_opened) {
 		toggleconsole_f();
+	}
 }
 
 void con_init(void)
@@ -63,15 +66,15 @@ static void con_putinc(u_byte c)
 
 static void free_excess_lines(void)
 {
-	int count = 0;
 	struct conline *l = conlines;
+	line_count = 0;
 
 	while(l->next != NULL) {
 		l = l->next;
-		count++;
+		line_count++;
 	}
 
-	while(count-- > CONSOLE_MAX_LINES) {
+	while(line_count-- > CONSOLE_MAX_LINES) {
 		l = l->prev;
 		B_free(l->next);
 		l->next = NULL;
@@ -125,7 +128,11 @@ static struct conline *get_nth_inputted_line(int n)
 
 static int calc_max_scroll(void)
 {
-	return 0;
+	int visible_lines = (ui_h / 2 - LINE_HEIGHT_PX) / LINE_HEIGHT_PX;
+	int max = line_count - visible_lines;
+	if(max < 0)
+		max = 0;
+	return max;
 }
 
 bool con_handle_key(int key, int keymod)
@@ -335,20 +342,18 @@ void ui_draw_console(void)
 		l = l->next;
 
 	if(con_scroll > 0) {
-		ui_printf(0, y, "%s", "...");
+		// draw scroll indicator
+		ui_printf(0, y, "...%d more line%s...", con_scroll, con_scroll > 1 ? "s" : "");
+		if(l == NULL)
+			return; // only draw indicator, no lines above this
 		l = l->next;
 		y -= 8;
 	}
 
 	for(; y >= 0; y -= 8) {
 		if(l != NULL) {
-			if(l->line[0] != '\0')
-				ui_printf(0, y, "%s", l->line);
-			else
-				y += 8;
+			ui_printf(0, y, "%s", l->line);
 			l = l->next;
-		} else {
-			ui_printf(0, y, "%c", ' ');
 		}
 	}
 }

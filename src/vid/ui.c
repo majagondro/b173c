@@ -3,7 +3,7 @@
 #include <ctype.h>
 #include "ui.h"
 #include "common.h"
-#include "console.h"
+#include "client/console.h"
 #include "vid.h"
 #include "client/client.h"
 
@@ -213,10 +213,8 @@ bool ui_drawchar(u_byte c, int x, int y, int color)
 {
 	int b = c;
 
-	if(color >= 0) {
-		// shadow
+	if(color >= 0) // draw shadow
 		ui_drawchar(c, x+1, y+1, -color);
-	}
 
 	if(fontcharcount > MAX_CON_CHARS - 10) {
 		con_printf("font count is @ %d!!!! not drawing any text anymore\n", fontcharcount);

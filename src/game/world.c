@@ -1,6 +1,6 @@
 #include <zlib.h>
 #include "world.h"
-#include "vid/console.h"
+#include "client/console.h"
 
 struct chunk *chunks;
 long time = 0;

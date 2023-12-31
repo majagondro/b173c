@@ -2,7 +2,7 @@
 #include "net/net.h"
 #include <SDL2/SDL.h>
 #include "vid/vid.h"
-#include "vid/console.h"
+#include "client/console.h"
 #include "input.h"
 #include "vid/ui.h"
 #include "client/client.h"
@@ -48,19 +48,16 @@ void app_shutdown(void)
 int main(void)
 {
 	u_long last_time = 0;
+
 	in_init();
-
 	con_init();
-
 	net_init();
-
 	vid_init();
 	ui_init();
 
 	while(!cl.done) {
 		cl.frametime = calc_frametime();
 
-		// maybe put input into tick_timer if too
 		in_update();
 
 		if(last_time - SDL_GetTicks64() >= 50) {

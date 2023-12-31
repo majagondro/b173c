@@ -1,6 +1,6 @@
 #include "net_internal.h"
 #include "client/client.h"
-#include "vid/console.h"
+#include "client/console.h"
 
 void net_write_packets(void)
 {

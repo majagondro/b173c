@@ -1,5 +1,5 @@
 #include <ctype.h>
-#include "vid/console.h"
+#include "console.h"
 #include "common.h"
 
 cvar *cvarlist = NULL;

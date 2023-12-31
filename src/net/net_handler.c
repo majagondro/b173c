@@ -1,6 +1,6 @@
 #include "net_internal.h"
 #include "game/world.h"
-#include "vid/console.h"
+#include "client/console.h"
 #include "client/client.h"
 
 void skip_metadata(void);

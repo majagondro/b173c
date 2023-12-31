@@ -9,7 +9,7 @@
 #include "net.h"
 #include "net_internal.h"
 #include "client/client.h"
-#include "vid/console.h"
+#include "client/console.h"
 #include <setjmp.h>
 
 static bool init_ok = false;

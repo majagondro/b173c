@@ -1,4 +1,4 @@
-#include "vid/console.h"
+#include "console.h"
 #include "common.h"
 #include "input.h"
 #include "client.h"

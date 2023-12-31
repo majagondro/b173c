@@ -17,10 +17,6 @@ static char input_line[MAX_INPUT_LEN+1] = {0};
 static int input_pos = 0;
 static int history_idx = 0;
 
-static ulong flash_tick = 0;
-static u_byte flash_char = '|';
-static bool flash = false;
-
 bool con_opened = true;
 int con_scroll = 0;
 
@@ -32,8 +28,9 @@ void toggleconsole_f(void)
 
 void con_show(void)
 {
-	if(!con_opened)
+	if(!con_opened) {
 		toggleconsole_f();
+	}
 }
 
 void con_hide(void)
@@ -162,17 +159,12 @@ bool con_handle_key(int key, int keymod)
 		} break;
 
 		case KEY_BACKSPACE: {
-			if(keymod & KEYMOD_CTRL) {
-				con_putinc(127);
-			} else {
-				if (input_pos > 0) {
-					if(input_pos == MAX_INPUT_LEN) {
-						input_line[input_pos - 1] = 0;
-					} else {
-						memmove(&input_line[input_pos - 1], &input_line[input_pos], MAX_INPUT_LEN - input_pos);
-					}
-					input_pos--;
-				}
+			if (input_pos > 0) {
+				if(input_pos == MAX_INPUT_LEN)
+					input_line[input_pos - 1] = 0;
+				else
+					memmove(&input_line[input_pos - 1], &input_line[input_pos], MAX_INPUT_LEN - input_pos);
+				input_pos--;
 			}
 		} break;
 
@@ -186,30 +178,33 @@ bool con_handle_key(int key, int keymod)
 			con_submit();
 		} break;
 
-		case KEY_HOME:
+		case KEY_HOME: {
 			if(keymod & KEYMOD_CTRL) {
 				con_scroll = 0;
 			} else {
 				input_pos = 0;
 			}
-			break;
+		} break;
 
-		case KEY_END:
+		case KEY_END: {
 			if(keymod & KEYMOD_CTRL) {
 				con_scroll = calc_max_scroll();
 			} else {
 				input_pos = MAX_INPUT_LEN;
 			}
-			break;
+		} break;
 
-		case KEY_LEFT:
-			if(input_pos > 0)
+		case KEY_LEFT: {
+			if(input_pos > 0) {
 				input_pos--;
-			break;
-		case KEY_RIGHT:
-			if(input_pos < (int) strnlen(input_line, MAX_INPUT_LEN))
+			}
+		} break;
+
+		case KEY_RIGHT: {
+			if(input_pos < (int) strnlen(input_line, MAX_INPUT_LEN)) {
 				input_pos++;
-			break;
+			}
+		} break;
 
 		case KEY_DOWN:
 			history_idx -= 2;
@@ -232,8 +227,6 @@ bool con_handle_key(int key, int keymod)
 			input_line[input_pos] = 0;
 			history_idx++;
 		} break;
-
-		// get ready.....
 
 #define checkkey(k, c) case (k): { con_putinc(c); } break
 #define checkkey2(k, c_norm, c_shift) case (k): { con_putinc((char)((keymod & KEYMOD_SHIFT) ? (c_shift) : (c_norm))); } break
@@ -261,8 +254,9 @@ bool con_handle_key(int key, int keymod)
 		checkkey2(KEY_PERIOD, '.', '>');
 		checkkey2(KEY_SLASH, '/', '?');
 
-		default:
+		default: {
 			return false;
+		}
 	}
 	return true;
 }
@@ -286,10 +280,11 @@ void con_printf(char *fmt, ...)
 
 	while(*p != 0) {
 		if(conlines->len < 256) {
-			if(*p == '\n') // the font has a symbol for \n, dont display it
+			if(*p == '\n') { // the font has a symbol for \n, dont display it
 				conlines->line[conlines->len++] = ' ';
-			else
+			} else {
 				conlines->line[conlines->len++] = *p;
+			}
 		} else {
 			// TODO: word wrapping
 		}
@@ -301,6 +296,7 @@ void con_printf(char *fmt, ...)
 			p++;
 			continue;
 		}
+
 		p++;
 	}
 
@@ -309,14 +305,18 @@ void con_printf(char *fmt, ...)
 
 static void draw_input_line(int y)
 {
+	static ulong flash_tick = 0;
+	static u_byte flash_char = '|';
+	static bool flash = false;
+
 	if(flash)
 		ui_printf(0, y, "]%.*s%c%s", input_pos, input_line, flash_char, input_line + input_pos);
 	else
 		ui_printf(0, y, "]%s", input_line);
 
 	if(SDL_GetTicks64() - flash_tick > 400) {
-		flash = !flash;
 		flash_tick = SDL_GetTicks64();
+		flash = !flash;
 	}
 }
 
@@ -351,5 +351,4 @@ void ui_draw_console(void)
 			ui_printf(0, y, "%c", ' ');
 		}
 	}
-
 }

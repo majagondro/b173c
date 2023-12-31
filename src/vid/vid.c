@@ -2,7 +2,7 @@
 #include <glad/glad.h>
 #include "vid.h"
 #include "shaders.h"
-#include "console.h"
+#include "client/console.h"
 #include "ui.h"
 #include "client/client.h"
 #include "game/world.h"

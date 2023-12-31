@@ -1,7 +1,7 @@
 #include <SDL2/SDL.h>
 #include "input.h"
 #include "vid/vid.h"
-#include "vid/console.h"
+#include "client/console.h"
 #include "client/client.h"
 
 extern SDL_Window *window_handle;

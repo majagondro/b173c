@@ -21,7 +21,6 @@ struct {
 	u_byte right : 1;
 	u_byte attack : 1;
 	u_byte jump : 1;
-	u_byte impulse;
 } inkeys;
 
 void forwarddown_f(void) { inkeys.forward = 1; }
@@ -36,7 +35,6 @@ void attackdown_f(void) { inkeys.attack = 1; }
 void attackup_f(void) { inkeys.attack = 0; }
 void jumpdown_f(void) { inkeys.jump = 1; }
 void jumpup_f(void) { inkeys.jump = 0; }
-void impulse_f(void) { inkeys.impulse = atoi(cmd_argv(1)); }
 
 struct keyname keynames[] = {
 	{"TAB",        KEY_TAB},
@@ -201,7 +199,6 @@ void in_init(void)
 	cmd_register("-attack", attackup_f);
 	cmd_register("+jump", jumpdown_f);
 	cmd_register("-jump", jumpup_f);
-	cmd_register("impulse", impulse_f);
 
 	key_bind(KEY_ESCAPE, "toggleconsole");
 }

@@ -313,7 +313,7 @@ char *tokenize(char *text)
 void cmd_exec_impl(char *text, bool from_server);
 void cmd_exec(char *text, bool from_server)
 {
-	bool quoted;
+	bool quoted = false;
 	char buf[2048] = {0};
 	int len = 0;
 

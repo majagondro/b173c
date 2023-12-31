@@ -6,7 +6,6 @@
 #include "input.h"
 #include "vid/ui.h"
 #include "client/client.h"
-#include <signal.h>
 
 struct client_state cl = {0};
 

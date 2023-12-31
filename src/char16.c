@@ -1,6 +1,5 @@
 #include "char16.h"
 #include "common.h"
-#include <stdint.h>
 
 char16 *c16(const char *s)
 {

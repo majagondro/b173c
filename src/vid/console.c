@@ -134,7 +134,7 @@ static int calc_max_scroll(void)
 bool con_handle_key(int key, int keymod)
 {
 	char c;
-	int caps_strength = 0;
+	int caps_strength;
 	bool red = keymod & KEYMOD_ALT;
 
 	if(!con_opened)
@@ -216,6 +216,7 @@ bool con_handle_key(int key, int keymod)
 			history_idx -= 2;
 			if(history_idx < -1)
 				history_idx = -1;
+			/* fall through */
 		case KEY_UP: {
 			struct conline *l;
 			l = get_nth_inputted_line(history_idx);

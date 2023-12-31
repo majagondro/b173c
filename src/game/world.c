@@ -1,5 +1,4 @@
 #include <zlib.h>
-#include <assert.h>
 #include "world.h"
 #include "vid/console.h"
 
@@ -66,6 +65,7 @@ int inflate_data(u_byte *in, u_byte *out, size_t size_in, size_t size_out)
 	switch (ret) {
 		case Z_NEED_DICT:
 			ret = Z_DATA_ERROR;
+			/* fall through */
 		case Z_DATA_ERROR:
 		case Z_MEM_ERROR:
 			return ret;
@@ -115,16 +115,14 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 			int index = x << 11 | z << 7 | yStart;
 			int ySize = yEnd - yStart;
 			memcpy(chunk_data->blocks + index, decomp + dataPos, ySize);
-			//System.arraycopy(data, dataPos, this.blocks, index, ySize);
 			dataPos += ySize;
 		}
 	}
 
 	for(x = xStart; x < xEnd; ++x) {
 		for(z = zStart; z < zEnd; ++z) {
-			int index = (x << 11 | z << 7 | yStart) >> 1;
+			//int index = (x << 11 | z << 7 | yStart) >> 1;
 			int ySize = (yEnd - yStart) / 2;
-			// src, srcPos, dst, dstPos, length
 			// System.arraycopy(data, dataPos, this.data.data, index, ySize);
 			dataPos += ySize;
 		}
@@ -132,7 +130,7 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 
 	for(x = xStart; x < xEnd; ++x) {
 		for(z = zStart; z < zEnd; ++z) {
-			int index = (x << 11 | z << 7 | yStart) >> 1;
+			//int index = (x << 11 | z << 7 | yStart) >> 1;
 			int ySize = (yEnd - yStart) / 2;
 			// System.arraycopy(data, dataPos, this.blocklightMap.data, index, ySize);
 			dataPos += ySize;
@@ -141,14 +139,12 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 
 	for(x = xStart; x < xEnd; ++x) {
 		for(z = zStart; z < zEnd; ++z) {
-			int index = (x << 11 | z << 7 | yStart) >> 1;
+			//int index = (x << 11 | z << 7 | yStart) >> 1;
 			int ySize = (yEnd - yStart) / 2;
 			// System.arraycopy(data, dataPos, this.skylightMap.data, index, ySize);
 			dataPos += ySize;
 		}
 	}
-
-	//con_printf("load ok?\n");
 
 }
 

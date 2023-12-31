@@ -4,7 +4,6 @@
 #include "client/client.h"
 #include "glad/glad.h"
 #include "game/world.h"
-#include "console.h"
 
 static mat4 view_mat = {0};
 static mat4 proj_mat = {0};
@@ -54,7 +53,6 @@ void world_render(void)
 
 	/* construct buffer data */
 
-	c = world_get_chunk((int)cl.game.pos[0] >> 4, (int)cl.game.pos[2] >> 4);
 	c = chunks;
 	while(c) {
 		for(i = 0; i < 16 * 16 * 128; i++) {

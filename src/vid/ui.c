@@ -4,7 +4,6 @@
 #include "ui.h"
 #include "common.h"
 #include "console.h"
-#include "mathlib.h"
 #include "vid.h"
 #include "client/client.h"
 
@@ -18,7 +17,7 @@ extern cvar vid_width;
 extern cvar vid_height;
 
 void onchange_ui_scale(void);
-cvar ui_scale = {"ui_scale", "2", 0, onchange_ui_scale};
+cvar ui_scale = {"ui_scale", "2", onchange_ui_scale};
 
 vec2 glyph_vertices_original[] = {
 	// this is 2 because opengl coords is -1 to 1 but i want the origin to be the top left corner
@@ -36,13 +35,10 @@ vec2 glyph_vertices[] = {
 	{2.0f, -2.0f}, {1.0f, 1.0f},
 };
 
-// for text rendering
-#include "../ext/default.c"
-
+#include "ext/default.c"
 int charwidths[256] = {0};
 vec4 fontdata[MAX_CON_CHARS] = {0};
 int fontcharcount = 0;
-int prev_fontcharcount = 0;
 uint fonttex;
 uint fontvao, fontvbo = 0, fontdatavbo;
 
@@ -197,7 +193,6 @@ void ui_commit(void)
 	glBindTexture(GL_TEXTURE_2D, fonttex);
 	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, fontcharcount);
 
-	prev_fontcharcount = fontcharcount;
 	fontcharcount = 0;
 }
 

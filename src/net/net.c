@@ -11,8 +11,6 @@
 #include "client/client.h"
 #include "vid/console.h"
 #include <setjmp.h>
-#include <SDL_timer.h>
-#include <signal.h>
 
 static bool init_ok = false;
 static bool cmds_reg = false;
@@ -862,7 +860,7 @@ void connect_f(void)
 {
 	char *addrstr;
 	int port = 25565;
-	int i, len, part, d, n;
+	int i, len, part, n;
 
 	if(cmd_argc() != 2) {
 		con_printf("usage: %s ip[:port]\n", cmd_argv(0));

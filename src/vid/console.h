@@ -25,7 +25,7 @@
 typedef struct cvar {
 	char *name;
 	char *default_value;
-	int flags;
+
 	void (*onchange)(void);
 
 	char *string;

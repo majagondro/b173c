@@ -15,13 +15,13 @@ struct keyname {
 };
 
 struct {
-	byte forward : 1;
-	byte back : 1;
-	byte left : 1;
-	byte right : 1;
-	byte attack : 1;
-	byte jump : 1;
-	byte impulse;
+	u_byte forward : 1;
+	u_byte back : 1;
+	u_byte left : 1;
+	u_byte right : 1;
+	u_byte attack : 1;
+	u_byte jump : 1;
+	u_byte impulse;
 } inkeys;
 
 void forwarddown_f(void) { inkeys.forward = 1; }

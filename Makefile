@@ -32,8 +32,14 @@ $(OBJ_DIR):
 $(BUILD_DIR):
 	mkdir $(BUILD_DIR)
 
+
+# dont care about warnings from these
+$(OBJ_DIR)/ext/%.o: $(SRC_DIR)/ext/%.c $(HDR_FILES)
+	./mkdirs.sh $@
+	$(CC) -c -Iinclude -o $@ $<
+
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(HDR_FILES)
-	mkdirs.sh $@
+	./mkdirs.sh $@
 	$(CC) -c $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 $(TARGET): $(OBJ_FILES)

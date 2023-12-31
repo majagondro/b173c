@@ -225,9 +225,7 @@ static void handle_mouse(int x, int y, int scroll)
 	cl.game.rot[0] += dy;
 	cl.game.rot[1] += dx;
 
-	if(dx > 0.1f || dy > 0.1f) {
-		cl.game.rotated = true;
-	}
+	cl.game.rotated = true;
 }
 
 static void handle_keys(void)
@@ -281,11 +279,13 @@ static void handle_keys(void)
 			cl.game.pos[1] -= dir[1] * cl.frametime * spd;
 			cl.game.stance -= dir[1] * cl.frametime * spd;
 			cl.game.pos[2] -= dir[2] * cl.frametime * spd;
+			cl.game.moved = true;
 		} else if(inkeys.back) {
 			cl.game.pos[0] += dir[0] * cl.frametime * spd;
 			cl.game.pos[1] += dir[1] * cl.frametime * spd;
 			cl.game.stance += dir[1] * cl.frametime * spd;
 			cl.game.pos[2] += dir[2] * cl.frametime * spd;
+			cl.game.moved = true;
 		}
 
 		//cl.game.pos[1] -= 9.81f * cl.frametime;

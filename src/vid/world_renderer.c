@@ -79,15 +79,17 @@ void world_render(void)
 	done:
 
 
+	/* update the view matrix */
+	if(cl.game.rotated || cl.game.moved) {
+		cl.game.pos[1] += .6f;
+		cl.game.pos[0] -= 0.5;
+		cl.game.pos[2] -= 0.5;
+		mat_view(view_mat, cl.game.pos, cl.game.rot);
+		cl.game.pos[0] += 0.5;
+		cl.game.pos[2] += 0.5;
+		cl.game.pos[1] -= .6f;
+	}
 
-	/* update view matrix */
-	cl.game.pos[1] += .6f;
-	cl.game.pos[0] -= 0.5;
-	cl.game.pos[2] -= 0.5;
-	mat_view(view_mat, cl.game.pos, cl.game.rot);
-	cl.game.pos[0] += 0.5;
-	cl.game.pos[2] += 0.5;
-	cl.game.pos[1] -= .6f;
 	mat_identity(model_mat);
 
 	glUniformMatrix4fv(loc_view, 1, GL_FALSE, (const GLfloat *) view_mat);

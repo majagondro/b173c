@@ -21,8 +21,15 @@ void net_write_packets(void)
 	if(cl.state != cl_connected)
 		return;
 
-	net_write_0x0D(cl.game.pos[0], cl.game.pos[1], cl.game.pos[1] + 0.2f, cl.game.pos[2], cl.game.rot[1]+180.0f, cl.game.rot[0], false);
-	//net_write_0x0C(cl.game.rot[1], cl.game.rot[0], false);
+	if(cl.game.moved && cl.game.rotated) {
+		net_write_0x0D(cl.game.pos[0], cl.game.pos[1], cl.game.pos[1] + 0.2f, cl.game.pos[2], cl.game.rot[1]+180.0f, cl.game.rot[0], false);
+	} else if(cl.game.moved) {
+		net_write_0x0B(cl.game.pos[0], cl.game.pos[1], cl.game.pos[1] + 0.2f, cl.game.pos[2], false);
+	} else if(cl.game.rotated) {
+		net_write_0x0C(cl.game.rot[1], cl.game.rot[0], false);
+	} else {
+		net_write_0x0A(false);
+	}
 }
 
 // macro trickery so the packet IDS get properly expanded

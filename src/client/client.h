@@ -9,7 +9,7 @@ extern struct client_state {
 		vec3 rot;
 		vec3 pos;
 		float stance;
-		bool rotated;
+		bool rotated, moved;
 		int our_id;
 	} game;
 

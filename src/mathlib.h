@@ -13,6 +13,7 @@
 #define vec3_invert(dest, a) dest[0] = -a[0], dest[1] = -a[1], dest[2] = -a[2]
 #define vec3_mul_scalar(dest, a, b) dest[0] = a[0] * b, dest[1] = a[1] * b, dest[2] = a[2] * b
 #define vec3_dot(a, b) (a[0]*b[0]+a[1]*b[1]+a[2]*b[2])
+#define vec3_len(a) sqrtf(a[0]*a[0]+a[1]*a[1]+a[2]*a[2])
 
 typedef float vec4[4];
 typedef float vec3[3];

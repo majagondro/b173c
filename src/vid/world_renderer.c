@@ -66,7 +66,9 @@ static struct plane make_plane(vec3 point, vec3 normal)
 {
 	struct plane p;
 	vec3_copy(p.normal, normal);
-	p.dist = vec3_dot(p.normal, point);
+	p.dist = vec3_dot(normal, point);
+	//p.dist = vec3_len(point);
+	//con_printf("dist = %f\n", p.dist);
 	return p;
 }
 
@@ -89,6 +91,7 @@ static void update_view_matrix(void)
 	vec3 fwdFar;
 	vec3 normal;
 	vec3 tmp;
+	vec3 org = {0,0,0};
 
 	cam_angles(forward, right, up, cl.game.rot[1], cl.game.rot[0]);
 	vec3_mul_scalar(fwdFar, forward, Z_FAR);
@@ -104,29 +107,29 @@ static void update_view_matrix(void)
 	frustum.near = make_plane(tmp, forward);
 
 	// broken
-	vec3_add(tmp, cl.game.pos, fwdFar);
+	vec3_add(tmp, org, fwdFar);
 	vec3_invert(normal, forward);
 	frustum.far = make_plane(tmp, normal);
 
 	vec3_mul_scalar(tmp, right, half_w);
 	vec3_sub(tmp, fwdFar, tmp);
 	vec3_cross(normal, tmp, up);
-	frustum.right = make_plane(cl.game.pos, normal);
+	frustum.right = make_plane(org, normal);
 
 	vec3_mul_scalar(tmp, right, half_w);
 	vec3_add(tmp, fwdFar, tmp);
 	vec3_cross(normal, up, tmp);
-	frustum.left = make_plane(cl.game.pos, normal);
+	frustum.left = make_plane(org, normal);
 
 	vec3_mul_scalar(tmp, up, half_h);
 	vec3_sub(tmp, fwdFar, tmp);
 	vec3_cross(normal, right, tmp);
-	frustum.top = make_plane(cl.game.pos, normal);
+	frustum.top = make_plane(org, normal);
 
 	vec3_mul_scalar(tmp, up, half_h);
 	vec3_add(tmp, fwdFar, tmp);
 	vec3_cross(normal, tmp, right);
-	frustum.bottom = make_plane(cl.game.pos, normal);
+	frustum.bottom = make_plane(org, normal);
 
 	// update view matrix
 	mat_view(view_mat, cl.game.pos, cl.game.rot);
@@ -137,7 +140,7 @@ static void update_view_matrix(void)
 
 static void recalculate_projection_matrix(void)
 {
-	mat_projection(proj_mat, fov.value, vid_width.value / vid_height.value, Z_NEAR, Z_FAR);
+	mat_projection(proj_mat, fov.value, (vid_width.value / vid_height.value), Z_NEAR, Z_FAR);
 	update_view_matrix();
 }
 
@@ -205,12 +208,18 @@ static void build_buffers(void)
 			continue;
 
 		for(int rb = 0; rb < 8; rb ++) {
+			vec3 center;
+
 			if(c->data->render_bufs[rb] == NULL) {
 				c->data->render_bufs[rb] = B_malloc(sizeof(struct render_buf));
 				*c->data->render_bufs[rb] = 1; // new buf, mark dirty
 			}
 
-			if(!is_visible_on_frustum((vec3) {c->x << 4, rb << 4, c->z << 4}, 0.0f)) {
+			center[0] = (c->x << 4) - cl.game.pos[0] + 8;
+			center[1] = (  rb << 4) - cl.game.pos[1] + 8;
+			center[2] = (c->z << 4) - cl.game.pos[2] + 8;
+
+			if(!is_visible_on_frustum(center, 14.0f)) {
 				((struct render_buf *)c->data->render_bufs[rb])->visible = false;
 				continue;
 			} else {
@@ -246,7 +255,6 @@ static void build_buffers(void)
 
 				/* build buffer */
 				face = 0;
-				con_printf("rebuilding a buffer\n");
 				r_buf->faces = B_malloc(sizeof(struct face) * r_buf->num_vis_faces);
 				for(int x = 0; x < 16; x++) {
 					for(int z = 0; z < 16; z++) {
@@ -321,7 +329,7 @@ void world_render(void)
 		return;
 
 	if(cl.game.rotated || cl.game.moved)
-		update_view_matrix();
+		recalculate_projection_matrix();
 
 	build_buffers();
 

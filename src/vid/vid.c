@@ -168,7 +168,7 @@ void ui_update_size(int, int);
 void vid_update_viewport(void)
 {
 	SDL_GetWindowSize(window_handle, &gl.w, &gl.h);
-	glViewport(0, 0, gl.w, gl.h);
+	glViewport(0, 0, gl.w * (16/9), gl.h);
 	cvar_set("vid_width", va("%d", gl.w));
 	cvar_set("vid_height", va("%d", gl.h));
 	cvar_find("ui_scale")->onchange(); // hack as fack

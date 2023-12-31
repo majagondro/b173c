@@ -79,8 +79,8 @@ static struct plane make_plane(vec3 point, vec3 normal)
 static bool is_visible_on_frustum(const vec3 point, float radius)
 {
 	return
-		get_dist_to_plane(&frustum.near, point) > -radius &&
-		get_dist_to_plane(&frustum.far, point) > -radius &&
+		//get_dist_to_plane(&frustum.near, point) > -radius &&
+		//get_dist_to_plane(&frustum.far, point) > -radius &&
 		get_dist_to_plane(&frustum.right, point) > -radius &&
 		get_dist_to_plane(&frustum.left, point) > -radius &&
 		get_dist_to_plane(&frustum.top, point) > -radius &&
@@ -104,9 +104,12 @@ static void update_view_matrix(void)
 	cl.game.pos[2] -= 0.5;
 
 	// update frustum
+
+	// broken
 	vec3_mul_scalar(tmp, forward, Z_NEAR);
 	frustum.near = make_plane(tmp, forward);
 
+	// broken
 	vec3_add(tmp, cl.game.pos, fwdFar);
 	vec3_invert(normal, forward);
 	frustum.far = make_plane(tmp, normal);
@@ -139,159 +142,216 @@ static void update_view_matrix(void)
 
 }
 
-static bool has_visible_face(int x, int y, int z, byte *blocks)
-{
 #define make_idx(x,y,z) ((((x) & 15) << 11) | (((z) & 15) << 7) | ((y) & 127))
-	int idx = make_idx(x,y,z);
-	int idx2;
-	if(blocks[idx] <= 0)
-		return false;
 
-	idx2 = make_idx(x,y+1,z);
-	if(blocks[idx2] == 0)
-		return true;
-
-	idx2 = make_idx(x,y-1,z);
-	if(blocks[idx2] == 0)
-		return true;
-
-	idx2 = make_idx(x+1,y,z);
-	if(blocks[idx2] == 0)
-		return true;
-
-	idx2 = make_idx(x-1,y,z);
-	if(blocks[idx2] == 0)
-		return true;
-
-	idx2 = make_idx(x,y,z+1);
-	if(blocks[idx2] == 0)
-		return true;
-
-	idx2 = make_idx(x,y,z-1);
-	if(blocks[idx2] == 0)
-		return true;
-
-	return false;
+static byte getbl(byte *blocks, int x, int y, int z)
+{
+	if((x & 15) != x || (z & 15) != z || (y & 127) != y)
+		return 1;
+	return blocks[make_idx(x,y,z)];
 }
 
-u_long num_blox = 0;
-struct thing { vec4 pos; /*vec2 data;*/ } *blox = NULL;
+#define is_transparent(blockid) (blockid == 0 || blockid == 8 || blockid == 9)
+
+static int num_visible_faces(int x, int y, int z, byte *blocks)
+{
+#define check(xx,yy,zz) (is_transparent(getbl(blocks,xx,yy,zz)) && getbl(blocks,xx,yy,zz) != getbl(blocks,x,y,z) ? 1 : 0)
+	if(blocks[make_idx(x,y,z)] <= 0)
+		return 0;
+	//if(x == 0 || z == 0)//if(x == 0 || x == 15 || z == 0 || z == 15)
+	//	return false;
+	return check(x,y+1,z) + check(x,y-1,z) + check(x+1,y,z) + check(x-1,y,z) + check(x,y,z+1) + check(x,y,z-1);
+}
+
+#undef check
+
+static int visible_faces(int x, int y, int z, byte *blocks)
+{
+#define check(xx,yy,zz,side) (is_transparent(getbl(blocks,xx,yy,zz)) && getbl(blocks,xx,yy,zz) != getbl(blocks,x,y,z) ? side : 0)
+	if(blocks[make_idx(x,y,z)] <= 0)
+		return 0;
+	//if(x == 0 || z == 0)
+	//	return false; ;//return check2(x,y+1,z,1) * 100000 + check2(x,y-1,z,2) * 10000 + check2(x+1,y,z,3) * 1000 + check2(x-1,y,z,4) * 100 + check2(x,y,z+1,5) * 10 + check2(x,y,z-1,6);
+	return check(x,y+1,z,1) * 100000 + check(x,y-1,z,2) * 10000 + check(x+1,y,z,3) * 1000 + check(x-1,y,z,4) * 100 + check(x,y,z+1,5) * 10 + check(x,y,z-1,6);
+}
+
+
+struct render_buf {
+	byte dirty;
+	bool visible;
+	int num_vis_faces;
+	struct face {
+		float x, y, z;
+		float data;
+	} *faces;
+};
+
+static int powi(int b, int e)
+{
+	int r = 1;
+	while(e-- > 0)
+		r *= b;
+	return r;
+}
 
 static void build_buffers(void)
 {
 	struct chunk *c;
-	int i;
-	num_blox = 0;
-
-	if(blox == NULL) {
-		blox = B_malloc(999999 * sizeof(struct thing));
-	}
 
 	/* construct buffer data */
-
-	c = chunks;
-	while(c) {
-		int y;
-		int minY = -1;
-		int maxY = -1;
+	for(c = chunks; c != NULL; c = c->next) {
+		c->visible = false;
 
 		if(!c->dirty)
-			return;
-
-		for(y = 0; y < 128; y += 16) {
-			if(is_visible_on_frustum((vec3) {c->x << 4, y, c->z << 4}, 64.0f)) {
-				if(minY == -1) {
-					minY = y;
-				} else {
-					maxY = y;
-				}
-			}
-		}
-
-		if(minY == maxY) {
-			c = c->next;
 			continue;
-		}
 
-		for(int x = 0; x < 16; x++) {
-			for(int z = 0; z < 16; z++) {
-				for(y = minY; y <= maxY; y++) {
-					if(has_visible_face(x, y, z, c->data->blocks)) {
-						blox[num_blox].pos[0] = (float) x + (float) (c->x << 4);// - cl.game.pos[0];
-						blox[num_blox].pos[1] = (float) y ;//- cl.game.pos[1];
-						blox[num_blox].pos[2] = (float) z + (float) (c->z << 4) ;//- cl.game.pos[2];
-						i = make_idx(x,y,z);
-						blox[num_blox].pos[3] = (float) c->data->blocks[i];
-						num_blox++;
-						if(num_blox >= 999990) {
-							goto done;
+		for(int rb = 0; rb < 8; rb ++) {
+			if(c->data->render_bufs[rb] == NULL) {
+				c->data->render_bufs[rb] = B_malloc(sizeof(struct render_buf));
+				*c->data->render_bufs[rb] = 1; // new buf, mark dirty
+			}
+
+			if(!is_visible_on_frustum((vec3) {c->x << 4, rb << 4, c->z << 4}, 0.0f)) {
+				((struct render_buf *)c->data->render_bufs[rb])->visible = false;
+				continue;
+			} else {
+				struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
+				int face;
+
+				// mark chunk and this piece as visible
+				c->visible = true;
+				r_buf->visible = true;
+
+				// not changed, no need to rebuild the mesh
+				if(!r_buf->dirty)
+					continue;
+
+				r_buf->dirty = false;
+				r_buf->num_vis_faces = 0;
+
+				/* count visible faces */
+				for(int x = 0; x < 16; x++) {
+					for(int z = 0; z < 16; z++) {
+						for(int y = 0; y < 16; y++) {
+							int block_y = (rb << 4) + y;
+							if(c->data->blocks[make_idx(x, block_y, z)] > 0) {
+								r_buf->num_vis_faces += num_visible_faces(x, block_y, z, c->data->blocks);
+							}
+						}
+					}
+				}
+
+				if(r_buf->num_vis_faces <= 0) {
+					continue;
+				}
+
+				/* build buffer */
+				face = 0;
+				con_printf("rebuilding a buffer\n");
+				r_buf->faces = B_malloc(sizeof(struct face) * r_buf->num_vis_faces);
+				for(int x = 0; x < 16; x++) {
+					for(int z = 0; z < 16; z++) {
+						for(int y = 0; y < 16; y++) {
+							int block_y = (rb << 4) + y;
+							int block_id = c->data->blocks[make_idx(x, block_y, z)];
+							if(block_id > 0) {
+								int sides = visible_faces(x, block_y, z, c->data->blocks);
+#define getsid(sides,i) (sides / powi(10,i) % 10)
+								if(getsid(sides, 0)) {
+									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
+									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
+									r_buf->faces[face].y = (float) block_y;
+									r_buf->faces[face].data = 0.0f + (10.0f * block_id);
+									face++;
+								}
+								if(getsid(sides, 1)) {
+									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
+									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
+									r_buf->faces[face].y = (float) block_y;
+									r_buf->faces[face].data = 1.0f + (10.0f * block_id);
+									face++;
+								}
+								if(getsid(sides, 2)) {
+									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
+									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
+									r_buf->faces[face].y = (float) block_y;
+									r_buf->faces[face].data = 2.0f + (10.0f * block_id);
+									face++;
+								}
+								if(getsid(sides, 3)) {
+									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
+									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
+									r_buf->faces[face].y = (float) block_y;
+									r_buf->faces[face].data = 3.0f + (10.0f * block_id);
+									face++;
+								}
+								if(getsid(sides, 4)) {
+									r_buf->faces[face].x = (float) x  + (float)(c->x << 4);
+									r_buf->faces[face].z = (float) z  + (float)(c->z << 4);
+									r_buf->faces[face].y = (float) block_y;
+									r_buf->faces[face].data = 4.0f + (10.0f * block_id);
+									face++;
+								}
+								if(getsid(sides, 5)) {
+									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
+									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
+									r_buf->faces[face].y = (float) block_y;
+									r_buf->faces[face].data = 5.0f + (10.0f * block_id);
+									face++;
+								}
+							}
 						}
 					}
 				}
 			}
 		}
-
-		/*for(i = 0; i < 16 * 16 * 128; i++) {
-			if(c->data->blocks[i] > 0) {
-				int x, y, z;
-
-				x = (i >> 11) & 15;
-				z = (i >> 7) & 15;
-				y = (i & 127);
-				if(y < 60)
-					continue;
-				blox[num_blox].pos[0] = (float) x + (float) (c->x << 4);// - cl.game.pos[0];
-				blox[num_blox].pos[1] = (float) y ;//- cl.game.pos[1];
-				blox[num_blox].pos[2] = (float) z + (float) (c->z << 4) ;//- cl.game.pos[2];
-				//blox[num_blox].data[0] = (float) c->data->blocks[i];
-				num_blox++;
-				if(num_blox >= 999990) {
-					goto done;
-				}
-			}
-		}*/
-		c = c->next;
 	}
-	done:
-	return;
 }
+
+int wr_total_faces;
+int wr_draw_calls;
 
 void world_render(void)
 {
-	static bool frustrum_updatd = false;
+	struct chunk *c;
+
+	wr_total_faces = 0;
+	wr_draw_calls = 0;
 
 	if(cl.state < cl_connected)
 		return;
 
-	if(!frustrum_updatd) {
+	if(cl.game.rotated || cl.game.moved)
 		update_view_matrix();
-		frustrum_updatd = true;
-	}
 
 	build_buffers();
 
-	//if(cl.game.rotated || cl.game.moved)
-	cl.game.pos[0] -= 0.5;
-	cl.game.pos[1] += 0.62f;
-	cl.game.pos[2] -= 0.5;
-	// update view matrix
-	mat_view(view_mat, cl.game.pos, cl.game.rot);
-	cl.game.pos[0] += 0.5;
-	cl.game.pos[1] -= 0.62f;
-	cl.game.pos[2] += 0.5;
-
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glLineWidth(3.0f);
+	glEnable(GL_CULL_FACE);
 	glUniformMatrix4fv(loc_view, 1, GL_FALSE, (const GLfloat *) view_mat);
 	glUniformMatrix4fv(loc_proj, 1, GL_FALSE, (const GLfloat *) proj_mat);
 
-
-	glPointSize(5.0f);
-
 	glBindVertexArray(vao);
 
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, num_blox * sizeof(struct thing), blox, GL_DYNAMIC_DRAW);
+	for(c = chunks; c != NULL; c = c->next) {
+		if(!c->visible)
+			continue;
 
-	glDrawArrays(GL_POINTS, 0, num_blox);
+		for(int rb = 0; rb < 8; rb ++) {
+			struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
+			if(!r_buf || !r_buf->visible || r_buf->num_vis_faces <= 0)
+				continue;
+
+			glBindBuffer(GL_ARRAY_BUFFER, vbo);
+			glBufferData(GL_ARRAY_BUFFER,  r_buf->num_vis_faces * sizeof(struct face), r_buf->faces, GL_DYNAMIC_DRAW);
+			glDrawArrays(GL_POINTS, 0, r_buf->num_vis_faces);
+
+			wr_total_faces += r_buf->num_vis_faces;
+			wr_draw_calls++;
+		}
+	}
+
 
 	glBindVertexArray(0);
 }

@@ -28,8 +28,13 @@ const char *shader_geometry = GLSL_VERSION stringify(
 	uniform mat4 VIEW;
 	uniform mat4 PROJECTION;
 
-	out float blockId;
-	out float shade;
+	out flat float blockId;
+	out flat float shade;
+
+	int modulo(int a, int b)
+	{
+		return a - (b * int(floor(a / b)));
+	}
 
 	void vert(float ox, float oy, float oz)
 	{
@@ -39,26 +44,78 @@ const char *shader_geometry = GLSL_VERSION stringify(
 
 	void main()
 	{
-		blockId = gl_in[0].gl_Position.w;
-		shade = 255.0f;
+		int side = modulo(int(gl_in[0].gl_Position.w), 10);
+		blockId = float(int(gl_in[0].gl_Position.w) / 10);
+		shade = 250.0f;
+		/*vert(-0.5f, -0.5f, -0.5f);
+		EndPrimitive();
+		return;*/
 
-		/* create a single face */
-		vert(-0.5f, -0.5f, 0.0f);
-		vert(+0.5f, -0.5f, 0.0f);
-		vert(-0.5f, +0.5f, 0.0f);
-		vert(+0.5f, +0.5f, 0.0f);
+		/* reference image for the comments */
+		/* persp: looking down on a cube    */
+		/* that only has its back walls     */
+		/*              __-__               */
+		/*         ..```  |  ```..          */
+		/*   <---  |      |      |  --->    */
+		/*   -x    |    ..+._    |    -z    */
+		/*         |..``     ``..|          */
+		/*           ```.._..```            */
+		/*                |                 */
+		/*                | -y              */
+		/*                V                 */
 
-		//vert(0.0f, 0.0f, 0.0f);
+		if(side == 0) {
+			/* z- */
+			shade = 150.0f;
+			vert(-0.5f, -0.5f, -0.5f); /* bot left */
+			vert(-0.5f, +0.5f, -0.5f); /* top left */
+			vert(+0.5f, -0.5f, -0.5f); /* bot right */
+			vert(+0.5f, +0.5f, -0.5f); /* top right */
+		} else if(side == 1) {
+			/* z+ */
+			shade = 150.0f;
+			vert(-0.5f, -0.5f, +0.5f); /* bot left */
+			vert(+0.5f, -0.5f, +0.5f); /* bot right */
+			vert(-0.5f, +0.5f, +0.5f); /* top left */
+			vert(+0.5f, +0.5f, +0.5f); /* top right */
+		} else if(side == 2) {
+			/* x- */
+			shade = 200.0f;
+			vert(-0.5f, -0.5f, -0.5f); /* bot right */
+			vert(-0.5f, -0.5f, +0.5f); /* bot left */
+			vert(-0.5f, +0.5f, -0.5f); /* top right */
+			vert(-0.5f, +0.5f, +0.5f); /* top left */
+		} else if(side == 3) {
+			/* x+ */
+			shade = 200.0f;
+			vert(+0.5f, -0.5f, -0.5f); /* bot right */
+			vert(+0.5f, +0.5f, -0.5f); /* top right */
+			vert(+0.5f, -0.5f, +0.5f); /* bot left */
+			vert(+0.5f, +0.5f, +0.5f); /* top left */
+		} else if(side == 4) {
+			/* y- */
+			shade = 250.0f;
+			vert(-0.5f, -0.5f, -0.5f); /* top */
+			vert(+0.5f, -0.5f, -0.5f); /* right */
+			vert(-0.5f, -0.5f, +0.5f); /* left */
+			vert(+0.5f, -0.5f, +0.5f); /* bottom */
+		} else if(side == 5) {
+			/* y+ */
+			shade = 250.0f;
+			vert(-0.5f, +0.5f, +0.5f); /* left */
+			vert(+0.5f, +0.5f, +0.5f); /* bottom */
+			vert(-0.5f, +0.5f, -0.5f); /* top */
+			vert(+0.5f, +0.5f, -0.5f); /* right */
+		}
 
 		EndPrimitive();
-
 	}
 );
 
 const char *shader_fragment = GLSL_VERSION stringify(
 	out vec4 COLOR;
-	in float blockId;
-	in float shade;
+	in flat float blockId;
+	in flat float shade;
 
 	void main()
 	{
@@ -79,7 +136,7 @@ const char *shader_fragment = GLSL_VERSION stringify(
 		} else {
 			COLOR.rgb = vec3(blockId / 256.0f);
 		}
-		//COLOR.rgb *= shade / 256.0f;
+		COLOR.rgb *= shade / 256.0f;
 		//COLOR = vec4(1);
 	}
 

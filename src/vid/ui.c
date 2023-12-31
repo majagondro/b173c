@@ -173,6 +173,10 @@ static char *statestr(void)
 void ui_commit(void)
 {
 	if(developer.integer) {
+		extern int wr_total_faces;
+		extern int wr_draw_calls;
+
+		ui_printf(8, ui_h - 48, "3d: %d draw calls / %d faces (avg %d)", wr_draw_calls, wr_total_faces, wr_total_faces / (wr_draw_calls+1));
 		ui_printf(8, ui_h - 40, "net: %s", statestr());
 
 		ui_printf(8, ui_h - 32, "%f %f %f / %f %f %f",

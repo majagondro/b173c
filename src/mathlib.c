@@ -121,9 +121,18 @@ void mat_projection(mat4 dest, float fov, float aspect, float znear, float zfar)
 	mat_frustrum(dest, -xmax, xmax, -ymax, ymax, znear, zfar);
 }
 
+void vec3_normalize(vec3 dest, const vec3 a)
+{
+	float len = sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
+	dest[0] = a[0] / len;
+	dest[1] = a[1] / len;
+	dest[2] = a[2] / len;
+}
+
 void vec3_cross(vec3 dest, const vec3 a, const vec3 b)
 {
 	dest[0] = a[1] * b[2] - a[2] * b[1];
 	dest[1] = a[2] * b[0] - a[0] * b[2];
 	dest[2] = a[0] * b[1] - a[1] * b[0];
+	vec3_normalize(dest, dest);
 }

@@ -8,11 +8,12 @@
 
 struct chunk_data {
 	byte blocks[16*16*128];
+	byte *render_bufs[8];
 };
 
 struct chunk {
 	int x, z;
-	bool dirty;
+	bool dirty, visible;
 	struct chunk_data *data;
 	struct chunk *next;
 };

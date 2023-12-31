@@ -93,6 +93,7 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 		return;
 	}
 
+	// world_get_chunk(x >> 4, z >> 4)->dirty = true;
 	chunk_data = world_get_chunk(x >> 4, z >> 4)->data;
 	if((dataPos = inflate_data(data, decomp, data_size, sizeof(decomp))) != Z_OK) {
 		con_printf("error while decompressing chunk data: %s\n", zError(dataPos));
@@ -107,6 +108,14 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 	xEnd = xStart + size_x;
 	yEnd = yStart + size_y;
 	zEnd = zStart + size_z;
+
+	world_get_chunk(x >> 4, z >> 4)->dirty = true;
+	for(y = yStart >> 4; y < yEnd >> 4; y++) {
+		if(chunk_data->render_bufs[y]) {
+			*chunk_data->render_bufs[y] = 1;
+			// mark dirty
+		}
+	}
 
 	dataPos = 0;
 
@@ -166,6 +175,12 @@ void world_set_block(int x, int y, int z, byte id)
 		return;
 
 	c = world_get_chunk(x >> 4, z >> 4);
+
+	// mark dirty
+	c->dirty = true;
+	if(c->data->render_bufs[y >> 4])
+		*c->data->render_bufs[y >> 4] = 1;
+
 	c->data->blocks[IDX_FROM_COORDS(x & 15, y, z & 15)] = id;
 }
 

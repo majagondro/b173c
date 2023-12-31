@@ -205,6 +205,7 @@ void vid_display_frame(void)
 	}
 
 	/* draw 2d stuff */
+	glPolygonMode(GL_FRONT_AND_BACK,  GL_FILL);
 	glUseProgram(gl.shader2d);
 	ui_commit();
 

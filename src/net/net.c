@@ -848,14 +848,6 @@ void skip_metadata(void)
 	}
 }
 
-static int powi(int b, int e)
-{
-	int r = 1;
-	while(e-- > 0)
-		r *= b;
-	return r;
-}
-
 void connect_f(void)
 {
 	char *addrstr;

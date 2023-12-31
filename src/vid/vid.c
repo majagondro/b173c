@@ -165,8 +165,9 @@ void vid_update_viewport(void)
 {
 	SDL_GetWindowSize(window_handle, &gl.w, &gl.h);
 	glViewport(0, 0, gl.w, gl.h);
-	// ?? not really what i want
-	// ui_update_size(gl.w, gl.h);
+	cvar_set("vid_width", va("%d", gl.w));
+	cvar_set("vid_height", va("%d", gl.h));
+	cvar_find("ui_scale")->onchange(); // hack as fack
 }
 
 void vid_mouse_grab(bool grab)

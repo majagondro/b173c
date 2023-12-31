@@ -23,4 +23,7 @@ void *_B_malloc(size_t sz, const char *file, int line);
 
 void con_printf(char *text, ...);
 
+// does a sprintf into a temp static buffer
+const char *va(const char *fmt, ...);
+
 #endif

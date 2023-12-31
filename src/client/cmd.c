@@ -19,9 +19,6 @@ void cmd_init(void)
 {
 	cvar_register(&developer);
 	cmds_register();
-
-	cmd_exec("exec config", false);
-	cmd_exec("exec autoexec", false);
 }
 
 char *cmd_argv(int i)
@@ -235,9 +232,8 @@ static void cmd_cvar(void)
 
 	if(cmd_argc() == 1) {
 		// display info
-		len = strlen(name);
-		con_printf("%*s : default value is \"%s\"\n", len, name, c->string);
-		con_printf("%*s   current value is \"%s\"\n", len, "", c->string);
+		con_printf("%s : default value is \"%s\"\n", name, c->string);
+		con_printf(STYLE_PADDED "%s : " STYLE_PADDED "current value is \"%s\"\n", name, c->string);
 	} else {
 		// set
 		cvar_set(name, cmd_argv(1));

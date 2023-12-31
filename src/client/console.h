@@ -19,6 +19,7 @@
 #define COLOR_PINK "\xa7" "d"
 #define COLOR_YELLOW "\xa7" "e"
 #define COLOR_WHITE "\xa7" "f"
+#define STYLE_PADDED "\xa7" "p"
 
 typedef struct cvar {
 	char *name;

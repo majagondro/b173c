@@ -322,7 +322,7 @@ static void draw_input_line(int y)
 
 void ui_draw_console(void)
 {
-	int y = (ui_h / 16) * 8 - 8;
+	int y = ui_h / 2 - 8;
 	struct conline *l = conlines;
 	int scroll = con_scroll;
 

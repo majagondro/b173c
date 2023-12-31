@@ -26,6 +26,18 @@ void *_B_malloc(size_t sz, const char *file, int line)
 	return ptr;
 }
 
+const char *va(const char *fmt, ...)
+{
+	static char buf[4096];
+	va_list va;
+
+	va_start(va, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, va);
+	va_end(va);
+
+	return buf;
+}
+
 float calc_frametime(void)
 {
 	static u_long now = 0;
@@ -54,6 +66,9 @@ int main(void)
 	net_init();
 	vid_init();
 	ui_init();
+
+	cmd_exec("exec config", false);
+	cmd_exec("exec autoexec", false);
 
 	while(!cl.done) {
 		cl.frametime = calc_frametime();

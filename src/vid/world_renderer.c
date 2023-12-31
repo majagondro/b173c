@@ -181,11 +181,12 @@ static int visible_faces(int x, int y, int z, byte *blocks)
 struct render_buf {
 	byte dirty;
 	bool visible;
-	int num_vis_faces;
+	int num_vis_opaque_faces;
+	int num_vis_transparent_faces;
 	struct face {
 		float x, y, z;
 		float data;
-	} *faces;
+	} *opaque_faces, *transparent_faces;
 };
 
 static int powi(int b, int e)
@@ -224,7 +225,9 @@ static void build_buffers(void)
 				continue;
 			} else {
 				struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
-				int face;
+				int o_face;
+				int t_face;
+				int *face;
 
 				// mark chunk and this piece as visible
 				c->visible = true;
@@ -235,76 +238,93 @@ static void build_buffers(void)
 					continue;
 
 				r_buf->dirty = false;
-				r_buf->num_vis_faces = 0;
+				r_buf->num_vis_opaque_faces = 0;
+				r_buf->num_vis_transparent_faces = 0;
 
 				/* count visible faces */
 				for(int x = 0; x < 16; x++) {
 					for(int z = 0; z < 16; z++) {
 						for(int y = 0; y < 16; y++) {
 							int block_y = (rb << 4) + y;
-							if(c->data->blocks[make_idx(x, block_y, z)] > 0) {
-								r_buf->num_vis_faces += num_visible_faces(x, block_y, z, c->data->blocks);
+							int block_id = c->data->blocks[make_idx(x, block_y, z)];
+							if(block_id > 0) {
+								if(is_transparent(block_id)) {
+									r_buf->num_vis_transparent_faces += num_visible_faces(x, block_y, z, c->data->blocks);
+								} else {
+									r_buf->num_vis_opaque_faces += num_visible_faces(x, block_y, z, c->data->blocks);
+								}
 							}
 						}
 					}
 				}
 
-				if(r_buf->num_vis_faces <= 0) {
+				if(r_buf->num_vis_opaque_faces <= 0 && r_buf->num_vis_transparent_faces <= 0) {
 					continue;
 				}
 
 				/* build buffer */
-				face = 0;
-				r_buf->faces = B_malloc(sizeof(struct face) * r_buf->num_vis_faces);
+				o_face = t_face = 0;
+				r_buf->opaque_faces = B_malloc(sizeof(struct face) * r_buf->num_vis_opaque_faces);
+				r_buf->transparent_faces = B_malloc(sizeof(struct face) * r_buf->num_vis_transparent_faces);
 				for(int x = 0; x < 16; x++) {
 					for(int z = 0; z < 16; z++) {
 						for(int y = 0; y < 16; y++) {
 							int block_y = (rb << 4) + y;
 							int block_id = c->data->blocks[make_idx(x, block_y, z)];
 							if(block_id > 0) {
+								struct face *buf;
+
+								if(is_transparent(block_id)) {
+									buf = r_buf->transparent_faces;
+									face = &t_face;
+								} else {
+									buf = r_buf->opaque_faces;
+									face = &o_face;
+								}
+
 								int sides = visible_faces(x, block_y, z, c->data->blocks);
 #define getsid(sides,i) (sides / powi(10,i) % 10)
 								if(getsid(sides, 0)) {
-									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
-									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
-									r_buf->faces[face].y = (float) block_y;
-									r_buf->faces[face].data = 0.0f + (10.0f * block_id);
-									face++;
+									buf[*face].x = (float) x + (float)(c->x << 4);
+									buf[*face].z = (float) z + (float)(c->z << 4);
+									buf[*face].y = (float) block_y;
+									buf[*face].data = 0.0f + (10.0f * block_id);
+									(*face)++;
 								}
 								if(getsid(sides, 1)) {
-									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
-									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
-									r_buf->faces[face].y = (float) block_y;
-									r_buf->faces[face].data = 1.0f + (10.0f * block_id);
-									face++;
+									buf[*face].x = (float) x + (float)(c->x << 4);
+									buf[*face].z = (float) z + (float)(c->z << 4);
+									buf[*face].y = (float) block_y;
+									buf[*face].data = 1.0f + (10.0f * block_id);
+									(*face)++;
 								}
 								if(getsid(sides, 2)) {
-									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
-									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
-									r_buf->faces[face].y = (float) block_y;
-									r_buf->faces[face].data = 2.0f + (10.0f * block_id);
-									face++;
+									buf[*face].x = (float) x + (float)(c->x << 4);
+									buf[*face].z = (float) z + (float)(c->z << 4);
+									buf[*face].y = (float) block_y;
+									buf[*face].data = 2.0f + (10.0f * block_id);
+									(*face)++;
 								}
 								if(getsid(sides, 3)) {
-									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
-									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
-									r_buf->faces[face].y = (float) block_y;
-									r_buf->faces[face].data = 3.0f + (10.0f * block_id);
-									face++;
+									buf[*face].x = (float) x + (float)(c->x << 4);
+									buf[*face].z = (float) z + (float)(c->z << 4);
+									buf[*face].y = (float) block_y;
+									buf[*face].data = 3.0f + (10.0f * block_id);
+									(*face)++;
 								}
 								if(getsid(sides, 4)) {
-									r_buf->faces[face].x = (float) x  + (float)(c->x << 4);
-									r_buf->faces[face].z = (float) z  + (float)(c->z << 4);
-									r_buf->faces[face].y = (float) block_y;
-									r_buf->faces[face].data = 4.0f + (10.0f * block_id);
-									face++;
+									buf[*face].x = (float) x + (float)(c->x << 4);
+									buf[*face].z = (float) z + (float)(c->z << 4);
+									buf[*face].y = (float) block_y;
+									buf[*face].data = 4.0f + (10.0f * block_id);
+									(*face)++;
 								}
 								if(getsid(sides, 5)) {
-									r_buf->faces[face].x = (float) x + (float)(c->x << 4);
-									r_buf->faces[face].z = (float) z + (float)(c->z << 4);
-									r_buf->faces[face].y = (float) block_y;
-									r_buf->faces[face].data = 5.0f + (10.0f * block_id);
-									face++;
+									buf[*face].x = (float) x + (float)(c->x << 4);
+									buf[*face].z = (float) z + (float)(c->z << 4);
+									buf[*face].y = (float) block_y;
+									buf[*face].data = 5.0f + (10.0f * block_id);
+									(*face)++;
 								}
 							}
 						}
@@ -313,6 +333,11 @@ static void build_buffers(void)
 			}
 		}
 	}
+}
+
+static void sort_chunks(void)
+{
+
 }
 
 int wr_total_faces;
@@ -341,34 +366,45 @@ void world_render(void)
 	glBindVertexArray(vao);
 
 	/* render opaque objects */
-	glUniform1i(loc_mode, 0);
+
 	for(c = chunks; c != NULL; c = c->next) {
 		if(!c->visible)
 			continue;
 
 		for(int rb = 0; rb < 8; rb ++) {
 			struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
-			if(!r_buf || !r_buf->visible || r_buf->num_vis_faces <= 0)
+			if(!r_buf || !r_buf->visible || r_buf->num_vis_opaque_faces <= 0)
 				continue;
 
 			glBindBuffer(GL_ARRAY_BUFFER, vbo);
-			glBufferData(GL_ARRAY_BUFFER,  r_buf->num_vis_faces * sizeof(struct face), r_buf->faces, GL_DYNAMIC_DRAW);
-			glDrawArrays(GL_POINTS, 0, r_buf->num_vis_faces);
 
-			wr_total_faces += r_buf->num_vis_faces;
-			wr_draw_calls++;
+			if(r_buf->num_vis_opaque_faces > 0) {
+				glUniform1i(loc_mode, 0);
+				glBufferData(GL_ARRAY_BUFFER, r_buf->num_vis_opaque_faces * sizeof(struct face), r_buf->opaque_faces, GL_DYNAMIC_DRAW);
+				glDrawArrays(GL_POINTS, 0, r_buf->num_vis_opaque_faces);
+				wr_total_faces += r_buf->num_vis_opaque_faces;
+				wr_draw_calls++;
+			}
+
+			if(r_buf->num_vis_transparent_faces > 0) {
+				glUniform1i(loc_mode, 1);
+				glBufferData(GL_ARRAY_BUFFER, r_buf->num_vis_transparent_faces * sizeof(struct face), r_buf->transparent_faces, GL_DYNAMIC_DRAW);
+				glDrawArrays(GL_POINTS, 0, r_buf->num_vis_transparent_faces);
+				wr_total_faces += r_buf->num_vis_transparent_faces;
+				wr_draw_calls++;
+			}
 		}
 	}
 
 	/* render transparent objects */
-	glUniform1i(loc_mode, 1);
+	/*glUniform1i(loc_mode, 1);
 	for(c = chunks; c != NULL; c = c->next) {
 		if(!c->visible)
 			continue;
 
 		for(int rb = 0; rb < 8; rb ++) {
 			struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
-			if(!r_buf || !r_buf->visible || r_buf->num_vis_faces <= 0)
+			if(!r_buf || !r_buf->visible || r_buf->num_vis_faces <= 0 || !r_buf->has_transparent)
 				continue;
 
 			glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -378,7 +414,7 @@ void world_render(void)
 			wr_total_faces += r_buf->num_vis_faces;
 			wr_draw_calls++;
 		}
-	}
+	}*/
 
 	/* done */
 	glBindVertexArray(0);

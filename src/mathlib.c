@@ -32,6 +32,35 @@ void mat_identity(float dest[4][4])
 		dest[i][i] = 1;
 }
 
+void cam_angles(vec3 fwd, vec3 side, vec3 up, float yaw, float pitch)
+{
+	float cp, sp, cy, sy;
+
+	// limit camera angles
+	yaw = fmodf(yaw, 360.0f);
+	if(pitch > 90.0f)
+		pitch = 90.0f;
+	if(pitch < -90.0f)
+		pitch = -90.0f;
+
+	cp = cosf(DEG2RAD(-pitch));
+	sp = sinf(DEG2RAD(-pitch));
+	cy = cosf(DEG2RAD(-yaw));
+	sy = sinf(DEG2RAD(-yaw));
+
+	side[0] = cy;
+	side[1] = 0;
+	side[2] = -sy;
+
+	up[0] = sy * sp;
+	up[1] = cp;
+	up[2] = cy * sp;
+
+	fwd[0] = sy * cp;
+	fwd[1] = -sp;
+	fwd[2] = cp * cy;
+}
+
 void mat_view(mat4 dest, const vec3 pos, vec3 ang)
 {
 	float cp, sp, cy, sy, *x, *y, *z;
@@ -59,9 +88,9 @@ void mat_view(mat4 dest, const vec3 pos, vec3 ang)
 		dest[i][3] = 0.0f;
 	}
 
-	dest[3][0] = -DOT(x, pos);
-	dest[3][1] = -DOT(y, pos);
-	dest[3][2] = -DOT(z, pos);
+	dest[3][0] = -vec3_dot(x, pos);
+	dest[3][1] = -vec3_dot(y, pos);
+	dest[3][2] = -vec3_dot(z, pos);
 	dest[3][3] = 1.0f;
 }
 
@@ -90,4 +119,11 @@ void mat_projection(mat4 dest, float fov, float aspect, float znear, float zfar)
 	ymax = znear * tanf(DEG2RAD(fov) * 0.5f);
 	xmax = ymax * aspect;
 	mat_frustrum(dest, -xmax, xmax, -ymax, ymax, znear, zfar);
+}
+
+void vec3_cross(vec3 dest, const vec3 a, const vec3 b)
+{
+	dest[0] = a[1] * b[2] - a[2] * b[1];
+	dest[1] = a[2] * b[0] - a[0] * b[2];
+	dest[2] = a[0] * b[1] - a[1] * b[0];
 }

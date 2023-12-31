@@ -7,18 +7,14 @@
 #define stringify(...) #__VA_ARGS__
 
 const char *shader_vertex = GLSL_VERSION stringify(
-	uniform mat4 MODEL;
-	uniform mat4 VIEW;
-	uniform mat4 PROJECTION;
-
-	layout(location = 0) in vec3 VERTEX_IN;
+	layout(location = 0) in vec4 VERTEX_IN;
 	//layout(location = 1) in vec2 DATA_IN;
 
 	out vec2 DATA;
 
 	void main()
 	{
-		gl_Position = vec4(VERTEX_IN, 1.0f);
+		gl_Position = VERTEX_IN;
 		DATA = vec2(0,0);
 	}
 );
@@ -29,7 +25,6 @@ const char *shader_geometry = GLSL_VERSION stringify(
 
 	in vec2[] DATA;
 
-	uniform mat4 MODEL;
 	uniform mat4 VIEW;
 	uniform mat4 PROJECTION;
 
@@ -38,13 +33,13 @@ const char *shader_geometry = GLSL_VERSION stringify(
 
 	void vert(float ox, float oy, float oz)
 	{
-		gl_Position = PROJECTION * VIEW * MODEL * (gl_in[0].gl_Position + vec4(ox, oy, oz, 0.0f));
+		gl_Position = PROJECTION * VIEW * (vec4(gl_in[0].gl_Position.xyz, 1.0f) + vec4(ox, oy, oz, 0.0f));
 		EmitVertex();
 	}
 
 	void main()
 	{
-		blockId = 2.0f;//DATA[0].x;
+		blockId = gl_in[0].gl_Position.w;
 		shade = 255.0f;
 
 		/* create a single face */
@@ -52,6 +47,8 @@ const char *shader_geometry = GLSL_VERSION stringify(
 		vert(+0.5f, -0.5f, 0.0f);
 		vert(-0.5f, +0.5f, 0.0f);
 		vert(+0.5f, +0.5f, 0.0f);
+
+		//vert(0.0f, 0.0f, 0.0f);
 
 		EndPrimitive();
 
@@ -82,7 +79,8 @@ const char *shader_fragment = GLSL_VERSION stringify(
 		} else {
 			COLOR.rgb = vec3(blockId / 256.0f);
 		}
-		COLOR.rgb *= shade / 256.0f;
+		//COLOR.rgb *= shade / 256.0f;
+		//COLOR = vec4(1);
 	}
 
 );

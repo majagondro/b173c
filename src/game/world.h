@@ -12,10 +12,10 @@ struct chunk_data {
 
 struct chunk {
 	int x, z;
+	bool dirty;
 	struct chunk_data *data;
 	struct chunk *next;
 };
-
 
 byte world_get_block(int x, int y, int z);
 void world_set_block(int x, int y, int z, byte id);

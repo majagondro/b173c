@@ -223,14 +223,14 @@ float *world_get_sky_color(void)
 		float f = (float)(t - 11000) / 3000.0f;
 		color[0] = f * 0.01f + (1.0f - f) * 0.55f;
 		color[1] = f * 0.01f + (1.0f - f) * 0.7f;
-		color[2] = f * 0.03f + (1.0f - f) * 0.9f;
+		color[2] = f * 0.03f + (1.0f - f) * 1.0f;
 	} else if(is_between(t, 22000, 24000)) {
 		// start of day
 		// interpolate between night (22000) and day (24000)
 		float f = (float)(t - 22000) / 2000.0f;
 		color[0] = f * 0.55f + (1.0f - f) * 0.01f;
 		color[1] = f * 0.7f + (1.0f - f) * 0.01f;
-		color[2] = f * 0.9f + (1.0f - f) * 0.03f;
+		color[2] = f * 1.0f + (1.0f - f) * 0.03f;
 	} else {
 		// day
 		color[0] = 0.55f;

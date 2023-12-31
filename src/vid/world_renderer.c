@@ -182,14 +182,6 @@ struct render_buf {
 	struct face *opaque_faces, *transparent_faces;
 };
 
-static int powi(int b, int e)
-{
-	int r = 1;
-	while(e-- > 0)
-		r *= b;
-	return r;
-}
-
 static void build_buffers(void)
 {
 	struct chunk *c;
@@ -293,15 +285,6 @@ static void build_buffers(void)
 				}
 			}
 		}
-
-		c->visible = false;
-		for(int rb = 0; rb < 8; rb++) {
-			if(((struct render_buf *)c->data->render_bufs[rb])->visible) {
-				c->visible = true;
-				break;
-			}
-		}
-
 	}
 }
 
@@ -378,7 +361,7 @@ void world_render(void)
 	}
 	glPointSize(5.0f);
 
-	//glEnable(GL_CULL_FACE);
+	glEnable(GL_CULL_FACE);
 
 	glUniformMatrix4fv(loc_view, 1, GL_FALSE, (const GLfloat *) view_mat);
 	glUniformMatrix4fv(loc_proj, 1, GL_FALSE, (const GLfloat *) proj_mat);

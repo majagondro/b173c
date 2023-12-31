@@ -143,6 +143,10 @@ void vid_init(void)
 
 	now = SDL_GetPerformanceCounter();
 
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	world_renderer_init();
 }
 
@@ -190,15 +194,9 @@ void vid_display_frame(void)
 	glClearColor(clearcolor[0], clearcolor[1], clearcolor[2], 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
 	/* draw 3d stuff */
-	glEnable(GL_DEPTH_TEST);
 	glUseProgram(gl.shader3d);
 	world_render();
-	glDisable(GL_DEPTH_TEST);
 
 	e = glGetError();
 	if(e) {
@@ -207,7 +205,6 @@ void vid_display_frame(void)
 	}
 
 	/* draw 2d stuff */
-
 	glUseProgram(gl.shader2d);
 	ui_commit();
 

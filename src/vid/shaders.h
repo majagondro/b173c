@@ -103,10 +103,16 @@ const char *shader_vertex2d = GLSL_VERSION stringify(
 		/* add instance offset */
 		/* x2 because opengl is -1 to 1, offset is 0 to 1 */
 		org += vec2(FONTDATA.x, -FONTDATA.y) * 2;
-		gl_Position = vec4(org, 0.0f, 1.0f);
+		gl_Position = vec4(org, -1.0f, 1.0f);
 		UV = TEXCOORD;
+
 		FONTCHAR = int(FONTDATA.z);
 		FONTCOLOR = int(FONTDATA.w);
+
+		if(FONTCOLOR < 0) {
+			/* shadow - draw behind */
+			gl_Position.z += 1.0f;
+		}
 	}
 );
 
@@ -164,6 +170,9 @@ const char *shader_fragment2d = GLSL_VERSION stringify(
 		newuv.y = float((FONTCHAR / 16 + UV.y) * 8) / 128.0f;
 
 		COLOR = texture(TEXTURE0, newuv) * get_color_from_code(FONTCOLOR);
+		if(COLOR.a < 0.5) {
+			discard;
+		}
 	}
 );
 #undef COLORCODE

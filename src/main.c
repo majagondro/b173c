@@ -50,13 +50,15 @@ float calc_frametime(void)
 
 int main(void)
 {
-	u_long last_time = 0;
+	float net_timeout = 0.0f;
 
 	in_init();
 	con_init();
 	net_init();
 	vid_init();
 	ui_init();
+
+	world_init();
 
 	cmd_exec("exec config", false);
 	cmd_exec("exec autoexec", false);
@@ -66,9 +68,10 @@ int main(void)
 
 		in_update();
 
-		if(last_time - SDL_GetTicks64() >= 50) {
+		net_timeout -= cl.frametime;
+		if(net_timeout <= 0.0f) {
 			net_process();
-			last_time = SDL_GetTicks64();
+			net_timeout = 0.01f;
 		}
 
 		vid_update();

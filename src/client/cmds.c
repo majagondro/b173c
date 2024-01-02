@@ -2,6 +2,7 @@
 #include "common.h"
 #include "input.h"
 #include "client.h"
+#include "vid/ui.h"
 #include <SDL2/SDL.h>
 
 extern cvar *cvarlist;
@@ -11,35 +12,44 @@ extern struct alias *aliaslist;
 void cmdlist_f(void)
 {
 	struct cmd *c;
-	for(c = cmdlist; c != NULL; c = c->next)
-		con_printf(" %s\n", c->name);
+	for(c = cmdlist; c != NULL; c = c->next) {
+		con_printf("%s\n", c->name);
+	}
 }
 
 void cvarlist_f(void)
 {
 	cvar *c;
-	size_t maxlen = 0;
-
-	for(c = cvarlist; c != NULL; c = c->next)
-		if(strlen(c->name) > maxlen)
-			maxlen = strlen(c->name);
+	int maxwidth = 0;
 
 	for(c = cvarlist; c != NULL; c = c->next) {
-		con_printf(" %*s : \"%s\"\n", maxlen, c->name, c->string);
+		int w = ui_strwidth(c->name);
+		if(w > maxwidth) {
+			maxwidth = w;
+		}
+	}
+
+	for(c = cvarlist; c != NULL; c = c->next) {
+		int px = maxwidth - ui_strwidth(c->name);
+		con_printf("%s"COLOR_PADPX"%d : \"%s\"\n", c->name, px, c->string);
 	}
 }
 
 void aliaslist_f(void)
 {
 	struct alias *a;
-	//size_t maxlen = 0;
-
-	//for(a = aliaslist; a != NULL; a = a->next)
-	//	if(strlen(a->name) > maxlen)
-	//		maxlen = strlen(a->name);
+	int maxwidth = 0;
 
 	for(a = aliaslist; a != NULL; a = a->next) {
-		con_printf(" %s : \"%s\"\n", a->name, a->cmd);
+		int w = ui_strwidth(a->name);
+		if(w > maxwidth) {
+			maxwidth = w;
+		}
+	}
+
+	for(a = aliaslist; a != NULL; a = a->next) {
+		int px = maxwidth - ui_strwidth(a->name);
+		con_printf("%s"COLOR_PADPX"%d : \"%s\"\n", a->name, px, a->cmd);
 	}
 }
 
@@ -57,17 +67,16 @@ void alias_f(void)
 		name = cmd_argv(1);
 		cmd = cmd_args(2, cmd_argc());
 		alias_register(name, cmd);
-
 	} else if(cmd_argc() == 2) {
 		name = cmd_argv(1);
 		a = alias_find(name);
 		if(a == NULL) {
 			con_printf("alias doesn't exist\n");
 		} else {
-			con_printf(" %s : \"%s\"\n", name, a->cmd);
+			con_printf("\"%s\" = \"%s\"\n", name, a->cmd);
 		}
 	} else {
-		con_printf("usage: %s <name> <command>\n", cmd_argv(0));
+		con_printf("usage: %s <name> [command]\n", cmd_argv(0));
 	}
 }
 

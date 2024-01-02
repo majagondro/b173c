@@ -3,6 +3,7 @@
 #include "vid/vid.h"
 #include "client/console.h"
 #include "client/client.h"
+#include "vid/ui.h"
 
 extern SDL_Window *window_handle;
 struct key_status input_keys[512] = {0};
@@ -21,9 +22,10 @@ struct {
 	u_byte right : 1;
 	u_byte attack : 1;
 	u_byte jump : 1;
+	u_byte sneak : 1;
 } inkeys;
 
-cvar in_sensitivity = {"in_sensitivity", "2.5"};
+cvar sensitivity = {"sensitivity", "2.5"};
 
 void forwarddown_f(void) { inkeys.forward = 1; }
 void forwardup_f(void) { inkeys.forward = 0; }
@@ -33,10 +35,12 @@ void leftdown_f(void) { inkeys.left = 1; }
 void leftup_f(void) { inkeys.left = 0; }
 void rightdown_f(void) { inkeys.right = 1; }
 void rightup_f(void) { inkeys.right = 0; }
-void attackdown_f(void) { inkeys.attack = 1; }
-void attackup_f(void) { inkeys.attack = 0; }
 void jumpdown_f(void) { inkeys.jump = 1; }
 void jumpup_f(void) { inkeys.jump = 0; }
+void sneakdown_f(void) { inkeys.sneak = 1; }
+void sneakup_f(void) { inkeys.sneak = 0; }
+void attackdown_f(void) { inkeys.attack = 1; }
+void attackup_f(void) { inkeys.attack = 0; }
 
 struct keyname keynames[] = {
 	{"TAB",        KEY_TAB},
@@ -49,15 +53,15 @@ struct keyname keynames[] = {
 	{"LEFTARROW",  KEY_LEFT},
 	{"RIGHTARROW", KEY_RIGHT},
 
-	{"ALT",        KEY_LALT},
 	{"LALT",       KEY_LALT},
 	{"RALT",       KEY_RALT},
-	{"CTRL",       KEY_LCTRL},
+	{"ALT",        KEY_LALT},
 	{"LCTRL",      KEY_LCTRL},
 	{"RCTRL",      KEY_RCTRL},
-	{"SHIFT",      KEY_LSHIFT},
+	{"CTRL",       KEY_LCTRL},
 	{"LSHIFT",     KEY_LSHIFT},
 	{"RSHIFT",     KEY_RSHIFT},
+	{"SHIFT",      KEY_LSHIFT},
 
 	{"F1",         KEY_F1},
 	{"F2",         KEY_F2},
@@ -149,20 +153,45 @@ void bind_f(void)
 	int key;
 	char *cmd;
 
-	if (cmd_argc() != 3) {
-		con_printf("usage: %s <key> <command>\n", cmd_argv(0));
+	if (cmd_argc() != 2 && cmd_argc() != 3) {
+		con_printf("usage: %s <key> [command]\n", cmd_argv(0));
 		return;
 	}
 
 	key = key_from_name(cmd_argv(1));
-	cmd = cmd_argv(2);
 
-	if (key == -1) {
+	if(key == -1) {
 		con_printf("invalid key\n");
 		return;
 	}
 
-	key_bind(key, cmd);
+	if(cmd_argc() == 3) {
+		cmd = cmd_argv(2);
+		key_bind(key, cmd);
+	} else {
+		con_printf("%s : \"%s\"\n", cmd_argv(1), input_keys[key].binding);
+	}
+}
+
+void bindlist_f(void)
+{
+	int maxwidth = 0;
+	for(int i = 0; i < (int) (sizeof(input_keys) / sizeof(input_keys[0])); i++) {
+		if(input_keys[i].binding) {
+			int w = ui_strwidth(name_from_key(i));
+			if(w > maxwidth) {
+				maxwidth = w;
+			}
+		}
+	}
+
+	for(int i = 0; i < (int) (sizeof(input_keys) / sizeof(input_keys[0])); i++) {
+		if(input_keys[i].binding) {
+			const char *name = name_from_key(i);
+			int px = maxwidth - ui_strwidth(name);
+			con_printf("%s"COLOR_PADPX"%d : \"%s\"\n", name, px, input_keys[i].binding);
+		}
+	}
 }
 
 void unbind_f(void)
@@ -186,23 +215,26 @@ void unbind_f(void)
 
 void in_init(void)
 {
-	cmd_register("bind", bind_f);
-	cmd_register("unbind", unbind_f);
-
 	cmd_register("+forward", forwarddown_f);
 	cmd_register("-forward", forwardup_f);
 	cmd_register("+back", backdown_f);
 	cmd_register("-back", backup_f);
-	cmd_register("+moveleft", leftdown_f);
-	cmd_register("-moveleft", leftup_f);
-	cmd_register("+moveright", rightdown_f);
-	cmd_register("-moveright", rightup_f);
+	cmd_register("+left", leftdown_f);
+	cmd_register("-left", leftup_f);
+	cmd_register("+right", rightdown_f);
+	cmd_register("-right", rightup_f);
 	cmd_register("+attack", attackdown_f);
 	cmd_register("-attack", attackup_f);
 	cmd_register("+jump", jumpdown_f);
 	cmd_register("-jump", jumpup_f);
+	cmd_register("+sneak", sneakdown_f);
+	cmd_register("-sneak", sneakup_f);
 
-	cvar_register(&in_sensitivity);
+	cmd_register("bind", bind_f);
+	cmd_register("bindlist", bindlist_f);
+	cmd_register("unbind", unbind_f);
+
+	cvar_register(&sensitivity);
 
 	key_bind(KEY_ESCAPE, "toggleconsole");
 }
@@ -210,8 +242,6 @@ void in_init(void)
 
 static void handle_mouse(int x, int y, int scroll)
 {
-	float dx, dy;
-
 	if(con_opened) {
 		con_scroll += scroll;
 		if(con_scroll < 0)
@@ -219,11 +249,15 @@ static void handle_mouse(int x, int y, int scroll)
 		return;
 	}
 
-	dx = ((float)(x)) * 0.022f * in_sensitivity.value;
-	dy = ((float)(y)) * 0.022f * in_sensitivity.value;
+	cl.game.rot[0] += ((float)(y)) * 0.022f * sensitivity.value;
+	cl.game.rot[1] -= ((float)(x)) * 0.022f * sensitivity.value;
 
-	cl.game.rot[0] += dy;
-	cl.game.rot[1] += dx;
+	// limit camera angles
+	cl.game.rot[1] = fmodf(cl.game.rot[1], 360.0f);
+	if(cl.game.rot[0] > 90.0f)
+		cl.game.rot[0] = 90.0f;
+	if(cl.game.rot[0] < -90.0f)
+		cl.game.rot[0] = -90.0f;
 
 	cl.game.rotated = true;
 }
@@ -235,7 +269,6 @@ static void handle_keys(void)
 	if (input_keys[KEY_CAPSLOCK].just_pressed)
 		capslock_keymod = !capslock_keymod;
 
-	// l/r distinction later? what for though?
 	keymod |= input_keys[KEY_LSHIFT].pressed ? KEYMOD_SHIFT : 0;
 	keymod |= input_keys[KEY_RSHIFT].pressed ? KEYMOD_SHIFT : 0;
 	keymod |= input_keys[KEY_LCTRL].pressed ? KEYMOD_CTRL : 0;
@@ -264,33 +297,42 @@ static void handle_keys(void)
 	}
 
 
-	if(cl.state == cl_connected) {
+	if(cl.state == cl_connected && !con_opened) {
 		//fixmee rmme
-		vec3 dir;
-		float cp, sp, cy, sy, spd = 10.0f;
-		cp = cosf(DEG2RAD(-cl.game.rot[0]));
-		sp = sinf(DEG2RAD(-cl.game.rot[0]));
-		cy = cosf(DEG2RAD(-cl.game.rot[1]));
-		sy = sinf(DEG2RAD(-cl.game.rot[1]));
-		dir[0] = sy * cp, dir[1] = -sp, dir[2] = cp * cy;
+		float spd = 20.0f;
+		vec3 fwd, side, up;
+		cam_angles(fwd, side, up, cl.game.rot[1], 0.0f);
+		fwd[1] = 0.0f;
 
 		if(inkeys.forward) {
-			cl.game.pos[0] -= dir[0] * cl.frametime * spd;
-			cl.game.pos[1] -= dir[1] * cl.frametime * spd;
-			cl.game.stance -= dir[1] * cl.frametime * spd;
-			cl.game.pos[2] -= dir[2] * cl.frametime * spd;
+			cl.game.pos[0] += fwd[0] * cl.frametime * spd;
+			cl.game.pos[2] += fwd[2] * cl.frametime * spd;
 			cl.game.moved = true;
 		} else if(inkeys.back) {
-			cl.game.pos[0] += dir[0] * cl.frametime * spd;
-			cl.game.pos[1] += dir[1] * cl.frametime * spd;
-			cl.game.stance += dir[1] * cl.frametime * spd;
-			cl.game.pos[2] += dir[2] * cl.frametime * spd;
+			cl.game.pos[0] -= fwd[0] * cl.frametime * spd;
+			cl.game.pos[2] -= fwd[2] * cl.frametime * spd;
 			cl.game.moved = true;
 		}
 
-		//cl.game.pos[1] -= 9.81f * cl.frametime;
-		//cl.game.stance -= 9.81f * cl.frametime;
+		if(inkeys.left) {
+			cl.game.pos[0] -= side[0] * cl.frametime * spd;
+			cl.game.pos[2] -= side[2] * cl.frametime * spd;
+			cl.game.moved = true;
+		} else if(inkeys.right) {
+			cl.game.pos[0] += side[0] * cl.frametime * spd;
+			cl.game.pos[2] += side[2] * cl.frametime * spd;
+			cl.game.moved = true;
+		}
 
+		if(inkeys.jump) {
+			cl.game.pos[1] += cl.frametime * spd;
+			cl.game.stance += cl.frametime * spd;
+			cl.game.moved = true;
+		} else if(inkeys.sneak) {
+			cl.game.pos[1] -= cl.frametime * spd;
+			cl.game.stance -= cl.frametime * spd;
+			cl.game.moved = true;
+		}
 	}
 
 }

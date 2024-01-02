@@ -25,6 +25,7 @@ HANDLER(PKT_LOGIN_REQUEST, int ent_id, string16 unused, long seed, byte dimensio
 {
 	cl.state = cl_connected;
 	con_printf(COLOR_DGREEN "connected!\n");
+	con_printf(COLOR_CYAN "seed: " COLOR_WHITE "%ld\n", seed);
 	con_hide();
 	cl.game.our_id = ent_id;
 	B_free(unused);
@@ -226,15 +227,12 @@ HANDLER(PKT_PRE_CHUNK, int chunk_x, int chunk_z, bool load)
 
 HANDLER(PKT_MAP_CHUNK, int x, short y, int z, byte size_x, byte size_y, byte size_z, int data_size, byte *data)
 {
-	static int num_paks = 0;
 	int sx, sy, sz;
 	sx = size_x + 1;
 	sy = size_y + 1;
 	sz = size_z + 1;
 	world_load_region_data(x, y, z, sx, sy, sz, data_size, (u_byte *) data);
-	if(sx == 16 && sz == 16 && sy == 128) {
-		num_paks++;
-	}
+
 }
 
 HANDLER(PKT_MULTI_BLOCK_CHANGE, int chunk_x, int chunk_z, short array_size, short *coord_array, byte *id_array, byte *metadata_array)

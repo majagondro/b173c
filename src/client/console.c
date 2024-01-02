@@ -3,9 +3,10 @@
 #include <SDL2/SDL.h>
 #include "input.h"
 #include "vid/vid.h"
+#include "common.h"
 
 #define CONSOLE_MAX_LINES 512
-#define LINE_HEIGHT_PX 8
+#define LINE_HEIGHT_PX 9
 
 struct conline {
 	char line[256];
@@ -91,7 +92,7 @@ static void add_line(struct conline *l)
 
 static void con_submit(void)
 {
-	con_printf("]%s\n", input_line);
+	con_printf(COLOR_GRAY"]%s\n", input_line);
 
 	cmd_exec((char *) input_line, false);
 

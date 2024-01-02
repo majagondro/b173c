@@ -112,7 +112,7 @@ void vid_init(void)
 	cvar_register(&vid_width);
 
 	/* ----- SDL INIT ----- */
-	ok = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
+	ok = SDL_Init(SDL_INIT_VIDEO);
 	if(ok < 0)
 		con_printf("SDL error: %s", SDL_GetError());
 

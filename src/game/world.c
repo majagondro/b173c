@@ -1,43 +1,89 @@
 #include <zlib.h>
 #include "world.h"
 #include "client/console.h"
+#include "vid/vid.h"
+#include "hashmap.h"
 
-struct chunk *chunks;
+int chunk_compare(const void *a, const void *b, void *udata)
+{
+	// 0 if equals i think
+	const struct chunk *ca = a, *cb = b;
+	return !(ca->x == cb->x && ca->z == cb->z);
+}
+
+uint64_t chunk_hash(const void *item, uint64_t seed0, uint64_t seed1)
+{
+	const struct chunk *c = item;
+	union {
+		uint64_t hash;
+		byte data[sizeof(uint64_t)];
+		struct {
+			int x, z;
+		};
+	} data;
+	data.x = c->x;
+	data.z = c->z;
+	return hashmap_xxhash3(data.data, sizeof(data.data), seed0, seed1);
+}
+
+struct hashmap *chunk_map;
 long time = 0;
+
+void world_init(void)
+{
+	chunk_map = hashmap_new(sizeof(struct chunk), 0, 0, 0, chunk_hash, chunk_compare, NULL, NULL);
+}
+
+void world_mark_chunk_dirty(int chunk_x, int chunk_z)
+{
+	if(world_chunk_exists(chunk_x, chunk_z)) {
+		struct chunk *c = world_get_chunk(chunk_x, chunk_z);
+		c->dirty = true;
+		if(c->data) {
+			/* mark render buffers dirty */
+			for(int rb = 0; rb < 8; rb++) {
+				if(c->data->render_bufs[rb]) {
+					// dirty = true
+					*c->data->render_bufs[rb] = true;
+				}
+			}
+		}
+	}
+}
 
 void world_prepare_chunk(int chunk_x, int chunk_z)
 {
-	struct chunk *c;
+	struct chunk c = {0};
 
-	/* alloc new chunk */
-	c = B_malloc(sizeof(*c));
-	c->x = chunk_x;
-	c->z = chunk_z;
-	c->data = B_malloc(sizeof(struct chunk_data));
-	bzero(c->data, sizeof(struct chunk_data));
+	if(world_chunk_exists(chunk_x, chunk_z))
+		return;
 
-	/* add to list */
-	c->next = chunks;
-	chunks = c;
+	c.x = chunk_x;
+	c.z = chunk_z;
+	c.data = B_malloc(sizeof(struct chunk_data));
+
+	/* chunk is copied by hashmap_set, so it can be allocated on the stack */
+	hashmap_set(chunk_map, &c);
+
+	/* mark neighbours dirty */
+	world_mark_chunk_dirty(chunk_x + 1, chunk_z);
+	world_mark_chunk_dirty(chunk_x - 1, chunk_z);
+	world_mark_chunk_dirty(chunk_x, chunk_z + 1);
+	world_mark_chunk_dirty(chunk_x, chunk_z - 1);
 }
 
 void world_delete_chunk(int chunk_x, int chunk_z)
 {
-	struct chunk *c, *prev;
+	struct chunk c;
+	struct chunk *cp;
+	c.x = chunk_x;
+	c.z = chunk_z;
 
-	/* find chunk */
-	for(c = chunks, prev = NULL; c != NULL; prev = c, c = c->next) {
-		if(c->x == chunk_x && c->z == chunk_z) {
-			if(!prev)
-				chunks = c->next;
-			else
-				prev->next = c->next;
+	cp = (struct chunk *) hashmap_get(chunk_map, &c);
+	world_renderer_free_chunk_rbufs(cp);
+	B_free(cp->data);
 
-			B_free(c->data);
-			B_free(c);
-			return;
-		}
-	}
+	hashmap_delete(chunk_map, &c);
 }
 
 int inflate_data(u_byte *in, u_byte *out, size_t size_in, size_t size_out)
@@ -51,7 +97,7 @@ int inflate_data(u_byte *in, u_byte *out, size_t size_in, size_t size_out)
 	strm.avail_in = 0;
 	strm.next_in = Z_NULL;
 	ret = inflateInit(&strm);
-	if (ret != Z_OK) {
+	if(ret != Z_OK) {
 		con_printf("inflate_data: zlib error: %s\n", zError(ret));
 		return ret;
 	}
@@ -62,7 +108,7 @@ int inflate_data(u_byte *in, u_byte *out, size_t size_in, size_t size_out)
 	strm.next_out = out;
 
 	ret = inflate(&strm, Z_NO_FLUSH);
-	switch (ret) {
+	switch(ret) {
 		case Z_NEED_DICT:
 			ret = Z_DATA_ERROR;
 			/* fall through */
@@ -84,22 +130,26 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 	struct chunk_data *chunk_data;
 	u_byte decomp[size_x * size_y * size_z * 5 / 2];
 
-	//con_printf("load region %d %d %d size %d %d %d\n", x,y,z,size_x,size_y,size_z);
-
 	// this region is always contained within a single chunk
 	// i think xd
 	if(!world_chunk_exists(x >> 4, z >> 4)) {
-		//con_printf("world_load_region_data: chunk %d %d does not exist\n", x >> 4, z >> 4);
-		return;
+		world_prepare_chunk(x >> 4, z >> 4);
+	} else {
+		int chunk_x = x >> 4;
+		int chunk_z = z >> 4;
+		/* mark neighbours dirty */
+		world_mark_chunk_dirty(chunk_x + 1, chunk_z);
+		world_mark_chunk_dirty(chunk_x - 1, chunk_z);
+		world_mark_chunk_dirty(chunk_x, chunk_z + 1);
+		world_mark_chunk_dirty(chunk_x, chunk_z - 1);
 	}
 
-	// world_get_chunk(x >> 4, z >> 4)->dirty = true;
-	chunk_data = world_get_chunk(x >> 4, z >> 4)->data;
 	if((dataPos = inflate_data(data, decomp, data_size, sizeof(decomp))) != Z_OK) {
-		con_printf("error while decompressing chunk data: %s\n", zError(dataPos));
+		con_printf(COLOR_RED"error while decompressing chunk data:"COLOR_WHITE"%s\n", zError(dataPos));
 		return;
 	}
 
+	chunk_data = world_get_chunk(x >> 4, z >> 4)->data;
 
 	xStart = x & 15;
 	yStart = y & 127;
@@ -112,8 +162,8 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 	world_get_chunk(x >> 4, z >> 4)->dirty = true;
 	for(y = yStart >> 4; y < yEnd >> 4; y++) {
 		if(chunk_data->render_bufs[y]) {
-			*chunk_data->render_bufs[y] = 1;
-			// mark dirty
+			// dirty = true
+			*chunk_data->render_bufs[y] = true;
 		}
 	}
 
@@ -127,7 +177,7 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 			dataPos += ySize;
 		}
 	}
-
+/*
 	for(x = xStart; x < xEnd; ++x) {
 		for(z = zStart; z < zEnd; ++z) {
 			//int index = (x << 11 | z << 7 | yStart) >> 1;
@@ -154,16 +204,23 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 			dataPos += ySize;
 		}
 	}
+*/
+}
 
+byte chunk_get_block(struct chunk *c, int x, int y, int z)
+{
+	return c->data->blocks[IDX_FROM_COORDS(x, y, z)];
 }
 
 byte world_get_block(int x, int y, int z)
 {
-	if(!world_chunk_exists(x >> 4, z >> 4))
-		return 0;
+	struct chunk *cp;
 	if(y < 0 || y >= 128)
 		return 0;
-	return 1;
+	cp = world_get_chunk(x >> 4, z >> 4);
+	if(!cp)
+		return 1;
+	return chunk_get_block(cp, x & 15, y, z & 15);
 }
 
 void world_set_block(int x, int y, int z, byte id)
@@ -191,13 +248,10 @@ bool world_chunk_exists(int chunk_x, int chunk_z)
 
 struct chunk *world_get_chunk(int chunk_x, int chunk_z)
 {
-	struct chunk *c;
-	for(c = chunks; c != NULL; c = c->next) {
-		if(c->x == chunk_x && c->z == chunk_z) {
-			return c;
-		}
-	}
-	return NULL;
+	struct chunk c;
+	c.x = chunk_x;
+	c.z = chunk_z;
+	return (struct chunk *) hashmap_get(chunk_map, &c);
 }
 
 void world_set_time(long t)
@@ -205,7 +259,8 @@ void world_set_time(long t)
 	time = t;
 }
 
-#define is_between(t,a,b) t >= a && t <= b
+#define is_between(t, a, b) t >= a && t <= b
+
 float *world_get_sky_color(void)
 {
 	static vec3 color;
@@ -220,14 +275,14 @@ float *world_get_sky_color(void)
 	} else if(is_between(t, 11000, 14000)) {
 		// start of night
 		// interpolate between day (11000) and night (14000)
-		float f = (float)(t - 11000) / 3000.0f;
+		float f = (float) (t - 11000) / 3000.0f;
 		color[0] = f * 0.01f + (1.0f - f) * 0.55f;
 		color[1] = f * 0.01f + (1.0f - f) * 0.7f;
 		color[2] = f * 0.03f + (1.0f - f) * 1.0f;
 	} else if(is_between(t, 22000, 24000)) {
 		// start of day
 		// interpolate between night (22000) and day (24000)
-		float f = (float)(t - 22000) / 2000.0f;
+		float f = (float) (t - 22000) / 2000.0f;
 		color[0] = f * 0.55f + (1.0f - f) * 0.01f;
 		color[1] = f * 0.7f + (1.0f - f) * 0.01f;
 		color[2] = f * 1.0f + (1.0f - f) * 0.03f;

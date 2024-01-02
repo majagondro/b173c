@@ -8,13 +8,10 @@
 
 const char *shader_vertex = GLSL_VERSION stringify(
 	layout(location=0) in vec4 VERTEX_IN;
-	/*layout(location=1) in uint sides;*/
-	/*layout(location=2) in uint block_id;*/
 
 	void main()
 	{
-		gl_Position = VERTEX_IN;
-		/*DATA = int(VERTEX_IN.w);*/
+		gl_Position = VERTEX_IN + vec4(0.5f, 0.5f, 0.5f, 0.0f);
 	}
 );
 
@@ -25,25 +22,32 @@ const char *shader_geometry = GLSL_VERSION stringify(
 	uniform mat4 VIEW;
 	uniform mat4 PROJECTION;
 
-	out flat float blockId;
+	out flat int blockId;
+	out flat int metadata;
 	out flat float shade;
+	out vec2 UV;
 
 	int modulo(int a, int b)
 	{
 		return a - (b * int(floor(a / b)));
 	}
 
-	void vert(float ox, float oy, float oz)
+	void vert(float ox, float oy, float oz, float u, float v)
 	{
 		gl_Position = PROJECTION * VIEW * (vec4(gl_in[0].gl_Position.xyz, 1.0f) + vec4(ox, oy, oz, 0.0f));
+		UV.x = u;
+		UV.y = v;
 		EmitVertex();
 	}
 
 	void main()
 	{
-		int data = int(gl_in[0].gl_Position.w);
+		int data =
+		int(gl_in[0].gl_Position.w);
 		int sides = data & 63;
-		blockId = data >> 6;
+		blockId = (data >> 6) & 255;
+		int renderType = (data >> 14) & 31;
+		metadata = data >> 19;
 		shade = 250.0f;
 
 		/* reference image for the comments */
@@ -52,65 +56,128 @@ const char *shader_geometry = GLSL_VERSION stringify(
 		/*              __-__               */
 		/*         ..```  |  ```..          */
 		/*   <---  |      |      |  --->    */
-		/*   -x    |    ..+._    |    -z    */
+		/*   -x    |    _.+._    |    -z    */
 		/*         |..``     ``..|          */
 		/*           ```.._..```            */
 		/*                |                 */
 		/*                | -y              */
 		/*                V                 */
 
-		if((sides & 32) != 0) {
-			/* z- */
-			shade = 150.0f;
-			vert(-0.5f, -0.5f, -0.5f); /* bot left */
-			vert(-0.5f, +0.5f, -0.5f); /* top left */
-			vert(+0.5f, -0.5f, -0.5f); /* bot right */
-			vert(+0.5f, +0.5f, -0.5f); /* top right */
+		if(renderType == 0 || renderType == 2) {
+			float x1 = 0.5f;
+			float x2 = ((renderType == 2) ? (0.5f - 1.0f / 16.0f) : (0.5f));
+			float y = 0.5f;
+			float z1 = 0.5f;
+			float z2 = ((renderType == 2) ? (0.5f - 1.0f / 16.0f) : (0.5f));
+			if((sides & 32) != 0) {
+				/* z- */
+				shade = 150.0f;
+				vert(-x1, -y, -z2, 1.0f, 1.0f); /* bot left */
+				vert(-x1, +y, -z2, 1.0f, 0.0f); /* top left */
+				vert(+x1, -y, -z2, 0.0f, 1.0f); /* bot right */
+				vert(+x1, +y, -z2, 0.0f, 0.0f); /* top right */
+				EndPrimitive();
+			}
+			if((sides & 16) != 0) {
+				/* z+ */
+				shade = 150.0f;
+				vert(-x1, -y, +z2, 0.0f, 1.0f); /* bot left */
+				vert(+x1, -y, +z2, 1.0f, 1.0f); /* bot right */
+				vert(-x1, +y, +z2, 0.0f, 0.0f); /* top left */
+				vert(+x1, +y, +z2, 1.0f, 0.0f); /* top right */
+				EndPrimitive();
+			}
+			if((sides & 8) != 0) {
+				/* x- */
+				shade = 200.0f;
+				vert(-x2, -y, -z1, 0.0f, 1.0f); /* bot right */
+				vert(-x2, -y, +z1, 1.0f, 1.0f); /* bot left */
+				vert(-x2, +y, -z1, 0.0f, 0.0f); /* top right */
+				vert(-x2, +y, +z1, 1.0f, 0.0f); /* top left */
+				EndPrimitive();
+			}
+			if((sides & 4) != 0) {
+				/* x+ */
+				shade = 200.0f;
+				vert(+x2, -y, -z1, 1.0f, 1.0f); /* bot right */
+				vert(+x2, +y, -z1, 1.0f, 0.0f); /* top right */
+				vert(+x2, -y, +z1, 0.0f, 1.0f); /* bot left */
+				vert(+x2, +y, +z1, 0.0f, 0.0f); /* top left */
+				EndPrimitive();
+			}
+			if((sides & 2) != 0) {
+				/* y- */
+				shade = 100.0f;
+				vert(-x1, -y, -z1, 0.0f, 0.0f); /* top */
+				vert(+x1, -y, -z1, 1.0f, 0.0f); /* right */
+				vert(-x1, -y, +z1, 0.0f, 1.0f); /* left */
+				vert(+x1, -y, +z1, 1.0f, 1.0f); /* bottom */
+				EndPrimitive();
+			}
+			if((sides & 1) != 0) {
+				/* y+ */
+				shade = 255.0f;
+				vert(-x1, +y, +z1, 0.0f, 1.0f); /* left */
+				vert(+x1, +y, +z1, 1.0f, 1.0f); /* bottom */
+				vert(-x1, +y, -z1, 0.0f, 0.0f); /* top */
+				vert(+x1, +y, -z1, 1.0f, 0.0f); /* right */
+				EndPrimitive();
+			}
+		} else if(renderType == 1) {
+			float r = sqrt(2) * 0.0625f;
+			shade = 255.0f;
+			vert(-0.5f + r, -0.5f, -0.5f + r, 1.0f, 1.0f);
+			vert(-0.5f + r, +0.5f, -0.5f + r, 1.0f, 0.0f);
+			vert(+0.5f - r, -0.5f, +0.5f - r, 0.0f, 1.0f);
+			vert(+0.5f - r, +0.5f, +0.5f - r, 0.0f, 0.0f);
 			EndPrimitive();
-		}
-		if((sides & 16) != 0) {
-			/* z+ */
-			shade = 150.0f;
-			vert(-0.5f, -0.5f, +0.5f); /* bot left */
-			vert(+0.5f, -0.5f, +0.5f); /* bot right */
-			vert(-0.5f, +0.5f, +0.5f); /* top left */
-			vert(+0.5f, +0.5f, +0.5f); /* top right */
+			vert(+0.5f - r, -0.5f, -0.5f + r, 1.0f, 1.0f);
+			vert(+0.5f - r, +0.5f, -0.5f + r, 1.0f, 0.0f);
+			vert(-0.5f + r, -0.5f, +0.5f - r, 0.0f, 1.0f);
+			vert(-0.5f + r, +0.5f, +0.5f - r, 0.0f, 0.0f);
 			EndPrimitive();
-		}
-		if((sides & 8) != 0) {
-			/* x- */
+			vert(-0.5f + r, -0.5f, -0.5f + r, 1.0f, 1.0f);
+			vert(+0.5f - r, -0.5f, +0.5f - r, 0.0f, 1.0f);
+			vert(-0.5f + r, +0.5f, -0.5f + r, 1.0f, 0.0f);
+			vert(+0.5f - r, +0.5f, +0.5f - r, 0.0f, 0.0f);
+			EndPrimitive();
+			vert(+0.5f - r, -0.5f, -0.5f + r, 1.0f, 1.0f);
+			vert(-0.5f + r, -0.5f, +0.5f - r, 0.0f, 1.0f);
+			vert(+0.5f - r, +0.5f, -0.5f + r, 1.0f, 0.0f);
+			vert(-0.5f + r, +0.5f, +0.5f - r, 0.0f, 0.0f);
+			EndPrimitive();
+		} else if(renderType == 3) {
+			bool is_plate = blockId == 70 || blockId == 72 ;
+			float h = is_plate ? (1.0f / 16.0f) : 0.5f;
+			float x1 = 0.5f - (is_plate ? h : 0.0f);
+			float z1 = 0.5f - (is_plate ? h : 0.0f);
+			float y1 =  h-0.5f;
+			float y2 =   -0.5f;
 			shade = 200.0f;
-			vert(-0.5f, -0.5f, -0.5f); /* bot right */
-			vert(-0.5f, -0.5f, +0.5f); /* bot left */
-			vert(-0.5f, +0.5f, -0.5f); /* top right */
-			vert(-0.5f, +0.5f, +0.5f); /* top left */
+			vert(-x1, y1, +z1,      h,  1.0f -  h);
+			vert(+x1, y1, +z1, 1.0f-h,  1.0f -  h);
+			vert(-x1, y1, -z1,      h,  h);
+			vert(+x1, y1, -z1, 1.0f-h,  h);
 			EndPrimitive();
-		}
-		if((sides & 4) != 0) {
-			/* x+ */
-			shade = 200.0f;
-			vert(+0.5f, -0.5f, -0.5f); /* bot right */
-			vert(+0.5f, +0.5f, -0.5f); /* top right */
-			vert(+0.5f, -0.5f, +0.5f); /* bot left */
-			vert(+0.5f, +0.5f, +0.5f); /* top left */
+			vert(-x1, y2, -z1, 1.0f - h, 1.0f    ); /* bot left */
+			vert(-x1, y1, -z1, 1.0f - h, 1.0f - h); /* top left */
+			vert(+x1, y2, -z1,        h, 1.0f    ); /* bot right */
+			vert(+x1, y1, -z1,        h, 1.0f - h); /* top right */
 			EndPrimitive();
-		}
-		if((sides & 2) != 0) {
-			/* y- */
-			shade = 250.0f;
-			vert(-0.5f, -0.5f, -0.5f); /* top */
-			vert(+0.5f, -0.5f, -0.5f); /* right */
-			vert(-0.5f, -0.5f, +0.5f); /* left */
-			vert(+0.5f, -0.5f, +0.5f); /* bottom */
+			vert(-x1, y2, +z1,        h, 1.0f    ); /* bot left */
+			vert(+x1, y2, +z1, 1.0f - h, 1.0f    ); /* bot right */
+			vert(-x1, y1, +z1,        h, 1.0f - h); /* top left */
+			vert(+x1, y1, +z1, 1.0f - h, 1.0f - h); /* top right */
 			EndPrimitive();
-		}
-		if((sides & 1) != 0) {
-			/* y+ */
-			shade = 250.0f;
-			vert(-0.5f, +0.5f, +0.5f); /* left */
-			vert(+0.5f, +0.5f, +0.5f); /* bottom */
-			vert(-0.5f, +0.5f, -0.5f); /* top */
-			vert(+0.5f, +0.5f, -0.5f); /* right */
+			vert(-x1, y2, -z1,        h, 1.0f    ); /* bot right */
+			vert(-x1, y2, +z1, 1.0f - h, 1.0f    ); /* bot left */
+			vert(-x1, y1, -z1,        h, 1.0f - h); /* top right */
+			vert(-x1, y1, +z1, 1.0f - h, 1.0f - h); /* top left */
+			EndPrimitive();
+			vert(+x1, y1, -z1, 1.0f - h, 1.0f    ); /* bot right */
+			vert(+x1, y2, -z1, 1.0f - h, 1.0f - h); /* top right */
+			vert(+x1, y1, +z1,        h, 1.0f    ); /* bot left */
+			vert(+x1, y2, +z1,        h, 1.0f - h); /* top left */
 			EndPrimitive();
 		}
 	}
@@ -119,36 +186,83 @@ const char *shader_geometry = GLSL_VERSION stringify(
 const char *shader_fragment = GLSL_VERSION stringify(
 	uniform int mode;
 
+	uniform sampler2D TEXTURE0;
+
 	out vec4 COLOR;
-	in flat float blockId;
+	in vec2 UV;
+	in flat int blockId;
+	in flat int metadata;
 	in flat float shade;
+
+	int modulo(int a, int b)
+	{
+		return a - (b * int(floor(a / b)));
+	}
 
 	void main()
 	{
-		COLOR.a = 1;
-		if(blockId == 1) {
-			COLOR.rgb = vec3(0.2f);
-		} else if(blockId == 3 || blockId == 17) {
-			COLOR.rgb = vec3(0.6f, 0.4f, 0.2f);
-		} else if(blockId == 2 || blockId == 18) {
-			COLOR.rgb = vec3(0.2f, 0.5f, 0.2f);
-		} else if(blockId == 9) {
-			COLOR.rgb = vec3(0.15f, 0.15f, 0.65f);
-			COLOR.a = 0.90f;
-		} else if(blockId == 12) {
-			COLOR.rgb = vec3(0.9f, 0.9f, 0.6f);
+		/*
+  		newuv.x = float((modulo(FONTCHAR, 16) + UV.x) * 8) / 128.0f;
+		newuv.y = float((FONTCHAR / 16 + UV.y) * 8) / 128.0f;
+		 */
+		vec4 COLORMOD = vec4(1);
+
+		int tex_y =       ((blockId - 1) / 16);
+		int tex_x = (modulo(blockId - 1, 16));
+
+		if(blockId == 2) {
+			if(shade == 200.0f || shade == 150.0f) {
+				tex_y = 15;
+				tex_x = 15;
+			} else if(shade == 100.0f) {
+				tex_y =        (int(3 - 1) / 16);
+				tex_x = (modulo(int(3) - 1, 16));
+			} else if(shade == 255.0f) {
+				COLORMOD.rgb = vec3(0.3,0.85,0.3);
+			}
+		} else if(blockId == 31 || blockId == 18) {
+			COLORMOD.rgb = vec3(0.3,0.85,0.3);
+		} else if(blockId == 17 && (shade == 255.0f || shade == 100.0f)) {
+			tex_y = 15;
+			tex_x = 14;
 		} else if(blockId == 81) {
-			COLOR.rgb = vec3(0.1f, 0.3f, 0.1f);
-		} else {
-			COLOR.rgb = vec3(blockId / 256.0f);
+			if(shade == 255.0f) {
+				tex_y = 15;
+				tex_x = 12;
+			} else if(shade == 100.0f) {
+				tex_y = 15;
+				tex_x = 13;
+			}
+		} else if(blockId == 58) {
+			if(shade == 150.0f) {
+				tex_y = 14;
+				tex_x = 15;
+			} else if(shade == 255.0f) {
+				tex_y = 13;
+				tex_x = 15;
+ 			} else if(shade == 100.0f) {
+				tex_y = 0;
+				tex_x = 4;
+			}
+		} else if(blockId == 72 || blockId == 44) {
+			tex_y = 0;
+			tex_x = 4;
+		} else if(blockId == 70) {
+			tex_y = 0;
+			tex_x = 0;
 		}
-		COLOR.rgb *= shade / 256.0f;
-		if(mode == 0 && COLOR.a < 1) {
+
+		vec2 newuv;
+		newuv.x = float(tex_x) / 16.0f + UV.x / 16.0f;
+		newuv.y = float(tex_y) / 16.0f + UV.y / 16.0f;
+		COLOR = texture(TEXTURE0, newuv) * COLORMOD * vec4(vec3(shade / 256.0f), 1.0f);
+
+		if(mode == 1 && COLOR.a == 0) {
 			discard;
-		} else if(mode == 1 && COLOR.a == 1) {
+		} else if(mode == 0 && COLOR.a < 1) {
 			discard;
 		}
-		//COLOR = vec4(1);
+
 	}
 
 );

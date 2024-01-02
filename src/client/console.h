@@ -19,7 +19,10 @@
 #define COLOR_PINK "\xa7" "d"
 #define COLOR_YELLOW "\xa7" "e"
 #define COLOR_WHITE "\xa7" "f"
-#define STYLE_PADDED "\xa7" "p"
+#define COLOR_INVISIBLE "\xa7" "i"
+/* must be followed by an integer */
+/* moves the cursor right by (the integer) pixels */
+#define COLOR_PADPX "\xa7" "p"
 
 typedef struct cvar {
 	char *name;

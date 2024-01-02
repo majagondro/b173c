@@ -233,7 +233,7 @@ static void cmd_cvar(void)
 	if(cmd_argc() == 1) {
 		// display info
 		con_printf("%s : default value is \"%s\"\n", name, c->string);
-		con_printf(STYLE_PADDED "%s : " STYLE_PADDED "current value is \"%s\"\n", name, c->string);
+		con_printf(COLOR_INVISIBLE "%s : " COLOR_WHITE "current value is \"%s\"\n", name, c->string);
 	} else {
 		// set
 		cvar_set(name, cmd_argv(1));
@@ -346,7 +346,7 @@ static int recurse_protection = 0;
 
 static bool is_color_code(char c)
 {
-	return isdigit(c) || (c >= 'a' && c <= 'f');
+	return isdigit(c) || (c >= 'a' && c <= 'f') || c == 'p' || c == 'i';
 }
 
 static void replace_color_codes(char *text)

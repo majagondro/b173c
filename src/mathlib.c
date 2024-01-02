@@ -35,22 +35,14 @@ void mat_identity(float dest[4][4])
 void cam_angles(vec3 fwd, vec3 side, vec3 up, float yaw, float pitch)
 {
 	float cp, sp, cy, sy;
+	cp = cosf(DEG2RAD(pitch));
+	sp = sinf(DEG2RAD(pitch));
+	cy = cosf(DEG2RAD(yaw));
+	sy = sinf(DEG2RAD(yaw));
 
-	// limit camera angles
-	yaw = fmodf(yaw, 360.0f);
-	if(pitch > 90.0f)
-		pitch = 90.0f;
-	if(pitch < -90.0f)
-		pitch = -90.0f;
-
-	cp = cosf(DEG2RAD(-pitch));
-	sp = sinf(DEG2RAD(-pitch));
-	cy = cosf(DEG2RAD(-yaw));
-	sy = sinf(DEG2RAD(-yaw));
-
-	side[0] = cy;
+	side[0] = -cy;
 	side[1] = 0;
-	side[2] = -sy;
+	side[2] = sy;
 
 	up[0] = sy * sp;
 	up[1] = cp;
@@ -63,23 +55,11 @@ void cam_angles(vec3 fwd, vec3 side, vec3 up, float yaw, float pitch)
 
 void mat_view(mat4 dest, const vec3 pos, vec3 ang)
 {
-	float cp, sp, cy, sy, *x, *y, *z;
+	vec3 x, y, z;
 
-	// limit camera angles
-	ang[1] = fmodf(ang[1], 360.0f);
-	if(ang[0] > 90.0f)
-		ang[0] = 90.0f;
-	if(ang[0] < -90.0f)
-		ang[0] = -90.0f;
-
-	cp = cosf(DEG2RAD(-ang[0]));
-	sp = sinf(DEG2RAD(-ang[0]));
-	cy = cosf(DEG2RAD(-ang[1]));
-	sy = sinf(DEG2RAD(-ang[1]));
-
-	x = (vec3){cy, 0, -sy};
-	y = (vec3){sy * sp, cp, cy * sp};
-	z = (vec3){sy * cp, -sp, cp * cy};
+	cam_angles(z, x, y, ang[1], ang[0]);
+	vec3_invert(z, z);
+	//vec3_invert(x, x);
 
 	for(int i = 0; i < 3; i++) {
 		dest[i][0] = x[i];

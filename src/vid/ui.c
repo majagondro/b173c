@@ -208,6 +208,8 @@ int ui_charwidth(u_byte c)
 int ui_strwidth(const char *text)
 {
 	int w = 0;
+	if(!text)
+		return 0;
 	while(*text)
 		w += ui_charwidth(*text++);
 	return w;
@@ -244,7 +246,7 @@ void ui_drawtext(const char *text, int x, int y)
 {
 	int color = 0xf;
 	bool read_color_code = false;
-	bool pad = false;
+	bool invisible = false;
 
 	// skip characters outside the screen
 	while(x < -CON_CHAR_SIZE && *text) {
@@ -257,11 +259,19 @@ void ui_drawtext(const char *text, int x, int y)
 
 	while(*text) {
 		if(read_color_code) {
-			if(*text == 'p') {
-				pad = !pad;
-				read_color_code = false;
-				text++;
-				continue;
+			switch(*text) {
+				case 'i': {
+					invisible = true;
+					read_color_code = false;
+					text++;
+					continue;
+				} break;
+				case 'p': {
+					read_color_code = false;
+					text++;
+					x += strtol(text, &text, 10);
+					continue;
+				} break;
 			}
 
 			if(isdigit(*text))
@@ -272,6 +282,7 @@ void ui_drawtext(const char *text, int x, int y)
 			if(color < 0x0 || color > 0xf)
 				color = 0xf;
 
+			invisible = false;
 			read_color_code = false;
 			text++;
 			continue;
@@ -281,7 +292,7 @@ void ui_drawtext(const char *text, int x, int y)
 			continue;
 		}
 
-		if(!pad) {
+		if(!invisible) {
 			if(!ui_drawchar(*text, x, y, color)) {
 				break;
 			}

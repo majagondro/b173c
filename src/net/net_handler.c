@@ -2,6 +2,7 @@
 #include "game/world.h"
 #include "client/console.h"
 #include "client/client.h"
+#include "vid/vid.h"
 
 void skip_metadata(void);
 
@@ -28,6 +29,7 @@ HANDLER(PKT_LOGIN_REQUEST, int ent_id, string16 unused, long seed, byte dimensio
 	con_printf(COLOR_CYAN "seed: " COLOR_WHITE "%ld\n", seed);
 	con_hide();
 	cl.game.our_id = ent_id;
+	vid_unlock_fps();
 	B_free(unused);
 }
 
@@ -346,6 +348,7 @@ HANDLER(PKT_DISCONNECT, string16 reason)
 	con_printf("you got kicked: %s\n", c8(reason));
 	cmd_exec("disconnect", false);
 	cl.state = cl_disconnected;
+	vid_lock_fps();
 	B_free(reason);
 }
 

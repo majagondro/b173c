@@ -219,17 +219,20 @@ bool ui_drawchar(u_byte c, int x, int y, int color)
 {
 	int b = c;
 
+	if(c == '\n')
+		return true; // hack as fack
+
 	if(color >= 0) // draw shadow
 		ui_drawchar(c, x+1, y+1, -color);
 
-	if(fontcharcount > MAX_CON_CHARS - 10) {
-		con_printf("font count is @ %d!!!! not drawing any text anymore\n", fontcharcount);
+	if(fontcharcount > MAX_CON_CHARS - 100) {
+		con_printf(COLOR_RED"font count is @ %d!!!! not drawing any text anymore\n", fontcharcount);
 		return false;
 	}
 
-	if(x < -CON_CHAR_SIZE || x > ui_w)
+	if(x <= -ui_charwidth(c) || x >= ui_w)
 		return false;
-	if(y < -CON_CHAR_SIZE || y > ui_h)
+	if(y <= -LINE_HEIGHT_PX || y >= ui_h)
 		return false;
 
 	fontdata[fontcharcount][0] = ((float)x) / ((float)ui_w);
@@ -248,14 +251,14 @@ void ui_drawtext(const char *text, int x, int y)
 	bool read_color_code = false;
 	bool invisible = false;
 
+	if(y == -LINE_HEIGHT_PX || y >= ui_h)
+		return; // cant be seen anyway
+
 	// skip characters outside the screen
-	while(x < -CON_CHAR_SIZE && *text) {
+	while(x < -ui_charwidth(*text) && *text) {
 		x += ui_charwidth(*text);
 		text++;
 	}
-
-	if(y == -CON_CHAR_SIZE || y > ui_h)
-		return; // cant be seen anyway
 
 	while(*text) {
 		if(read_color_code) {

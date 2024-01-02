@@ -6,16 +6,12 @@
 #include "common.h"
 
 #define CONSOLE_MAX_LINES 512
-#define LINE_HEIGHT_PX 9
+#define CONSOLE_MAX_LINE 256
 
-struct conline {
-	char line[256];
-	int len;
-	struct conline *next, *prev;
-} *conlines = NULL;
-
-#define MAX_INPUT_LEN 256
-static char input_line[MAX_INPUT_LEN+1] = {0};
+static char conbuf[1024 * 1024];
+static size_t conbuf_len = 0;
+static size_t conbuf_lines = 0;
+static char input_line[CONSOLE_MAX_LINE + 1] = {0};
 static int input_pos = 0;
 static int history_idx = 0;
 static int line_count = 0;
@@ -45,9 +41,6 @@ void con_hide(void)
 
 void con_init(void)
 {
-	conlines = B_malloc(sizeof(*conlines));
-	memset(conlines, 0, sizeof(*conlines));
-
 	cmd_init();
 
 	cmd_register("toggleconsole", toggleconsole_f);
@@ -55,48 +48,23 @@ void con_init(void)
 
 static void con_putinc(u_byte c)
 {
-	if(input_pos < MAX_INPUT_LEN) {
-		if(strnlen(input_line, MAX_INPUT_LEN) == MAX_INPUT_LEN) {
+	if(input_pos < CONSOLE_MAX_LINE) {
+		if(strnlen(input_line, CONSOLE_MAX_LINE) == CONSOLE_MAX_LINE) {
 			// dont
 		} else {
-			memmove(&input_line[input_pos + 1], &input_line[input_pos], MAX_INPUT_LEN - input_pos - 1);
+			memmove(&input_line[input_pos + 1], &input_line[input_pos], CONSOLE_MAX_LINE - input_pos - 1);
 			input_line[input_pos++] = c;
 		}
 	}
 }
 
-static void free_excess_lines(void)
-{
-	struct conline *l = conlines;
-	line_count = 0;
-
-	while(l->next != NULL) {
-		l = l->next;
-		line_count++;
-	}
-
-	while(line_count-- > CONSOLE_MAX_LINES) {
-		l = l->prev;
-		B_free(l->next);
-		l->next = NULL;
-	}
-}
-
-static void add_line(struct conline *l)
-{
-	conlines->prev = l;
-	l->next = conlines;
-	conlines = l;
-	free_excess_lines();
-}
-
 static void con_submit(void)
 {
-	con_printf(COLOR_GRAY"]%s\n", input_line);
+	con_printf("]%s\n", input_line);
 
 	cmd_exec((char *) input_line, false);
 
-	memset(input_line, 0, MAX_INPUT_LEN);
+	memset(input_line, 0, CONSOLE_MAX_LINE);
 	input_pos = 0;
 
 	// reset history index
@@ -106,25 +74,9 @@ static void con_submit(void)
 	con_scroll = 0;
 }
 
-static struct conline *get_nth_inputted_line(int n)
+static const char *get_nth_inputted_line(int n)
 {
-	struct conline *c;
-	int i;
-
-	if(!conlines)
-		return NULL;
-
-	c = conlines;
-	for(i = 0; i < n+1 && c != NULL;) {
-		if(c->line[0] == ']' && c->line[1] != '\0') {
-			i++;
-			if(i >= n+1) {
-				break;
-			}
-		}
-		c = c->next;
-	}
-	return c;
+	return NULL;
 }
 
 static int calc_max_scroll(void)
@@ -168,17 +120,17 @@ bool con_handle_key(int key, int keymod)
 
 		case KEY_BACKSPACE: {
 			if (input_pos > 0) {
-				if(input_pos == MAX_INPUT_LEN)
+				if(input_pos == CONSOLE_MAX_LINE)
 					input_line[input_pos - 1] = 0;
 				else
-					memmove(&input_line[input_pos - 1], &input_line[input_pos], MAX_INPUT_LEN - input_pos);
+					memmove(&input_line[input_pos - 1], &input_line[input_pos], CONSOLE_MAX_LINE - input_pos);
 				input_pos--;
 			}
 		} break;
 
 		case KEY_DELETE: {
-			if(input_pos < MAX_INPUT_LEN) {
-				memmove(&input_line[input_pos], &input_line[input_pos + 1], MAX_INPUT_LEN - input_pos);
+			if(input_pos < CONSOLE_MAX_LINE) {
+				memmove(&input_line[input_pos], &input_line[input_pos + 1], CONSOLE_MAX_LINE - input_pos);
 			}
 		} break;
 
@@ -198,7 +150,7 @@ bool con_handle_key(int key, int keymod)
 			if(keymod & KEYMOD_CTRL) {
 				con_scroll = calc_max_scroll();
 			} else {
-				input_pos = MAX_INPUT_LEN;
+				input_pos = CONSOLE_MAX_LINE;
 			}
 		} break;
 
@@ -209,7 +161,7 @@ bool con_handle_key(int key, int keymod)
 		} break;
 
 		case KEY_RIGHT: {
-			if(input_pos < (int) strnlen(input_line, MAX_INPUT_LEN)) {
+			if(input_pos < (int) strnlen(input_line, CONSOLE_MAX_LINE)) {
 				input_pos++;
 			}
 		} break;
@@ -220,7 +172,7 @@ bool con_handle_key(int key, int keymod)
 				history_idx = -1;
 			/* fall through */
 		case KEY_UP: {
-			struct conline *l;
+			/*struct conline *l;
 			l = get_nth_inputted_line(history_idx);
 			if(l == NULL) {
 				if(history_idx != 0) {
@@ -230,10 +182,10 @@ bool con_handle_key(int key, int keymod)
 				}
 				return true;
 			}
-			strlcpy(input_line, l->line+1, 255);
+			strlcpy(input_line, l->line+1, CONSOLE_MAX_LINE - 1);
 			input_pos = strlen(input_line) - 1;
 			input_line[input_pos] = 0;
-			history_idx++;
+			history_idx++;*/
 		} break;
 
 #define checkkey(k, c) case (k): { con_putinc(c); } break
@@ -269,92 +221,140 @@ bool con_handle_key(int key, int keymod)
 	return true;
 }
 
+static void recalc_num_lines(void)
+{
+	conbuf_lines = 0;
+	for(size_t i = 0; i < sizeof(conbuf); i++) {
+		if(conbuf[i] == '\n') {
+			conbuf_lines++;
+		}
+	}
+}
+
 void con_printf(char *fmt, ...)
 {
-	struct conline *l;
-	char *text, *p;
 	va_list va;
-	size_t len = strlen(fmt) + 2048; // additional space for expansions
+	size_t n;
 
-	text = B_malloc(len + 1);
-	memset(text, 0, len + 1);
-	p = text;
+	if(!fmt)
+		return;
 
 	va_start(va, fmt);
-	vsnprintf(text, len, fmt, va);
+	n = (size_t) vsnprintf(conbuf + conbuf_len, sizeof(conbuf), fmt, va);
+	conbuf_len += n + 1;
 	va_end(va);
 
-	printf("%s", text);
-
-	while(*p != 0) {
-		if(conlines->len < 256) {
-			if(*p == '\n') { // the font has a symbol for \n, dont display it
-				conlines->line[conlines->len++] = ' ';
-			} else {
-				conlines->line[conlines->len++] = *p;
-			}
-		} else {
-			// TODO: word wrapping
-		}
-
-		if(*p == '\n') {
-			l = B_malloc(sizeof(*l));
-			memset(l, 0, sizeof(*l));
-			add_line(l);
-			p++;
-			continue;
-		}
-
-		p++;
+	if(n >= sizeof(conbuf)) {
+		// free old stuff
+		size_t nb = sizeof(conbuf) / 2;
+		memmove(conbuf, conbuf + nb, nb);
+		conbuf_len = nb;
+		conbuf_len += snprintf(conbuf, sizeof(conbuf), "console buffer truncated\n");
 	}
 
-	B_free(text);
+	recalc_num_lines();
 }
 
 static void draw_input_line(int y)
 {
-	static ulong flash_tick = 0;
-	static u_byte flash_char = '|';
-	static bool flash = false;
+	// todo: always show cursor while the user is typing
+	static ulong blink_tick = 0;
+	static u_byte blink_char = '|';
+	static bool blink = false;
 
-	if(flash)
-		ui_printf(0, y, "]%.*s%c%s", input_pos, input_line, flash_char, input_line + input_pos);
+	if(blink)
+		ui_printf(1, y, "]%.*s%c%s", input_pos, input_line, blink_char, input_line + input_pos);
 	else
-		ui_printf(0, y, "]%s", input_line);
+		ui_printf(1, y, "]%s", input_line);
 
-	if(SDL_GetTicks64() - flash_tick > 400) {
-		flash_tick = SDL_GetTicks64();
-		flash = !flash;
+	if(SDL_GetTicks64() - blink_tick > 800) {
+		blink_tick = SDL_GetTicks64();
+		blink = !blink;
+	}
+}
+static char *textwidthwordmax(char *text, int maxwidth)
+{
+	int w = 0;
+	char *lastword = text;
+	while(*text && w < maxwidth) {
+		w += ui_charwidth(*text);
+		if(isspace(*text)) {
+			lastword = text;
+		}
+		text++;
+	}
+	return w > 0 ? lastword + 1 : NULL;
+}
+
+static void drawwrap(int x, int *y, char *p, int *scroll)
+{
+	char *end;
+	char old;
+
+	if(*y < -LINE_HEIGHT_PX || *y >= ui_h)
+		return;
+
+	// todo: calculate proper y and go down instead of up? thus removing recursion
+	end = textwidthwordmax(p, ui_w);
+
+	if(!end)
+		// drawtext p?
+		return;
+
+	if(ui_strwidth(end) > ui_w) {
+		drawwrap(x, y, end, scroll);
+	} else {
+		if(*scroll <= 0) {
+			ui_drawtext(end, x, *y);
+			*y -= LINE_HEIGHT_PX;
+		}
+		(*scroll)--;
+	}
+
+	if(*scroll <= 0) {
+		old = *end;
+		*end = 0;
+		ui_drawtext(p, x, *y);
+		*end = old;
+		*y -= LINE_HEIGHT_PX;
+	} else {
+		(*scroll)--;
 	}
 }
 
 void ui_draw_console(void)
 {
-	int y = ui_h / 2 - LINE_HEIGHT_PX;
-	struct conline *l = conlines;
+	int y = ui_h / 2;
 	int scroll = con_scroll;
+	int num_lines_that_fit = y / LINE_HEIGHT_PX;
+	char *p;
 
 	if(!con_opened)
 		return;
+	if(conbuf_len <= 0)
+		return;
 
-	draw_input_line(y + LINE_HEIGHT_PX);
+	draw_input_line(y);
+	y -= LINE_HEIGHT_PX;
 
-	while(scroll-- >= 0 && l != NULL)
-		l = l->next;
-
-	if(con_scroll > 0) {
-		// draw scroll indicator
-		ui_printf(0, y, "...%d more line%s...", con_scroll, con_scroll > 1 ? "s" : "");
-		if(l == NULL)
-			return; // only draw indicator, no lines above this
-		l = l->next;
-		y -= LINE_HEIGHT_PX;
-	}
-
-	for(; y >= 0; y -= LINE_HEIGHT_PX) {
-		if(l != NULL) {
-			ui_printf(0, y, "%s", l->line);
-			l = l->next;
+	p = conbuf + conbuf_len - 2;
+	for(int i = 0; i < num_lines_that_fit + con_scroll; i++) {
+		while(*p)
+			p--;
+		p++;
+		if(ui_strwidth(p) >= ui_w - 8) {
+			drawwrap(1, &y, p, &scroll);
+		} else if(scroll <= 0) {
+			ui_printf(1, y, p);
+			y -= LINE_HEIGHT_PX;
 		}
+		scroll--;
+		if(p == conbuf) {
+			break;
+		}
+		if(y <= -LINE_HEIGHT_PX) {
+			break;
+		}
+		p -= 2;
 	}
 }

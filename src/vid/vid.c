@@ -139,8 +139,6 @@ void vid_init(void)
 	gl.shader3d = load_shader(shader_vertex, shader_fragment, shader_geometry);
 	gl.shader2d = load_shader(shader_vertex2d, shader_fragment2d, NULL);
 
-	SDL_GL_SetSwapInterval(0);
-
 	now = SDL_GetPerformanceCounter();
 
 	glEnable(GL_DEPTH_TEST);
@@ -148,6 +146,16 @@ void vid_init(void)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	world_renderer_init();
+}
+
+void vid_lock_fps(void)
+{
+	SDL_GL_SetSwapInterval(-1);
+}
+
+void vid_unlock_fps(void)
+{
+	SDL_GL_SetSwapInterval(0);
 }
 
 void vid_shutdown(void)
@@ -164,7 +172,6 @@ void vid_shutdown(void)
 	SDL_DestroyWindow(window_handle);
 }
 
-void ui_update_size(int, int);
 void vid_update_viewport(void)
 {
 	SDL_GetWindowSize(window_handle, &gl.w, &gl.h);
@@ -172,6 +179,7 @@ void vid_update_viewport(void)
 	cvar_set("vid_width", va("%d", gl.w));
 	cvar_set("vid_height", va("%d", gl.h));
 	cvar_find("ui_scale")->onchange(); // hack as fack
+	cvar_find("fov")->onchange(); // hack as fack
 }
 
 void vid_mouse_grab(bool grab)

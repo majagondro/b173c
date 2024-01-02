@@ -3,6 +3,8 @@
 
 #include "common.h"
 
+#define LINE_HEIGHT_PX 9
+
 extern int ui_w, ui_h;
 
 void ui_init(void);

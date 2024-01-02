@@ -10,6 +10,7 @@
 #include "net_internal.h"
 #include "client/client.h"
 #include "client/console.h"
+#include "vid/vid.h"
 #include <setjmp.h>
 
 static bool init_ok = false;
@@ -134,6 +135,7 @@ void net_process(void)
 	if(should_disconnect) {
 		net_connect(NULL, 0);
 		cl.state = cl_disconnected;
+		vid_lock_fps();
 		net_write_packets(); // reset handshake flag
 		should_disconnect = false;
 	}
@@ -604,6 +606,7 @@ void net_shutdown(void)
 	}
 
 	cl.state = cl_disconnected;
+	vid_lock_fps();
 }
 
 void net_read_buf(void *dest, size_t n)
@@ -918,6 +921,7 @@ void disconnect_f(void)
 
 		// net_update will disconnect next update
 		cl.state = cl_disconnected;
+		vid_lock_fps();
 		should_disconnect = true;
 
 		con_show();

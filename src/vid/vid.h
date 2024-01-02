@@ -15,8 +15,11 @@ void vid_update(void);
 
 void vid_update_viewport(void);
 void vid_mouse_grab(bool grab);
+void vid_lock_fps(void);
+void vid_unlock_fps(void);
 
 void vid_display_frame(void);
+
 
 void world_renderer_init(void);
 void world_renderer_shutdown(void);

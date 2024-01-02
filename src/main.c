@@ -71,7 +71,7 @@ int main(void)
 		net_timeout -= cl.frametime;
 		if(net_timeout <= 0.0f) {
 			net_process();
-			net_timeout = 0.01f;
+			net_timeout = 0.05f;
 		}
 
 		vid_update();

@@ -35,7 +35,7 @@ vec2 glyph_vertices[] = {
 	{2.0f, -2.0f}, {1.0f, 1.0f},
 };
 
-#include "ext/default.c"
+#include "ext/pixelbrains.c"
 int charwidths[256] = {0};
 vec4 fontdata[MAX_CON_CHARS] = {0};
 int fontcharcount = 0;
@@ -80,7 +80,7 @@ static void calculate_char_widths(void)
 			continue;
 		}
 
-		xe = 7;
+		xe = 1;
 		xs = 0;
 
 		x = (c % 16) * CON_CHAR_SIZE;
@@ -100,13 +100,15 @@ static void calculate_char_widths(void)
 					start_set = true;
 				}
 			} else {
-				xe = x2 - x;
-				if(empty) {
-					break;
+				if(!empty) {
+					xe = x2 - x + 1;
 				}
 			}
 		}
 		charwidths[c] = xe - xs + 1;
+		if(charwidths[c] < 0) {
+			charwidths[c] = 0;
+		}
 	}
 }
 

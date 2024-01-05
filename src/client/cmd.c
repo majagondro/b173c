@@ -12,12 +12,14 @@ static int $argc = 0;
 static char *emptystr = "";
 
 cvar developer = {"developer", "0"};
+cvar cvar_name = {"name", "player"};
 
 // cmds.c
 void cmds_register(void);
 void cmd_init(void)
 {
 	cvar_register(&developer);
+	cvar_register(&cvar_name);
 	cmds_register();
 }
 

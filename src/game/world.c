@@ -122,6 +122,16 @@ int inflate_data(u_byte *in, u_byte *out, size_t size_in, size_t size_out)
 	return Z_OK;
 }
 
+static void copy4to8(void *dest, void *src, size_t n)
+{
+	u_byte *in = src;
+	u_byte *out = dest;
+	while(n-- > 0) {
+		*out++ = (*in   & 0x0f);
+		*out++ = (*in++ & 0xf0) >> 4;
+	}
+}
+
 void world_load_region_data(int x, short y, int z, int size_x, int size_y, int size_z, int data_size, u_byte *data)
 {
 	int xStart, yStart, zStart;
@@ -177,34 +187,33 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 			dataPos += ySize;
 		}
 	}
-/*
+
 	for(x = xStart; x < xEnd; ++x) {
 		for(z = zStart; z < zEnd; ++z) {
-			//int index = (x << 11 | z << 7 | yStart) >> 1;
+			int index = (x << 11 | z << 7 | yStart) >> 1;
 			int ySize = (yEnd - yStart) / 2;
-			// System.arraycopy(data, dataPos, this.data.data, index, ySize);
+			memcpy(chunk_data->metadata + index, decomp + dataPos, ySize);
 			dataPos += ySize;
 		}
 	}
 
 	for(x = xStart; x < xEnd; ++x) {
 		for(z = zStart; z < zEnd; ++z) {
-			//int index = (x << 11 | z << 7 | yStart) >> 1;
+			int index = (x << 11 | z << 7 | yStart) >> 1;
 			int ySize = (yEnd - yStart) / 2;
-			// System.arraycopy(data, dataPos, this.blocklightMap.data, index, ySize);
+			memcpy(chunk_data->blocklight + index, decomp + dataPos, ySize);
 			dataPos += ySize;
 		}
 	}
 
 	for(x = xStart; x < xEnd; ++x) {
 		for(z = zStart; z < zEnd; ++z) {
-			//int index = (x << 11 | z << 7 | yStart) >> 1;
+			int index = (x << 11 | z << 7 | yStart) >> 1;
 			int ySize = (yEnd - yStart) / 2;
-			// System.arraycopy(data, dataPos, this.skylightMap.data, index, ySize);
+			memcpy(chunk_data->skylight + index, decomp + dataPos, ySize);
 			dataPos += ySize;
 		}
 	}
-*/
 }
 
 byte chunk_get_block(struct chunk *c, int x, int y, int z)
@@ -223,6 +232,38 @@ byte world_get_block(int x, int y, int z)
 	return chunk_get_block(cp, x & 15, y, z & 15);
 }
 
+u_byte chunk_get_block_lighting(struct chunk *c, int x, int y, int z)
+{
+	int i = IDX_FROM_COORDS(x, y, z);
+	int block_id = c->data->blocks[i];
+	int l, bl;
+	if(block_id == 44 || block_id == 60 || block_id == 53 || block_id == 67) {
+		int py = world_get_block_lighting(x, y + 1, z);
+		int px = world_get_block_lighting(x + 1, y, z);
+		int nx = world_get_block_lighting(x - 1, y, z);
+		int pz = world_get_block_lighting(x, y, z + 1);
+		int nz = world_get_block_lighting(x, y, z - 1);
+		return max(py, max(px, max(nx, max(pz, nz))));
+	}
+	l = GET4BIT(c->data->skylight, i);
+	bl = GET4BIT(c->data->blocklight, i);
+	return (bl > l ? bl : l) & 15;
+}
+
+u_byte world_get_block_lighting(int x, int y, int z)
+{
+	struct chunk *cp;
+	if(y < 0)
+		return 0;
+	if(y >= 128)
+		return 15;
+	cp = world_get_chunk(x >> 4, z >> 4);
+	if(!cp)
+		return 15;
+	return chunk_get_block_lighting(cp, x & 15, y, z & 15);
+}
+
+
 void world_set_block(int x, int y, int z, byte id)
 {
 	struct chunk *c;
@@ -239,6 +280,24 @@ void world_set_block(int x, int y, int z, byte id)
 		*c->data->render_bufs[y >> 4] = 1;
 
 	c->data->blocks[IDX_FROM_COORDS(x & 15, y, z & 15)] = id;
+}
+
+void world_set_metadata(int x, int y, int z, byte metadata)
+{
+	struct chunk *c;
+	if(!world_chunk_exists(x >> 4, z >> 4))
+		return;
+	if(y < 0 || y >= 128)
+		return;
+
+	c = world_get_chunk(x >> 4, z >> 4);
+
+	// mark dirty
+	c->dirty = true;
+	if(c->data->render_bufs[y >> 4])
+		*c->data->render_bufs[y >> 4] = true;
+
+	c->data->metadata[IDX_FROM_COORDS(x & 15, y, z & 15) >> 1] = metadata;
 }
 
 bool world_chunk_exists(int chunk_x, int chunk_z)
@@ -294,4 +353,28 @@ float *world_get_sky_color(void)
 	}
 
 	return color;
+}
+
+float world_get_light_modifier(void)
+{
+	float lmod;
+	int t = time % 24000;
+	if(is_between(t, 14000, 22000)) {
+		// darkest night
+		lmod = 1.0f;
+	} else if(is_between(t, 11000, 14000)) {
+		// start of night
+		// interpolate between day (11000) and night (14000)
+		float f = (float) (t - 11000) / 3000.0f;
+		lmod = f * 1.0f + (1.0f - f) * 15.0f;
+	} else if(is_between(t, 22000, 24000)) {
+		// start of day
+		// interpolate between night (22000) and day (24000)
+		float f = (float) (t - 22000) / 2000.0f;
+		lmod = f * 15.0f + (1.0f - f) * 1.0f;
+	} else {
+		// day
+		lmod = 15.0f;
+	}
+	return lmod / 15.0f;
 }

@@ -12,9 +12,10 @@ void net_write_packets(void)
 	}
 
 	if(cl.state == cl_connecting && !sent_handshake) {
+		extern cvar cvar_name;
 		// send handshake once
 		con_printf(COLOR_DGRAY "awaiting handshake...\n");
-		net_write_0x02(c16("player"));
+		net_write_0x02(c16(cvar_name.string));
 		sent_handshake = true;
 	}
 

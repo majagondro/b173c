@@ -8,7 +8,7 @@
 #define CONSOLE_MAX_LINES 512
 #define CONSOLE_MAX_LINE 256
 
-static char conbuf[1024 * 1024];
+static char conbuf[1024 * 1024] = {0};
 static size_t conbuf_len = 0;
 static size_t conbuf_lines = 0;
 static char input_line[CONSOLE_MAX_LINE + 1] = {0};
@@ -241,11 +241,14 @@ void con_printf(char *fmt, ...)
 
 	va_start(va, fmt);
 	n = (size_t) vsnprintf(conbuf + conbuf_len, sizeof(conbuf), fmt, va);
+	printf("%s", conbuf + conbuf_len);
 	conbuf_len += n + 1;
+
 	va_end(va);
 
 	if(n >= sizeof(conbuf)) {
 		// free old stuff
+		// todo reprint again
 		size_t nb = sizeof(conbuf) / 2;
 		memmove(conbuf, conbuf + nb, nb);
 		conbuf_len = nb;

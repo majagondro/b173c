@@ -14,7 +14,7 @@
 static mat4 view_mat = {0};
 static mat4 proj_mat = {0};
 static u_int vao, tex;
-static u_int loc_mode, loc_proj, loc_view;
+static u_int loc_mode, loc_proj, loc_view, loc_nightlightmod;
 
 struct {
 	struct plane {
@@ -23,9 +23,9 @@ struct {
 	} top, bottom, right, left, far, near;
 } frustum = {0};
 
-struct face {
+struct block {
 	float x, y, z;
-	float data;
+	float data1, data2;
 } __attribute__((packed));
 
 static void recalculate_projection_matrix(void);
@@ -51,14 +51,18 @@ void world_renderer_init(void)
 	/* init vao */
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
-	glVertexAttribFormat(0, 4, GL_FLOAT, GL_FALSE, 0);
+	glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0);
+	glVertexAttribFormat(1, 2, GL_FLOAT, GL_FALSE, 12);
 	glVertexAttribBinding(0, 0);
+	glVertexAttribBinding(1, 0);
 	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
 	glBindVertexArray(0);
 
 	loc_view = glGetUniformLocation(gl.shader3d, "VIEW");
 	loc_proj = glGetUniformLocation(gl.shader3d, "PROJECTION");
-	loc_mode = glGetUniformLocation(gl.shader3d, "mode");
+	loc_mode = glGetUniformLocation(gl.shader3d, "RENDER_MODE");
+	loc_nightlightmod = glGetUniformLocation(gl.shader3d, "NIGHTTIME_LIGHT_MODIFIER");
 
 	/* load terrain texture */
 	glGenTextures(1, &tex);
@@ -155,9 +159,17 @@ static void recalculate_projection_matrix(void)
 
 static bool alpha_blocks[256] = {
 	[0] = true,
+	[6] = true,
 	[8] = true,
 	[9] = true,
+	[10] = true,
+	[11] = true,
 	[18] = true,
+	[20] = true,
+	[26] = true,
+	[27] = true,
+	[28] = true,
+	[30] = true,
 	[31] = true,
 	[32] = true,
 	[37] = true,
@@ -165,40 +177,44 @@ static bool alpha_blocks[256] = {
 	[39] = true,
 	[40] = true,
 	[44] = true,
+	[50] = true,
+	[52] = true,
+	[53] = true,
+	[55] = true,
+	[59] = true,
+	[60] = true,
+	[64] = true,
+	[65] = true,
+	[66] = true,
+	[67] = true,
+	[69] = true,
 	[70] = true,
 	[72] = true,
+	[75] = true,
+	[76] = true,
+	[77] = true,
+	[78] = true,
+	[79] = true,
 	[81] = true,
-	[83] = true
+	[83] = true,
+	[85] = true,
+	[88] = true,
+	[90] = true,
+	[92] = true,
+	[96] = true
 };
 
-static int render_type(byte blockid)
+static bool is_water(u_byte block_id)
 {
-	switch(blockid) {
-		case 31:
-		case 32:
-		case 37:
-		case 38:
-		case 39:
-		case 40:
-		case 83:
-			return 1; /* X */
-		case 81:
-			return 2; /* cactus */
-		case 70:
-		case 72:
-		case 44:
-			return 3; /* slab/pressure plate */
-	}
-	return 0;
+	// todo: nether portal block too?
+	return block_id == 8 || block_id == 9;
 }
-
-#define make_idx(x, y, z) ((((x) & 15) << 11) | (((z) & 15) << 7) | ((y) & 127))
 
 static u_byte getbl(struct chunk *c, int x, int y, int z)
 {
 	if(x < 0 || x > 15 || z < 0 || z > 15)
 		return world_get_block(x + (c->x << 4), y, z + (c->z << 4));
-	return c->data->blocks[make_idx(x, y, z)];
+	return c->data->blocks[IDX_FROM_COORDS(x, y, z)];
 }
 
 static int check_side(struct chunk *c, int x, int y, int z, u_byte idself, int side)
@@ -211,7 +227,7 @@ static int check_side(struct chunk *c, int x, int y, int z, u_byte idself, int s
 
 static int visible_faces(int x, int y, int z, struct chunk *c, int block_id_self)
 {
-	if(c->data->blocks[make_idx(x, y, z)] == 0)
+	if(c->data->blocks[IDX_FROM_COORDS(x, y, z)] == 0)
 		return 0; // air (id 0) isnt drawn
 
 	return check_side(c, x, y + 1, z, block_id_self, 1) |
@@ -222,13 +238,44 @@ static int visible_faces(int x, int y, int z, struct chunk *c, int block_id_self
 		   check_side(c, x, y, z - 1, block_id_self, 32);
 }
 
+static u_byte getbl_light(struct chunk *c, int x, int y, int z)
+{
+	if(y < 0 || y > 127)
+		return 0;
+	if(x < 0 || x > 15 || z < 0 || z > 15)
+		return world_get_block_lighting(x + (c->x << 4), y, z + (c->z << 4));
+	return chunk_get_block_lighting(c, x, y, z);
+}
+
+static int calc_light_data(int sides, int x, int y, int z, struct chunk *c)
+{
+	u_byte l[6] = {0};
+	if(sides & 1)
+		l[0] = getbl_light(c, x, y+1, z);
+	if(sides & 2)
+		l[1] = getbl_light(c, x, y-1, z);
+	if(sides & 4)
+		l[2] = getbl_light(c, x+1, y, z);
+	if(sides & 8)
+		l[3] = getbl_light(c, x-1, y, z);
+	if(sides & 16)
+		l[4] = getbl_light(c, x, y, z+1);
+	if(sides & 32)
+		l[5] = getbl_light(c, x, y, z-1);
+	return  (l[0] & 15) |
+			(l[1] & 15) << 4 |
+			(l[2] & 15) << 8 |
+			(l[3] & 15) << 12 |
+			(l[4] & 15) << 16 |
+			(l[5] & 15) << 20;
+}
 
 struct render_buf {
 	byte dirty;
 	bool visible;
 	int num_opaq_faces, num_alpha_faces;
 	u_int gl_buf_opaq, gl_buf_alpha;
-	struct face *opaque_faces, *alpha_faces;
+	struct block *opaque_faces, *alpha_faces;
 };
 
 extern struct hashmap *chunk_map;
@@ -252,7 +299,7 @@ static void build_buffers(void)
 
 			if(c->data->render_bufs[rb] == NULL) {
 				c->data->render_bufs[rb] = B_malloc(sizeof(struct render_buf));
-				*c->data->render_bufs[rb] = 1; // new buf, mark dirty
+				*c->data->render_bufs[rb] = true; // new buf, mark dirty
 			}
 
 			center[0] = (c->x << 4) - cl.game.pos[0] + 8;
@@ -265,7 +312,7 @@ static void build_buffers(void)
 			} else {
 				struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
 				int o_face;
-				int t_face;
+				int a_face;
 				int *face;
 
 				// mark chunk and this piece as visible
@@ -290,10 +337,10 @@ static void build_buffers(void)
 					for(int z = 0; z < 16; z++) {
 						for(int y = 0; y < 16; y++) {
 							int block_y = (rb << 4) + y;
-							int block_id = c->data->blocks[make_idx(x, block_y, z)];
+							int block_id = c->data->blocks[IDX_FROM_COORDS(x, block_y, z)];
 							if(block_id > 0) {
 								int n = visible_faces(x, block_y, z, c, block_id) > 0 ? 1 : 0;
-								if(alpha_blocks[block_id]) {
+								if(is_water(block_id)) {
 									r_buf->num_alpha_faces += n;
 								} else {
 									r_buf->num_opaq_faces += n;
@@ -307,26 +354,27 @@ static void build_buffers(void)
 				if(r_buf->num_opaq_faces <= 0 && r_buf->num_alpha_faces <= 0) {
 					r_buf->visible = false;
 					return; // return, dont stall the cpu too much by building
-					        // all rbufs or we get lag spikes
-					continue;
+					        // all rbufs in a single frame or we get lag spikes
 				}
 
 				/* build buffers */
-				o_face = t_face = 0;
-				r_buf->opaque_faces = B_malloc(sizeof(struct face) * r_buf->num_opaq_faces);
-				r_buf->alpha_faces = B_malloc(sizeof(struct face) * r_buf->num_alpha_faces);
+				o_face = a_face = 0;
+				r_buf->opaque_faces = B_malloc(sizeof(struct block) * r_buf->num_opaq_faces);
+				r_buf->alpha_faces = B_malloc(sizeof(struct block) * r_buf->num_alpha_faces);
 				for(int x = 0; x < 16; x++) {
 					for(int z = 0; z < 16; z++) {
 						for(int y = 0; y < 16; y++) {
 							int block_y = (rb << 4) + y;
-							int block_id = c->data->blocks[make_idx(x, block_y, z)];
+							int idx = IDX_FROM_COORDS(x, block_y, z);
+							int block_id = c->data->blocks[idx];
+							u_byte metadata = GET4BIT(c->data->metadata, idx);
 							if(block_id > 0) {
-								struct face *buf;
+								struct block *buf;
 								int sides;
 
-								if(alpha_blocks[block_id]) {
+								if(is_water(block_id)) {
 									buf = r_buf->alpha_faces;
-									face = &t_face;
+									face = &a_face;
 								} else {
 									buf = r_buf->opaque_faces;
 									face = &o_face;
@@ -334,10 +382,17 @@ static void build_buffers(void)
 
 								sides = visible_faces(x, block_y, z, c, block_id);
 								if(sides != 0) {
+									int d1, d2;
 									buf[*face].x = (float) x + (float) (c->x << 4);
 									buf[*face].z = (float) z + (float) (c->z << 4);
 									buf[*face].y = (float) block_y;
-									buf[*face].data = (float) (sides + (block_id << 6) + (render_type(block_id) << 14));
+									d1 = sides;
+									d1 += block_id << 6;
+									d1 += metadata << 14;
+									d1 += getbl_light(c, x, block_y, z) << 18;
+									d2 = calc_light_data(sides, x, block_y, z, c);
+									buf[*face].data1 = (float) d1;
+									buf[*face].data2 = (float) d2;
 									(*face)++;
 								}
 							}
@@ -347,25 +402,19 @@ static void build_buffers(void)
 
 				if(r_buf->num_opaq_faces > 0) {
 					glBindBuffer(GL_ARRAY_BUFFER, r_buf->gl_buf_opaq);
-					glBufferData(GL_ARRAY_BUFFER, r_buf->num_opaq_faces * sizeof(struct face), r_buf->opaque_faces, GL_DYNAMIC_DRAW);
+					glBufferData(GL_ARRAY_BUFFER, r_buf->num_opaq_faces * sizeof(struct block), r_buf->opaque_faces, GL_DYNAMIC_DRAW);
 					glBindBuffer(GL_ARRAY_BUFFER, 0);
 				}
 				if(r_buf->num_alpha_faces > 0) {
 					glBindBuffer(GL_ARRAY_BUFFER, r_buf->gl_buf_alpha);
-					glBufferData(GL_ARRAY_BUFFER, r_buf->num_alpha_faces * sizeof(struct face), r_buf->alpha_faces, GL_DYNAMIC_DRAW);
+					glBufferData(GL_ARRAY_BUFFER, r_buf->num_alpha_faces * sizeof(struct block), r_buf->alpha_faces, GL_DYNAMIC_DRAW);
 					glBindBuffer(GL_ARRAY_BUFFER, 0);
 				}
-				return;
+				return; // return, dont stall the cpu too much by building
+						// all rbufs in a single frame or we get lag spikes
 			}
 		}
 	}
-}
-
-float dist_to_player(struct chunk *c)
-{
-	float xd = cl.game.pos[0] - ((c->x << 4) + 8);
-	float zd = cl.game.pos[2] - ((c->z << 4) + 8);
-	return xd * xd + zd * zd;
 }
 
 int wr_total_faces;
@@ -402,6 +451,7 @@ void world_render(void)
 
 	glUniformMatrix4fv(loc_view, 1, GL_FALSE, (const GLfloat *) view_mat);
 	glUniformMatrix4fv(loc_proj, 1, GL_FALSE, (const GLfloat *) proj_mat);
+	glUniform1f(loc_nightlightmod, world_get_light_modifier());
 
 	glBindTexture(GL_TEXTURE_2D, tex);
 
@@ -420,7 +470,7 @@ void world_render(void)
 
 			if(r_buf->num_opaq_faces > 0) {
 				glUniform1i(loc_mode, 0);
-				glBindVertexBuffer(0, r_buf->gl_buf_opaq, 0, sizeof(vec4));
+				glBindVertexBuffer(0, r_buf->gl_buf_opaq, 0, sizeof(struct block));
 				glDrawArrays(GL_POINTS, 0, r_buf->num_opaq_faces);
 				wr_total_faces += r_buf->num_opaq_faces;
 				wr_draw_calls++;
@@ -442,7 +492,7 @@ void world_render(void)
 
 			if(r_buf->num_alpha_faces > 0) {
 				glUniform1i(loc_mode, 1);
-				glBindVertexBuffer(0, r_buf->gl_buf_alpha, 0, sizeof(vec4));
+				glBindVertexBuffer(0, r_buf->gl_buf_alpha, 0, sizeof(struct block));
 				glDrawArrays(GL_POINTS, 0, r_buf->num_alpha_faces);
 				wr_total_faces += r_buf->num_alpha_faces;
 				wr_draw_calls++;

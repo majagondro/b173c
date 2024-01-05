@@ -5,6 +5,8 @@
 #include "common.h"
 #include <math.h>
 
+#define max(a, b) ((a) > (b) ? (a) : (b))
+
 #define DEG2RAD(d) ((d) * (3.1415f / 180.0f))
 
 #define vec3_copy(dest, a) dest[0] = a[0], dest[1] = a[1], dest[2] = a[2]

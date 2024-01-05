@@ -63,6 +63,8 @@ int main(void)
 	cmd_exec("exec config", false);
 	cmd_exec("exec autoexec", false);
 
+	con_printf("lorem ipsum dolor sit amet.\n");
+
 	while(!cl.done) {
 		cl.frametime = calc_frametime();
 

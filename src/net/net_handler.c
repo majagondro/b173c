@@ -35,10 +35,11 @@ HANDLER(PKT_LOGIN_REQUEST, int ent_id, string16 unused, long seed, byte dimensio
 
 HANDLER(PKT_HANDSHAKE, string16 conn_hash)
 {
+	extern cvar cvar_name;
 	cl.state = cl_connecting;
 	// if conn_hash[0] == '+', auth to mojang or something
 	// nah
-	NET_WRITE(PKT_LOGIN_REQUEST, PROTOCOL_VERSION, c16("player"), 0, 0);
+	NET_WRITE(PKT_LOGIN_REQUEST, PROTOCOL_VERSION, c16(cvar_name.string), 0, 0);
 	con_printf(COLOR_GRAY "awaiting login approval...\n");
 	B_free(conn_hash);
 }
@@ -246,20 +247,23 @@ HANDLER(PKT_MULTI_BLOCK_CHANGE, int chunk_x, int chunk_z, short array_size, shor
 		return;
 	for(i = 0; i < array_size; i++) {
 		byte id = id_array[i];
-		int x, y, z, c = coord_array[i];
+		int x, y, z, c = coord_array[i], idx;
 		x = (c >> 12) & 4;
 		z = (c >> 8) & 4;
 		y = c & 255;
 		if(y > 127)
 			continue;
 
-		chunk->data->blocks[IDX_FROM_COORDS(x,y,z)] = id;
+		idx = IDX_FROM_COORDS(x, y, z);
+		chunk->data->blocks[idx] = id;
+		chunk->data->metadata[idx] = metadata_array[i];
 	}
 }
 
 HANDLER(PKT_BLOCK_CHANGE, int x, byte y, int z, byte block_id, byte metadata)
 {
 	world_set_block(x, y, z, block_id);
+	world_set_metadata(x, y, z, metadata);
 }
 
 HANDLER(PKT_BLOCK_ACTION, int x, short y, int z, byte data1, byte data2)

@@ -136,7 +136,7 @@ void vid_init(void)
 		con_printf("Failed to initialize GLAD");
 
 	// load shaders
-	gl.shader3d = load_shader(shader_vertex, shader_fragment, shader_geometry);
+	gl.shader3d = load_shader(blocks_v_glsl, blocks_f_glsl, blocks_g_glsl);
 	gl.shader2d = load_shader(shader_vertex2d, shader_fragment2d, NULL);
 
 	now = SDL_GetPerformanceCounter();
@@ -213,7 +213,7 @@ void vid_display_frame(void)
 	}
 
 	/* draw 2d stuff */
-	glPolygonMode(GL_FRONT_AND_BACK,  GL_FILL);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glUseProgram(gl.shader2d);
 	ui_commit();
 

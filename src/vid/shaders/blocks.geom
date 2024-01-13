@@ -1,8 +1,8 @@
-#version 430 core
+#version 460 core
 layout(points) in;
 layout(triangle_strip, max_vertices = 24) out;
 
-in vec2[] DATA;
+layout(location=0) in vec2[] DATA;
 
 uniform mat4 VIEW;
 uniform mat4 PROJECTION;
@@ -440,44 +440,8 @@ void vert2(float ox, float oy, float oz, vec2 uv)
     EmitVertex();
 }
 
-void render_block_standard(int block_id, int metadata, int[7] light, int sides)
+void render_block_standard_impl(vec3 min, vec3 max, int block_id, int metadata, int[7] light, int sides)
 {
-    vec3 min = vec3(0.0f);
-    vec3 max = vec3(1.0f);
-
-    if(block_id == 44) {
-        max.y = 0.5f;
-    } else if(block_id == 70 || block_id == 72) {
-        min.x = 1.0f / 16.0f;
-        min.z = 1.0f / 16.0f;
-        max.x = 15.0f / 16.0f;
-        max.y = (metadata == 1 ? 0.5f : 1.0f) / 16.0f;
-        max.z = 15.0f / 16.0f;
-        light[5] = light[4] = light[3] = light[2] = light[1] = light[0] = light[6];
-    } else if(block_id == 77) {
-        bool pressed = (metadata & 8) != 0;
-        int side = metadata & 7;
-        float ymin = 6.0f / 16.0f;
-        float ymax = 10.0f / 16.0f;
-        float side1 = 3.0f / 16.0f;
-        float side2 = (pressed ? 1.0f : 2.0f) / 16.0f;
-        if(side == 1) {
-            min = vec3(0.0f, ymin, 0.5f - side1);
-            max = vec3(side2, ymax, 0.5f + side1);
-        } else if(side == 2) {
-            min = vec3(1.0f - side2, ymin, 0.5f - side1);
-            max = vec3(1.0f, ymax, 0.5f + side1);
-        } else if(side == 3) {
-            min = vec3(0.5f - side1, ymin, 0.0f);
-            max = vec3(0.5f + side1, ymax, side2);
-        } else if(side == 4) {
-            min = vec3(0.5f - side1, ymin, 1.0f - side2);
-            max = vec3(0.5f + side1, ymax, 1.0f);
-        }
-        light[5] = light[4] = light[3] = light[2] = light[1] = light[0] = light[6];
-    }
-
-
     if((sides & 32) != 0 || min.z != 0.0f) {
         float u1 = min.x;
         float v1 = min.y;
@@ -556,6 +520,101 @@ void render_block_standard(int block_id, int metadata, int[7] light, int sides)
         vert(max.x, max.y, max.z, vec2(u2, v2));
         EndPrimitive();
     }
+}
+
+void render_block_standard(int block_id, int metadata, int[7] light, int sides)
+{
+    vec3 min = vec3(0.0f);
+    vec3 max = vec3(1.0f);
+
+    if (block_id == 44) {
+        // single slab
+        max.y = 0.5f;
+    } else if (block_id == 70 || block_id == 72) {
+        // pressure plates
+        min.x = 1.0f / 16.0f;
+        min.z = 1.0f / 16.0f;
+        max.x = 15.0f / 16.0f;
+        max.y = (metadata == 1 ? 0.5f : 1.0f) / 16.0f;
+        max.z = 15.0f / 16.0f;
+        light[5] = light[4] = light[3] = light[2] = light[1] = light[0] = light[6];
+    } else if (block_id == 77) {
+        // button
+        bool pressed = (metadata & 8) != 0;
+        int side = metadata & 7;
+        float ymin = 6.0f / 16.0f;
+        float ymax = 10.0f / 16.0f;
+        float side1 = 3.0f / 16.0f;
+        float side2 = (pressed ? 1.0f : 2.0f) / 16.0f;
+        if (side == 1) {
+            min = vec3(0.0f, ymin, 0.5f - side1);
+            max = vec3(side2, ymax, 0.5f + side1);
+        } else if (side == 2) {
+            min = vec3(1.0f - side2, ymin, 0.5f - side1);
+            max = vec3(1.0f, ymax, 0.5f + side1);
+        } else if (side == 3) {
+            min = vec3(0.5f - side1, ymin, 0.0f);
+            max = vec3(0.5f + side1, ymax, side2);
+        } else if (side == 4) {
+            min = vec3(0.5f - side1, ymin, 1.0f - side2);
+            max = vec3(0.5f + side1, ymax, 1.0f);
+        }
+        light[5] = light[4] = light[3] = light[2] = light[1] = light[0] = light[6];
+    } else if(block_id == 85) {
+        // fence
+        min = vec3(6.0f / 16.0f, 0.0f, 6.0f / 16.0f);
+        max = vec3(10.0f / 16.0f, 1.0f, 10.0f / 16.0f);
+        light[5] = light[4] = light[3] = light[2] = light[1] = light[0] = light[6];
+        render_block_standard_impl(min, max, block_id, metadata, light, sides);
+
+        if((metadata & 1) != 0) {
+            // connected to -x
+            int s = 1 | 2 | 8 | 16 | 32;
+            min = vec3(0.0f, 12.0f / 16.0f, 7.0f / 16.0f);
+            max = vec3(0.5f, 15.0f / 16.0f, 9.0f / 16.0f);
+            if((metadata & 2) != 0) {
+                // also connected to +x
+                max.x = 1.0f;
+                s |= 4;
+                metadata &= ~2;
+            }
+            render_block_standard_impl(min, max, block_id, metadata, light, s);
+        }
+
+        if((metadata & 2) != 0) {
+            // connected to +x
+            int s = 1 | 2 | 4 | 16 | 32;
+            min = vec3(0.5f, 12.0f / 16.0f, 7.0f / 16.0f);
+            max = vec3(1.0f, 15.0f / 16.0f, 9.0f / 16.0f);
+            render_block_standard_impl(min, max, block_id, metadata, light, s);
+        }
+
+        if((metadata & 4) != 0) {
+            // connected to -z
+            int s = 1 | 2 | 4 | 8 | 32;
+            min = vec3(7.0f / 16.0f, 12.0f / 16.0f, 0.0f);
+            max = vec3(9.0f / 16.0f, 15.0f / 16.0f, 0.5f);
+            if((metadata & 8) != 0) {
+                // also connected to +x
+                max.z = 1.0f;
+                s |= 16;
+                metadata &= ~8;
+            }
+            render_block_standard_impl(min, max, block_id, metadata, light, s);
+        }
+
+        if((metadata & 8) != 0) {
+            // connected to +z
+            int s = 1 | 2 | 4 | 8 | 16;
+            min = vec3( 7.0f / 16.0f, 12.0f / 16.0f, 0.5f);
+            max = vec3( 9.0f / 16.0f, 15.0f / 16.0f, 1.0f);
+            render_block_standard_impl(min, max, block_id, metadata, light, s);
+        }
+
+        return;
+    }
+
+    render_block_standard_impl(min, max, block_id, metadata, light, sides);
 }
 
 void render_block_cross(int block_id, int metadata, int light_level)
@@ -681,7 +740,6 @@ void render_block_torch(int block_id, int metadata, int light_level)
     vert(x_mhalf + skew_x, y + 0.0f, z + 1.0f / 16.0f + skew_z, vec2(0, 1));
     vert(x_mhalf         , y + 1.0f, z + 1.0f / 16.0f         , vec2(0, 0));
     EndPrimitive();
-
 }
 
 void main()

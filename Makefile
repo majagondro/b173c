@@ -1,5 +1,6 @@
 CC := gcc
-CFLAGS := -ggdb3 -Wall -Wpedantic -Wextra -Wdeclaration-after-statement -Iinclude
+CFLAGS := -ggdb -Wall -Wpedantic -Wextra -Wdeclaration-after-statement -Iinclude -Wno-unused-parameter
+# CFLAGS += -fsanitize=address
 LDFLAGS := -lm
 
 # add SDL2

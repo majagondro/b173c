@@ -6,15 +6,16 @@
 #include "ui.h"
 #include "client/client.h"
 #include "game/world.h"
+#include <SDL2/SDL_vulkan.h>
 
 SDL_Window *window_handle;
 SDL_GLContext glcontext;
 
-ulong frames_drawn = 0;
-ulong last_check_tick = 0; // for fps because its a little more stable and looks nicer :)
-ulong then = 0, now = 0; // for frametime
+u_long frames_drawn = 0;
+u_long last_check_tick = 0; // for fps because its a little more stable and looks nicer :)
+u_long then = 0, now = 0; // for frametime
 
-cvar vid_width  = {"vid_width", "1280"};
+cvar vid_width = {"vid_width", "1280"};
 cvar vid_height = {"vid_height", "720"};
 
 struct gl_state gl;
@@ -23,7 +24,7 @@ struct gl_state gl;
 
 static bool check_shader_compile_impl(uint h, const char *name)
 {
-	int ok, loglen;
+	int ok = true, loglen;
 	char *log;
 
 	glGetShaderiv(h, GL_COMPILE_STATUS, &ok);
@@ -34,6 +35,7 @@ static bool check_shader_compile_impl(uint h, const char *name)
 		glGetShaderInfoLog(h, loglen, &loglen, log);
 		con_printf("shader '%s' failed to compile: %s\n", name, log);
 		glDeleteShader(h);
+		B_free(log);
 	}
 
 	return ok;
@@ -41,19 +43,26 @@ static bool check_shader_compile_impl(uint h, const char *name)
 
 static uint check_program_compile(uint h, uint h_vs, uint h_fs)
 {
-	int ok, loglen;
+	int ok = true, loglen;
 	char *log;
 
-	glGetProgramiv(h, GL_LINK_STATUS, &ok);
+	printf("asd\n");
+	//glGetProgramiv(h, GL_LINK_STATUS, &ok);
+	printf("asd222\n");
 	if(!ok) {
+		printf("NOTOK\n");
 		glGetProgramiv(h, GL_INFO_LOG_LENGTH, &loglen);
+		printf("after get\n");
 		log = B_malloc(loglen + 1);
 		memset(log, 0, loglen + 1);
 		glGetProgramInfoLog(h, loglen, &loglen, log);
+		printf("after get infolog\n");
 		con_printf("shader program failed to compile:\n%s\n", log);
 		glDeleteProgram(h);
 		glDeleteShader(h_vs);
 		glDeleteShader(h_fs);
+		printf("after deletes\n");
+		B_free(log);
 		return 0;
 	}
 
@@ -61,11 +70,12 @@ static uint check_program_compile(uint h, uint h_vs, uint h_fs)
 	glDetachShader(h, h_fs);
 	glDeleteShader(h_vs);
 	glDeleteShader(h_fs);
+	printf("after deletes 22\n");
 
 	return h;
 }
 
-static uint load_shader(const char *vs, const char *fs, const char *gs)
+static uint load_shader(const char *vs, const char *fs, const char *gs, size_t s)
 {
 	uint h_vs, h_fs, h_gs, h_prog;
 
@@ -86,11 +96,18 @@ static uint load_shader(const char *vs, const char *fs, const char *gs)
 	// geometry shader
 	if(gs) {
 		h_gs = glCreateShader(GL_GEOMETRY_SHADER);
-		glShaderSource(h_gs, 1, &gs, NULL);
-		glCompileShader(h_gs);
+		//glShaderSource(h_gs, 1, &gs, NULL);
+		printf("shadbin\n");
+		glShaderBinary(1, &h_gs, GL_SHADER_BINARY_FORMAT_SPIR_V, gs, s);
+		printf("specshad\n");
+		glSpecializeShader(h_gs, "main", 0, NULL, NULL);
+		printf("done :-)\n");
+		//glCompileShader(h_gs);
 		if(!check_shader_compile(h_gs)) {
+			printf("ret 0 :-)\n");
 			return 0;
 		}
+		printf("checkd :-)\n");
 	}
 
 	h_prog = glCreateProgram();
@@ -100,13 +117,22 @@ static uint load_shader(const char *vs, const char *fs, const char *gs)
 		glAttachShader(h_prog, h_gs);
 	}
 	glLinkProgram(h_prog);
+		printf("aaa :-)\n");
 	return check_program_compile(h_prog, h_vs, h_fs);
+}
+
+void gl_debug_message(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
+{
+	fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+			(type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
+			type, severity, message);
 }
 
 void vid_init(void)
 {
 	int flags, ok;
 	int x = SDL_WINDOWPOS_CENTERED, y = SDL_WINDOWPOS_CENTERED;
+	extern unsigned char geom_spirv[];
 
 	cvar_register(&vid_height);
 	cvar_register(&vid_width);
@@ -118,7 +144,7 @@ void vid_init(void)
 
 	SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, true);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
 	flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL | SDL_WINDOW_INPUT_FOCUS | SDL_WINDOW_SHOWN;
@@ -135,9 +161,15 @@ void vid_init(void)
 	if(!ok)
 		con_printf("Failed to initialize GLAD");
 
+	// enable debug ooutput
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(gl_debug_message, 0);
+
 	// load shaders
-	gl.shader3d = load_shader(blocks_v_glsl, blocks_f_glsl, blocks_g_glsl);
-	gl.shader2d = load_shader(shader_vertex2d, shader_fragment2d, NULL);
+	size_t sz = 0;
+	char *data = SDL_LoadFile("geom.spv", &sz);
+	gl.shader3d = load_shader(blocks_v_glsl, blocks_f_glsl, data, sz);
+	gl.shader2d = load_shader(shader_vertex2d, shader_fragment2d, NULL, 0);
 
 	now = SDL_GetPerformanceCounter();
 
@@ -160,7 +192,7 @@ void vid_unlock_fps(void)
 
 void vid_shutdown(void)
 {
-	SDL_GL_DeleteContext(glcontext);
+	// SDL_GL_DeleteContext(glcontext);
 	SDL_DestroyWindow(window_handle);
 
 	SDL_Quit();
@@ -175,7 +207,7 @@ void vid_shutdown(void)
 void vid_update_viewport(void)
 {
 	SDL_GetWindowSize(window_handle, &gl.w, &gl.h);
-	glViewport(0, 0, gl.w * (16/9), gl.h);
+	glViewport(0, 0, gl.w * (16 / 9), gl.h);
 	cvar_set("vid_width", va("%d", gl.w));
 	cvar_set("vid_height", va("%d", gl.h));
 	cvar_find("ui_scale")->onchange(); // hack as fack

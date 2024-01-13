@@ -280,6 +280,15 @@ struct render_buf {
 
 extern struct hashmap *chunk_map;
 
+static u_byte construct_fence_metadata(int x, int y, int z)
+{
+	u_byte nx = world_get_block(x - 1, y, z) == 85 ? 1 : 0;
+	u_byte px = world_get_block(x + 1, y, z) == 85 ? 2 : 0;
+	u_byte nz = world_get_block(x, y, z - 1) == 85 ? 4 : 0;
+	u_byte pz = world_get_block(x, y, z + 1) == 85 ? 8 : 0;
+	return nx | px | nz | pz;
+}
+
 static void build_buffers(void)
 {
 	// fixme: +zoom, load new chunks, unzoom, some old chunks get rebuilt?
@@ -368,6 +377,10 @@ static void build_buffers(void)
 							int idx = IDX_FROM_COORDS(x, block_y, z);
 							int block_id = c->data->blocks[idx];
 							u_byte metadata = GET4BIT(c->data->metadata, idx);
+							if(block_id == 85) {
+								// of course...
+								metadata = construct_fence_metadata(x + (c->x << 4), block_y, z + (c->z << 4));
+							}
 							if(block_id > 0) {
 								struct block *buf;
 								int sides;

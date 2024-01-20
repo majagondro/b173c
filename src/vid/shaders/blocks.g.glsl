@@ -2,7 +2,7 @@
 layout(points) in;
 layout(triangle_strip, max_vertices = 24) out;
 
-layout(location=0) in vec2[] DATA;
+in vec2[] DATA;
 
 uniform mat4 VIEW;
 uniform mat4 PROJECTION;
@@ -113,109 +113,35 @@ const ivec2 block_textures[NUM_BLOCKS] = ivec2[NUM_BLOCKS](
     ivec2( 4,  5)  // trapdoor
 );
 
-const int block_render_types[NUM_BLOCKS] = int[NUM_BLOCKS](
-    0, // air/error
-    0, // stone
-    0, // grass
-    0, // dirt
-    0, // cobble
-    0, // planks
-    1, // oak sampling
-    0, // bedrock
-    4, // water
-    4, // water
-    4, // lava
-    4, // lava
-    0, // sand
-    0, // gravel
-    0, // gold ore
-    0, // iron ore
-    0, // coal ore
-    0, // oak log
-    0, // oak leaves
-    0, // sponge
-    0, // glass
-    0, // lapis ore
-    0, // lapis block
-    0, // dispenser
-    0, // sandstone
-    0, // noteblock
-    14, // bed
-    9, // powered rail
-    9, // detector rail
-    0, // sticky piston
-    1, // cobweb
-    1, // tall grass
-    1, // deadbush
-    0, // piston
-    0, // piston head?
-    0, // wool
-    0, // top grass block thing?
-    1, // yellow flower
-    1, // red flower
-    1, // brown mushroom
-    1, // red mushroom
-    0, // gold block
-    0, // iron block
-    0, // double slab
-    0, // single slab
-    0, // bricks
-    0, // tnt
-    0, // bookshelf
-    0, // mossy cobblestone
-    0, // obsidian
-    2, // torch
-    3, // fire
-    0, // spawner
-    10, // wooden stairs
-    0, // chest
-    5, // redstone dust
-    0, // diamond ore
-    0, // diamond block
-    0, // workbench
-    6, // crops
-    0, // farmland
-    0, // furnace
-    0, // burning furnace
-    0, // ?
-    7, // door
-    8, // ladder
-    9, // rail
-    10, // cobblestone stairs
-    0, // ?
-    12, // lever
-    0, // stone pressure plate
-    7, // iron door
-    0, // wooden pressure plate
-    0, // redstone ore
-    0, // redstone ore 2
-    2, // disabled redstone torch
-    2, // redstone torch
-    0, // stone button
-    0, // snow layer
-    0, // ice
-    0, // snow
-    13, // cactus
-    0, // clay
-    1, // reeds
-    0, // jukebox
-    11, // fence
-    0, // pumpkin
-    0, // netherrack
-    0, // soul sand
-    0, // glowstone
-    0, // portal todo
-    0, // jack'o lantern
-    0, // cake
-    0, // ?
-    0, // ?
-    0, // chest (the april fools one)
-    7  // trapdoor
-);
+#define _0px 0.0f
+#define _1px (1.0f / 16.0f)
+#define _2px (_1px * 2)
+#define _3px (_1px * 3)
+#define _4px (_1px * 4)
+#define _5px (_1px * 5)
+#define _6px (_1px * 6)
+#define _7px (_1px * 7)
+#define _8px (_1px * 8)
+#define _9px (_1px * 9)
+#define _10px (_1px * 10)
+#define _11px (_1px * 11)
+#define _12px (_1px * 12)
+#define _13px (_1px * 13)
+#define _14px (_1px * 14)
+#define _15px (_1px * 15)
+#define _16px 1.0f
 
-#define BLOCK_SIZE (1.0f / 16.0f)
 
 #define GRASS_COLORMOD vec3(0.443f, 0.645f, 0.279f)
+
+#define SIDE_Z_NEG 32
+#define SIDE_Z_POS 16
+#define SIDE_X_NEG 8
+#define SIDE_X_POS 4
+#define SIDE_Y_NEG 2
+#define SIDE_Y_POS 1
+
+#define SIDE_ALL (SIDE_X_POS|SIDE_X_NEG|SIDE_Y_NEG|SIDE_Y_POS|SIDE_Z_NEG|SIDE_Z_POS)
 
 int get_block_render_type(int block_id)
 {
@@ -321,33 +247,33 @@ void face_yp(int block_id, int metadata, int light_level)
     case 58: // workbench
     case 86: // pumpkin
     case 91: // jack'o lantern
-        UV_BLOCK.y -= BLOCK_SIZE;
+        UV_BLOCK.y -= _1px;
         break;
     case 23: // dispenser
     case 61: // furnace
     case 62: // burning furnace
-        UV_BLOCK = vec2(14, 3) * BLOCK_SIZE;
+        UV_BLOCK = vec2(14, 3) * _1px;
         break;
     case 54: // chest
     case 95: // prank chest
-        UV_BLOCK.x -= 2 * BLOCK_SIZE;
+        UV_BLOCK.x -= 2 * _1px;
         break;
     case 47: // bookshelf
-        UV_BLOCK = vec2(4, 0) * BLOCK_SIZE;
+        UV_BLOCK = vec2(4, 0) * _1px;
         break;
     case 60: // farmland
-        UV_BLOCK = vec2(7, 5) * BLOCK_SIZE;
+        UV_BLOCK = vec2(7, 5) * _1px;
         if(metadata > 0) {
-            UV_BLOCK.x -= BLOCK_SIZE;
+            UV_BLOCK.x -= _1px;
         }
         break;
     case 81: // cactus
-        UV_BLOCK.x -= BLOCK_SIZE;
+        UV_BLOCK.x -= _1px;
         break;
     case 17: // log
     case 46: // tnt
     case 84: // jukebox
-        UV_BLOCK.x += BLOCK_SIZE;
+        UV_BLOCK.x += _1px;
         break;
     }
 }
@@ -357,37 +283,37 @@ void face_yn(int block_id, int metadata, int light_level)
     UV_BLOCK = face_base(block_id, light_level, metadata);
     switch(block_id) {
     case 2: // grass
-        UV_BLOCK = vec2(2, 0) * BLOCK_SIZE;
+        UV_BLOCK = vec2(2, 0) * _1px;
         break;
     case 24: // sandstone
-        UV_BLOCK.y += BLOCK_SIZE;
+        UV_BLOCK.y += _1px;
         break;
     case 86: // pumpkin
     case 91: // jack'o lantern
-        UV_BLOCK.y -= BLOCK_SIZE;
+        UV_BLOCK.y -= _1px;
         break;
     case 23: // dispenser
     case 61: // furnace
     case 62: // burning furnace
-        UV_BLOCK = vec2(14, 3) * BLOCK_SIZE;
+        UV_BLOCK = vec2(14, 3) * _1px;
         break;
     case 54: // chest
     case 95: // prank chest
-        UV_BLOCK.x -= 2 * BLOCK_SIZE;
+        UV_BLOCK.x -= 2 * _1px;
         break;
     case 47: // bookshelf
     case 58: // workbench
-        UV_BLOCK = vec2(4, 0) * BLOCK_SIZE;
+        UV_BLOCK = vec2(4, 0) * _1px;
         break;
     case 81: // cactus
     case 17: // log
-        UV_BLOCK.x += BLOCK_SIZE;
+        UV_BLOCK.x += _1px;
         break;
     case 46: // tnt
-        UV_BLOCK.x += 2 * BLOCK_SIZE;
+        UV_BLOCK.x += 2 * _1px;
         break;
     case 92: // cake
-        UV_BLOCK.x += 3 * BLOCK_SIZE;
+        UV_BLOCK.x += 3 * _1px;
         break;
     }
     COLORMOD.rgb *= 0.4f;
@@ -442,7 +368,7 @@ void vert2(float ox, float oy, float oz, vec2 uv)
 
 void render_block_standard_impl(vec3 min, vec3 max, int block_id, int metadata, int[7] light, int sides)
 {
-    if((sides & 32) != 0 || min.z != 0.0f) {
+    if((sides & SIDE_Z_NEG) != 0 || min.z != 0.0f) {
         float u1 = min.x;
         float v1 = min.y;
         float u2 = max.x;
@@ -455,7 +381,7 @@ void render_block_standard_impl(vec3 min, vec3 max, int block_id, int metadata, 
         vert(max.x, max.y, min.z, vec2(u1, v1));
         EndPrimitive();
     }
-    if((sides & 16) != 0 || max.z != 1.0f) {
+    if((sides & SIDE_Z_POS) != 0 || max.z != 1.0f) {
         float u1 = min.x;
         float v1 = min.y;
         float u2 = max.x;
@@ -468,7 +394,7 @@ void render_block_standard_impl(vec3 min, vec3 max, int block_id, int metadata, 
         vert(max.x, max.y, max.z, vec2(u2, v1));
         EndPrimitive();
     }
-    if((sides & 8) != 0 || min.x != 0.0f) {
+    if((sides & SIDE_X_NEG) != 0 || min.x != 0.0f) {
         float u1 = min.z;
         float v1 = min.y;
         float u2 = max.z;
@@ -481,7 +407,7 @@ void render_block_standard_impl(vec3 min, vec3 max, int block_id, int metadata, 
         vert(min.x, max.y, max.z, vec2(u2, v1));
         EndPrimitive();
     }
-    if((sides & 4) != 0 || max.x != 1.0f) {
+    if((sides & SIDE_X_POS) != 0 || max.x != 1.0f) {
         float u1 = min.z;
         float v1 = min.y;
         float u2 = max.z;
@@ -494,7 +420,7 @@ void render_block_standard_impl(vec3 min, vec3 max, int block_id, int metadata, 
         vert(max.x, max.y, max.z, vec2(u1, v1));
         EndPrimitive();
     }
-    if((sides & 2) != 0 || min.y != 0.0f) {
+    if((sides & SIDE_Y_NEG) != 0 || min.y != 0.0f) {
         float u1 = min.x;
         float v1 = min.z;
         float u2 = max.x;
@@ -507,7 +433,7 @@ void render_block_standard_impl(vec3 min, vec3 max, int block_id, int metadata, 
         vert(max.x, min.y, max.z, vec2(u2, v2));
         EndPrimitive();
     }
-    if((sides & 1) != 0 || max.y != 1.0f) {
+    if((sides & SIDE_Y_POS) != 0 || max.y != 1.0f) {
         float u1 = min.x;
         float v1 = min.z;
         float u2 = max.x;
@@ -529,22 +455,22 @@ void render_block_standard(int block_id, int metadata, int[7] light, int sides)
 
     if (block_id == 44) {
         // single slab
-        max.y = 0.5f;
+       // max.y = 0.5f;
     } else if (block_id == 70 || block_id == 72) {
         // pressure plates
-        min.x = 1.0f / 16.0f;
-        min.z = 1.0f / 16.0f;
-        max.x = 15.0f / 16.0f;
-        max.y = (metadata == 1 ? 0.5f : 1.0f) / 16.0f;
-        max.z = 15.0f / 16.0f;
+        min.x = _1px;
+        min.z = _1px;
+        max.x = _15px;
+        max.y = _1px * (metadata == 1 ? 0.5f : 1.0f); // half size if pressed
+        max.z = _15px;
         light[5] = light[4] = light[3] = light[2] = light[1] = light[0] = light[6];
     } else if (block_id == 77) {
         // button
         bool pressed = (metadata & 8) != 0;
         int side = metadata & 7;
-        float ymin = 6.0f / 16.0f;
-        float ymax = 10.0f / 16.0f;
-        float side1 = 3.0f / 16.0f;
+        float ymin = _6px;
+        float ymax = _10px;
+        float side1 = _3px;
         float side2 = (pressed ? 1.0f : 2.0f) / 16.0f;
         if (side == 1) {
             min = vec3(0.0f, ymin, 0.5f - side1);
@@ -560,58 +486,6 @@ void render_block_standard(int block_id, int metadata, int[7] light, int sides)
             max = vec3(0.5f + side1, ymax, 1.0f);
         }
         light[5] = light[4] = light[3] = light[2] = light[1] = light[0] = light[6];
-    } else if(block_id == 85) {
-        // fence
-        min = vec3(6.0f / 16.0f, 0.0f, 6.0f / 16.0f);
-        max = vec3(10.0f / 16.0f, 1.0f, 10.0f / 16.0f);
-        light[5] = light[4] = light[3] = light[2] = light[1] = light[0] = light[6];
-        render_block_standard_impl(min, max, block_id, metadata, light, sides);
-
-        if((metadata & 1) != 0) {
-            // connected to -x
-            int s = 1 | 2 | 8 | 16 | 32;
-            min = vec3(0.0f, 12.0f / 16.0f, 7.0f / 16.0f);
-            max = vec3(0.5f, 15.0f / 16.0f, 9.0f / 16.0f);
-            if((metadata & 2) != 0) {
-                // also connected to +x
-                max.x = 1.0f;
-                s |= 4;
-                metadata &= ~2;
-            }
-            render_block_standard_impl(min, max, block_id, metadata, light, s);
-        }
-
-        if((metadata & 2) != 0) {
-            // connected to +x
-            int s = 1 | 2 | 4 | 16 | 32;
-            min = vec3(0.5f, 12.0f / 16.0f, 7.0f / 16.0f);
-            max = vec3(1.0f, 15.0f / 16.0f, 9.0f / 16.0f);
-            render_block_standard_impl(min, max, block_id, metadata, light, s);
-        }
-
-        if((metadata & 4) != 0) {
-            // connected to -z
-            int s = 1 | 2 | 4 | 8 | 32;
-            min = vec3(7.0f / 16.0f, 12.0f / 16.0f, 0.0f);
-            max = vec3(9.0f / 16.0f, 15.0f / 16.0f, 0.5f);
-            if((metadata & 8) != 0) {
-                // also connected to +x
-                max.z = 1.0f;
-                s |= 16;
-                metadata &= ~8;
-            }
-            render_block_standard_impl(min, max, block_id, metadata, light, s);
-        }
-
-        if((metadata & 8) != 0) {
-            // connected to +z
-            int s = 1 | 2 | 4 | 8 | 16;
-            min = vec3( 7.0f / 16.0f, 12.0f / 16.0f, 0.5f);
-            max = vec3( 9.0f / 16.0f, 15.0f / 16.0f, 1.0f);
-            render_block_standard_impl(min, max, block_id, metadata, light, s);
-        }
-
-        return;
     }
 
     render_block_standard_impl(min, max, block_id, metadata, light, sides);
@@ -677,7 +551,6 @@ void render_block_torch(int block_id, int metadata, int light_level)
 {
     float skew_x = 0.0f;
     float skew_z = 0.0f;
-    float _1over16 = 1.0f / 16.0f;
 
     float x = 0.5f;
     float y = 0.2f;
@@ -707,39 +580,93 @@ void render_block_torch(int block_id, int metadata, int light_level)
     float z_phalf = z + 0.5f;
 
     // +y
-    vert(x + skew_x * 0.375f - 1.0f / 16.0f, y + 0.625f, z + skew_z * 0.375f - 1.0f / 16.0f, vec2(7.0f / 16.0f, 6.0f / 16.0f));
-    vert(x + skew_x * 0.375f - 1.0f / 16.0f, y + 0.625f, z + skew_z * 0.375f + 1.0f / 16.0f, vec2(7.0f / 16.0f, 8.0f / 16.0f));
-    vert(x + skew_x * 0.375f + 1.0f / 16.0f, y + 0.625f, z + skew_z * 0.375f - 1.0f / 16.0f, vec2(9.0f / 16.0f, 6.0f / 16.0f));
-    vert(x + skew_x * 0.375f + 1.0f / 16.0f, y + 0.625f, z + skew_z * 0.375f + 1.0f / 16.0f, vec2(9.0f / 16.0f, 8.0f / 16.0f));
+    vert(x + skew_x * 0.375f - _1px, y + 0.625f, z + skew_z * 0.375f - _1px, vec2(_7px, _6px));
+    vert(x + skew_x * 0.375f - _1px, y + 0.625f, z + skew_z * 0.375f + _1px, vec2(_7px, _8px));
+    vert(x + skew_x * 0.375f + _1px, y + 0.625f, z + skew_z * 0.375f - _1px, vec2(_9px, _6px));
+    vert(x + skew_x * 0.375f + _1px, y + 0.625f, z + skew_z * 0.375f + _1px, vec2(_9px, _8px));
     EndPrimitive();
 
     // -x
-    vert(x - 1.0f / 16.0f         , y + 1.0f, z_mhalf         , vec2(0, 0));
-    vert(x - 1.0f / 16.0f + skew_x, y + 0.0f, z_mhalf + skew_z, vec2(0, 1));
-    vert(x - 1.0f / 16.0f         , y + 1.0f, z_phalf         , vec2(1, 0));
-    vert(x - 1.0f / 16.0f + skew_x, y + 0.0f, z_phalf + skew_z, vec2(1, 1));
+    vert(x - _1px         , y + 1.0f, z_mhalf         , vec2(0, 0));
+    vert(x - _1px + skew_x, y + 0.0f, z_mhalf + skew_z, vec2(0, 1));
+    vert(x - _1px         , y + 1.0f, z_phalf         , vec2(1, 0));
+    vert(x - _1px + skew_x, y + 0.0f, z_phalf + skew_z, vec2(1, 1));
     EndPrimitive();
 
     // +x
-    vert(x + 1.0f / 16.0f         , y + 1.0f, z_phalf         , vec2(0, 0));
-    vert(x + 1.0f / 16.0f + skew_x, y + 0.0f, z_phalf + skew_z, vec2(0, 1));
-    vert(x + 1.0f / 16.0f         , y + 1.0f, z_mhalf         , vec2(1, 0));
-    vert(x + 1.0f / 16.0f + skew_x, y + 0.0f, z_mhalf + skew_z, vec2(1, 1));
+    vert(x + _1px         , y + 1.0f, z_phalf         , vec2(0, 0));
+    vert(x + _1px + skew_x, y + 0.0f, z_phalf + skew_z, vec2(0, 1));
+    vert(x + _1px         , y + 1.0f, z_mhalf         , vec2(1, 0));
+    vert(x + _1px + skew_x, y + 0.0f, z_mhalf + skew_z, vec2(1, 1));
     EndPrimitive();
 
     // -z
-    vert(x_mhalf + skew_x, y + 0.0f, z - 1.0f / 16.0f + skew_z, vec2(1, 1));
-    vert(x_mhalf         , y + 1.0f, z - 1.0f / 16.0f         , vec2(1, 0));
-    vert(x_phalf + skew_x, y + 0.0f, z - 1.0f / 16.0f + skew_z, vec2(0, 1));
-    vert(x_phalf         , y + 1.0f, z - 1.0f / 16.0f         , vec2(0, 0));
+    vert(x_mhalf + skew_x, y + 0.0f, z - _1px + skew_z, vec2(1, 1));
+    vert(x_mhalf         , y + 1.0f, z - _1px         , vec2(1, 0));
+    vert(x_phalf + skew_x, y + 0.0f, z - _1px + skew_z, vec2(0, 1));
+    vert(x_phalf         , y + 1.0f, z - _1px         , vec2(0, 0));
     EndPrimitive();
 
     // +z
-    vert(x_phalf + skew_x, y + 0.0f, z + 1.0f / 16.0f + skew_z, vec2(1, 1));
-    vert(x_phalf         , y + 1.0f, z + 1.0f / 16.0f         , vec2(1, 0));
-    vert(x_mhalf + skew_x, y + 0.0f, z + 1.0f / 16.0f + skew_z, vec2(0, 1));
-    vert(x_mhalf         , y + 1.0f, z + 1.0f / 16.0f         , vec2(0, 0));
+    vert(x_phalf + skew_x, y + 0.0f, z + _1px + skew_z, vec2(1, 1));
+    vert(x_phalf         , y + 1.0f, z + _1px         , vec2(1, 0));
+    vert(x_mhalf + skew_x, y + 0.0f, z + _1px + skew_z, vec2(0, 1));
+    vert(x_mhalf         , y + 1.0f, z + _1px         , vec2(0, 0));
     EndPrimitive();
+}
+
+void render_block_fence(int block_id, int metadata, int light_self)
+{
+    vec3 min = vec3(_6px, _0px, _6px);
+    vec3 max = vec3(_10px, _16px, _10px);
+    int[7] light = int[7](light_self, light_self, light_self, light_self, light_self, light_self, light_self);
+    int sides = SIDE_ALL;
+
+    render_block_standard_impl(min, max, block_id, metadata, light, sides);
+
+    if((metadata & 1) != 0) {
+        // connected to -x
+        int s = SIDE_ALL - SIDE_X_POS;
+        min = vec3(0.0, _12px, _7px);
+        max = vec3(0.5, _15px, _9px);
+        if((metadata & 2) != 0) {
+            // also connected to +x
+            max.x = 1.0f;
+            s |= SIDE_X_POS;
+            metadata &= ~2;
+        }
+        render_block_standard_impl(min, max, block_id, metadata, light, s);
+    }
+
+    if((metadata & 2) != 0) {
+        // connected to +x
+        int s = SIDE_ALL - SIDE_X_NEG;
+        min = vec3(0.5, _12px, _7px);
+        max = vec3(1.0, _15px, _9px);
+        render_block_standard_impl(min, max, block_id, metadata, light, s);
+    }
+
+    if((metadata & 4) != 0) {
+        // connected to -z
+        int s = SIDE_ALL - SIDE_Z_POS;
+        min = vec3(_7px, _12px, 0.0);
+        max = vec3(_9px, _15px, 0.5);
+        if((metadata & 8) != 0) {
+            // also connected to +x
+            max.z = 1.0f;
+            s |= SIDE_Z_POS;
+            metadata &= ~8;
+        }
+        render_block_standard_impl(min, max, block_id, metadata, light, s);
+    }
+
+    if((metadata & 8) != 0) {
+        // connected to +z
+        int s = SIDE_ALL - SIDE_Z_NEG;
+        min = vec3(_7px, _12px, 0.5);
+        max = vec3(_9px, _15px, 1.0);
+        render_block_standard_impl(min, max, block_id, metadata, light, s);
+    }
 }
 
 void main()
@@ -765,25 +692,26 @@ void main()
 
     COLORMOD = vec4(1);
 
-    int rt = get_block_render_type(block_id);
-    switch(rt) {
+    render_block_standard(block_id, metadata, light, sides);
+    //int rt = get_block_render_type(block_id);
+   /*switch(rt) {
         case 0: render_block_standard(block_id, metadata, light, sides); break;
         case 1: render_block_cross(block_id, metadata, light_self); break;
         case 2: render_block_torch(block_id, metadata, light_self); break;
-        case 3: render_block_standard(block_id, metadata, light, sides); break;
-        case 4: render_block_standard(block_id, metadata, light, sides); break;
-        case 5: render_block_standard(block_id, metadata, light, sides); break;
-        case 6: render_block_standard(block_id, metadata, light, sides); break;
-        case 7: render_block_standard(block_id, metadata, light, sides); break;
-        case 8: render_block_standard(block_id, metadata, light, sides); break;
-        case 9: render_block_standard(block_id, metadata, light, sides); break;
-        case 10: render_block_standard(block_id, metadata, light, sides); break;
-        case 11: render_block_standard(block_id, metadata, light, sides); break;
-        case 12: render_block_standard(block_id, metadata, light, sides); break;
-        case 13: render_block_standard(block_id, metadata, light, sides); break;
-        case 14: render_block_standard(block_id, metadata, light, sides); break;
-        case 15: render_block_standard(block_id, metadata, light, sides); break;
-        case 16: render_block_standard(block_id, metadata, light, sides); break;
-        case 17: render_block_standard(block_id, metadata, light, sides); break;
-    }
+//        case 3: render_block_standard(block_id, metadata, light, sides); break;
+//        case 4: render_block_standard(block_id, metadata, light, sides); break;
+//        case 5: render_block_standard(block_id, metadata, light, sides); break;
+//        case 6: render_block_standard(block_id, metadata, light, sides); break;
+//        case 7: render_block_standard(block_id, metadata, light, sides); break;
+//        case 8: render_block_standard(block_id, metadata, light, sides); break;
+//        case 9: render_block_standard(block_id, metadata, light, sides); break;
+//        case 10: render_block_standard(block_id, metadata, light, sides); break;
+        case 11: render_block_fence(block_id, metadata, light_self); break;
+//        case 12: render_block_standard(block_id, metadata, light, sides); break;
+//        case 13: render_block_standard(block_id, metadata, light, sides); break;
+//        case 14: render_block_standard(block_id, metadata, light, sides); break;
+//        case 15: render_block_standard(block_id, metadata, light, sides); break;
+//        case 16: render_block_standard(block_id, metadata, light, sides); break;
+//        case 17: render_block_standard(block_id, metadata, light, sides); break;
+    }*/
 }

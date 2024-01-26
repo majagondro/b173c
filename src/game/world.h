@@ -8,12 +8,24 @@
 #define GET4BIT(arr, idx) (((arr)[(idx) >> 1] >> ((idx & 1) ? 4 : 0)) & 15)
 
 struct chunk_data {
+	// laid out y,z,x
 	u_byte blocks[16*16*128];
 	// :-( these values are 4-bit...
 	u_byte metadata  [16 * 16 * 64];
 	u_byte skylight  [16 * 16 * 64];
 	u_byte blocklight[16 * 16 * 64];
-	bool *render_bufs[8];
+
+	u_int gl_vbo, gl_ebo;
+	u_int *ebo;
+	struct side {
+		// local pos (0-16), global is passed in model matrix
+		u_byte x, y, z;
+		// 0-256
+		u_byte texture_index;
+		// light etc,, 0 for now
+		u_byte data;
+	} __attribute__((__packed__)) *vbo;
+	size_t size_ebo, size_vbo;
 };
 
 struct chunk {

@@ -41,7 +41,7 @@ static bool check_shader_compile_impl(uint h, const char *name)
 	return ok;
 }
 
-static uint check_program_compile(uint h, uint h_vs, uint h_fs, u_int h_gs)
+static uint check_program_compile(uint h, uint h_vs, uint h_fs)
 {
 	int ok = true, loglen;
 	char *log;
@@ -53,30 +53,27 @@ static uint check_program_compile(uint h, uint h_vs, uint h_fs, u_int h_gs)
 		memset(log, 0, loglen + 1);
 		glGetProgramInfoLog(h, loglen, &loglen, log);
 		con_printf("shader program failed to compile:\n%s\n", log);
+		B_free(log);
+
 		glDeleteProgram(h);
 		glDeleteShader(h_vs);
 		glDeleteShader(h_fs);
-		if(h_gs != 0)
-			glDeleteShader(h_gs);
-		B_free(log);
+
 		return 0;
 	}
 
 	glDetachShader(h, h_vs);
 	glDetachShader(h, h_fs);
-	if(h_gs != 0) {
-		glDetachShader(h, h_gs);
-		glDeleteShader(h_gs);
-	}
+
 	glDeleteShader(h_vs);
 	glDeleteShader(h_fs);
 
 	return h;
 }
 
-static uint load_shader(const char *vs, const char *fs, const char *gs)
+static uint load_shader(const char *vs, const char *fs)
 {
-	uint h_vs, h_fs, h_gs = 0, h_prog;
+	uint h_vs, h_fs, h_prog;
 
 	// vertex shader
 	h_vs = glCreateShader(GL_VERTEX_SHADER);
@@ -92,24 +89,11 @@ static uint load_shader(const char *vs, const char *fs, const char *gs)
 	if(!check_shader_compile(h_fs))
 		return 0;
 
-	// geometry shader
-	if(gs) {
-		h_gs = glCreateShader(GL_GEOMETRY_SHADER);
-		glShaderSource(h_gs, 1, &gs, NULL);
-		glCompileShader(h_gs);
-		if(!check_shader_compile(h_gs)) {
-			return 0;
-		}
-	}
-
 	h_prog = glCreateProgram();
 	glAttachShader(h_prog, h_vs);
 	glAttachShader(h_prog, h_fs);
-	if(gs) {
-		glAttachShader(h_prog, h_gs);
-	}
 	glLinkProgram(h_prog);
-	return check_program_compile(h_prog, h_vs, h_fs, h_gs);
+	return check_program_compile(h_prog, h_vs, h_fs);
 }
 
 void gl_debug_message(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
@@ -157,8 +141,8 @@ void vid_init(void)
 	glDebugMessageCallback(gl_debug_message, 0);
 
 	// load shaders
-	gl.shader3d = load_shader(blocks_v_glsl, blocks_f_glsl, blocks_g_glsl);
-	gl.shader2d = load_shader(shader_vertex2d, shader_fragment2d, NULL);
+	gl.shader3d = load_shader(blocks_v_glsl, blocks_f_glsl);
+	gl.shader2d = load_shader(shader_vertex2d, shader_fragment2d);
 
 	now = SDL_GetPerformanceCounter();
 

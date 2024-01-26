@@ -25,7 +25,7 @@ struct {
 
 struct block {
 	float x, y, z;
-	float data1, data2;
+	// float data1, data2;
 } __attribute__((packed));
 
 static void recalculate_projection_matrix(void);
@@ -51,12 +51,20 @@ void world_renderer_init(void)
 	/* init vao */
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
-	glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0);
-	glVertexAttribFormat(1, 2, GL_FLOAT, GL_FALSE, 12);
+
+	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 0); // x
+	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 1); // y
+	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 2); // z
+	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 3); // texture index
+	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 4); // data
+
+	// allow reusage of vao for different vbos
 	glVertexAttribBinding(0, 0);
 	glVertexAttribBinding(1, 0);
+
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
+
 	glBindVertexArray(0);
 
 	loc_view = glGetUniformLocation(gl.shader3d, "VIEW");
@@ -289,144 +297,40 @@ static u_byte construct_fence_metadata(int x, int y, int z)
 	return nx | px | nz | pz;
 }
 
-static void build_buffers(void)
+static void build_buffer_for_chunk(struct chunk *chunk)
 {
-	// fixme: +zoom, load new chunks, unzoom, some old chunks get rebuilt?
-	size_t i = 0;
-	void *it;
+	struct side *vbo_p;
 
-	/* construct buffer data */
-	while(hashmap_iter(chunk_map, &i, &it)) {
-		struct chunk *c = (struct chunk *) it;
-		c->visible = false;
+	chunk->data->vbo = B_malloc(sizeof(struct side) * 16 * 16 * 128);
+	chunk->data->size_vbo = 0;
 
-		if(!c->dirty)
-			continue;
+	vbo_p = chunk->data->vbo;
 
-		for(int rb = 0; rb < 8; rb++) {
-			vec3 center;
-
-			if(c->data->render_bufs[rb] == NULL) {
-				c->data->render_bufs[rb] = B_malloc(sizeof(struct render_buf));
-				*c->data->render_bufs[rb] = true; // new buf, mark dirty
-			}
-
-			center[0] = (c->x << 4) - cl.game.pos[0] + 8;
-			center[1] = (rb << 4) - cl.game.pos[1] + 8;
-			center[2] = (c->z << 4) - cl.game.pos[2] + 8;
-
-			if(!is_visible_on_frustum(center, 14.0f)) {
-				((struct render_buf *) c->data->render_bufs[rb])->visible = false;
-				continue;
-			} else {
-				struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
-				int o_face;
-				int a_face;
-				int *face;
-
-				// mark chunk and this piece as visible
-				c->visible = true;
-				r_buf->visible = true;
-
-				// not changed, no need to rebuild the mesh
-				if(!r_buf->dirty)
-					continue;
-
-				r_buf->dirty = false;
-				r_buf->num_opaq_faces = 0;
-				r_buf->num_alpha_faces = 0;
-
-				if(!r_buf->gl_buf_opaq)
-					glGenBuffers(1, &r_buf->gl_buf_opaq);
-				if(!r_buf->gl_buf_alpha)
-					glGenBuffers(1, &r_buf->gl_buf_alpha);
-
-				/* count visible faces */
-				for(int x = 0; x < 16; x++) {
-					for(int z = 0; z < 16; z++) {
-						for(int y = 0; y < 16; y++) {
-							int block_y = (rb << 4) + y;
-							int block_id = c->data->blocks[IDX_FROM_COORDS(x, block_y, z)];
-							if(block_id > 0) {
-								int n = visible_faces(x, block_y, z, c, block_id) > 0 ? 1 : 0;
-								if(is_water(block_id)) {
-									r_buf->num_alpha_faces += n;
-								} else {
-									r_buf->num_opaq_faces += n;
-								}
-							}
-						}
-					}
+	for(int x = 0; x < 16; x++) {
+		for(int z = 0; z < 16; z++) {
+			for(int y = 0; y < 128; y++) {
+				if(visible_faces(x, y, z, chunk, 1) > 0) {
+					chunk->data->size_vbo++;
+					vbo_p->x = x;
+					vbo_p->y = y;
+					vbo_p->z = z;
+					vbo_p++;
 				}
-
-				/* no faces, don't build any buffers */
-				if(r_buf->num_opaq_faces <= 0 && r_buf->num_alpha_faces <= 0) {
-					r_buf->visible = false;
-					return; // return, dont stall the cpu too much by building
-					        // all rbufs in a single frame or we get lag spikes
-				}
-
-				/* build buffers */
-				o_face = a_face = 0;
-				r_buf->opaque_faces = B_malloc(sizeof(struct block) * r_buf->num_opaq_faces);
-				r_buf->alpha_faces = B_malloc(sizeof(struct block) * r_buf->num_alpha_faces);
-				for(int x = 0; x < 16; x++) {
-					for(int z = 0; z < 16; z++) {
-						for(int y = 0; y < 16; y++) {
-							int block_y = (rb << 4) + y;
-							int idx = IDX_FROM_COORDS(x, block_y, z);
-							int block_id = c->data->blocks[idx];
-							u_byte metadata = GET4BIT(c->data->metadata, idx);
-							if(block_id == 85) {
-								// of course...
-								metadata = construct_fence_metadata(x + (c->x << 4), block_y, z + (c->z << 4));
-							}
-							if(block_id > 0) {
-								struct block *buf;
-								int sides;
-
-								if(is_water(block_id)) {
-									buf = r_buf->alpha_faces;
-									face = &a_face;
-								} else {
-									buf = r_buf->opaque_faces;
-									face = &o_face;
-								}
-
-								sides = visible_faces(x, block_y, z, c, block_id);
-								if(sides != 0) {
-									int d1, d2;
-									buf[*face].x = (float) x + (float) (c->x << 4);
-									buf[*face].z = (float) z + (float) (c->z << 4);
-									buf[*face].y = (float) block_y;
-									d1 = sides;
-									d1 += block_id << 6;
-									d1 += metadata << 14;
-									d1 += getbl_light(c, x, block_y, z) << 18;
-									d2 = calc_light_data(sides, x, block_y, z, c);
-									buf[*face].data1 = (float) d1;
-									buf[*face].data2 = (float) d2;
-									(*face)++;
-								}
-							}
-						}
-					}
-				}
-
-				if(r_buf->num_opaq_faces > 0) {
-					glBindBuffer(GL_ARRAY_BUFFER, r_buf->gl_buf_opaq);
-					glBufferData(GL_ARRAY_BUFFER, r_buf->num_opaq_faces * sizeof(struct block), r_buf->opaque_faces, GL_DYNAMIC_DRAW);
-					glBindBuffer(GL_ARRAY_BUFFER, 0);
-				}
-				if(r_buf->num_alpha_faces > 0) {
-					glBindBuffer(GL_ARRAY_BUFFER, r_buf->gl_buf_alpha);
-					glBufferData(GL_ARRAY_BUFFER, r_buf->num_alpha_faces * sizeof(struct block), r_buf->alpha_faces, GL_DYNAMIC_DRAW);
-					glBindBuffer(GL_ARRAY_BUFFER, 0);
-				}
-				return; // return, dont stall the cpu too much by building
-						// all rbufs in a single frame or we get lag spikes
 			}
 		}
+	}
+
+	glGenBuffers(1, &chunk->data->gl_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, chunk->data->gl_vbo);
+	glBufferData(GL_ARRAY_BUFFER, chunk->data->size_vbo * sizeof(struct side), chunk->data->vbo, GL_STATIC_DRAW);
+}
+
+static void build_buffers(void)
+{
+	static bool built = false;
+	if(!built && world_chunk_exists(0, 0) && world_get_chunk(0, 0)->dirty) {
+		build_buffer_for_chunk(world_get_chunk(0, 0));
+		built = true;
 	}
 }
 
@@ -449,15 +353,12 @@ void world_render(void)
 
 	build_buffers();
 
-	if(!strcasecmp(gl_polygon_mode.string, "GL_LINE")) {
+	if(!strcasecmp(gl_polygon_mode.string, "GL_LINE"))
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	} else if(!strcasecmp(gl_polygon_mode.string, "GL_POINT")) {
+	else if(!strcasecmp(gl_polygon_mode.string, "GL_POINT"))
 		glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-	} else {
+	else
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	}
-
-	glPointSize(5.0f);
 
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
@@ -470,25 +371,14 @@ void world_render(void)
 
 	glBindVertexArray(vao);
 
+
+
 	while(hashmap_iter(chunk_map, &i, &it)) {
 		struct chunk *c = (struct chunk *) it;
 
 		if(!c->visible)
 			continue;
 
-		for(int rb = 0; rb < 8; rb++) {
-			struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
-			if(!r_buf || !r_buf->visible)
-				continue;
-
-			if(r_buf->num_opaq_faces > 0) {
-				glUniform1i(loc_mode, 0);
-				glBindVertexBuffer(0, r_buf->gl_buf_opaq, 0, sizeof(struct block));
-				glDrawArrays(GL_POINTS, 0, r_buf->num_opaq_faces);
-				wr_total_faces += r_buf->num_opaq_faces;
-				wr_draw_calls++;
-			}
-		}
 	}
 
 	i = 0;
@@ -498,19 +388,6 @@ void world_render(void)
 		if(!c->visible)
 			continue;
 
-		for(int rb = 0; rb < 8; rb++) {
-			struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
-			if(!r_buf || !r_buf->visible)
-				continue;
-
-			if(r_buf->num_alpha_faces > 0) {
-				glUniform1i(loc_mode, 1);
-				glBindVertexBuffer(0, r_buf->gl_buf_alpha, 0, sizeof(struct block));
-				glDrawArrays(GL_POINTS, 0, r_buf->num_alpha_faces);
-				wr_total_faces += r_buf->num_alpha_faces;
-				wr_draw_calls++;
-			}
-		}
 	}
 
 	/* done */
@@ -521,16 +398,7 @@ void world_render(void)
 
 void world_renderer_free_chunk_rbufs(struct chunk *c)
 {
-	for(int rb = 0; rb < 8; rb++) {
-		struct render_buf *r_buf = (struct render_buf *) c->data->render_bufs[rb];
-		if(!r_buf)
-			continue;
-		glDeleteBuffers(1, &r_buf->gl_buf_opaq);
-		glDeleteBuffers(1, &r_buf->gl_buf_alpha);
-		B_free(r_buf->opaque_faces);
-		B_free(r_buf->alpha_faces);
-		B_free(r_buf);
-	}
+
 }
 
 void world_renderer_shutdown(void)

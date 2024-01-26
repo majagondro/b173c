@@ -37,17 +37,7 @@ void world_init(void)
 void world_mark_chunk_dirty(int chunk_x, int chunk_z)
 {
 	if(world_chunk_exists(chunk_x, chunk_z)) {
-		struct chunk *c = world_get_chunk(chunk_x, chunk_z);
-		c->dirty = true;
-		if(c->data) {
-			/* mark render buffers dirty */
-			for(int rb = 0; rb < 8; rb++) {
-				if(c->data->render_bufs[rb]) {
-					// dirty = true
-					*c->data->render_bufs[rb] = true;
-				}
-			}
-		}
+		world_get_chunk(chunk_x, chunk_z)->dirty = true;
 	}
 }
 
@@ -169,13 +159,7 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 	yEnd = yStart + size_y;
 	zEnd = zStart + size_z;
 
-	world_get_chunk(x >> 4, z >> 4)->dirty = true;
-	for(y = yStart >> 4; y < yEnd >> 4; y++) {
-		if(chunk_data->render_bufs[y]) {
-			// dirty = true
-			*chunk_data->render_bufs[y] = true;
-		}
-	}
+	world_mark_chunk_dirty(x >> 4, z >> 4);
 
 	dataPos = 0;
 
@@ -274,10 +258,7 @@ void world_set_block(int x, int y, int z, byte id)
 
 	c = world_get_chunk(x >> 4, z >> 4);
 
-	// mark dirty
-	c->dirty = true;
-	if(c->data->render_bufs[y >> 4])
-		*c->data->render_bufs[y >> 4] = 1;
+	world_mark_chunk_dirty(x >> 4, z >> 4);
 
 	c->data->blocks[IDX_FROM_COORDS(x & 15, y, z & 15)] = id;
 }
@@ -292,10 +273,7 @@ void world_set_metadata(int x, int y, int z, byte metadata)
 
 	c = world_get_chunk(x >> 4, z >> 4);
 
-	// mark dirty
-	c->dirty = true;
-	if(c->data->render_bufs[y >> 4])
-		*c->data->render_bufs[y >> 4] = true;
+	world_mark_chunk_dirty(x >> 4, z >> 4);
 
 	c->data->metadata[IDX_FROM_COORDS(x & 15, y, z & 15) >> 1] = metadata;
 }

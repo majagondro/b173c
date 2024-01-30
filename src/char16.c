@@ -26,7 +26,7 @@ char16 *c16h(const char *s)
 {
 	char16 *buf;
 	int i;
-	buf = B_malloc(strlen(s) * sizeof(char16));
+	buf = mem_alloc(strlen(s) * sizeof(char16));
 	for(i = 0; s && i < (int) strlen(s); i++)
 		buf[i] = s[i];
 	buf[i] = 0;

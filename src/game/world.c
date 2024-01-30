@@ -36,8 +36,10 @@ void world_init(void)
 
 void world_mark_chunk_dirty(int chunk_x, int chunk_z)
 {
-	if(world_chunk_exists(chunk_x, chunk_z)) {
-		world_get_chunk(chunk_x, chunk_z)->dirty = true;
+	struct chunk *c;
+	c = world_get_chunk(chunk_x, chunk_z);
+	if(c != NULL) {
+		c->dirty = true;
 	}
 }
 
@@ -50,16 +52,10 @@ void world_prepare_chunk(int chunk_x, int chunk_z)
 
 	c.x = chunk_x;
 	c.z = chunk_z;
-	c.data = B_malloc(sizeof(struct chunk_data));
+	c.data = mem_alloc(sizeof(struct chunk_data));
 
 	/* chunk is copied by hashmap_set, so it can be allocated on the stack */
 	hashmap_set(chunk_map, &c);
-
-	/* mark neighbours dirty */
-	world_mark_chunk_dirty(chunk_x + 1, chunk_z);
-	world_mark_chunk_dirty(chunk_x - 1, chunk_z);
-	world_mark_chunk_dirty(chunk_x, chunk_z + 1);
-	world_mark_chunk_dirty(chunk_x, chunk_z - 1);
 }
 
 void world_delete_chunk(int chunk_x, int chunk_z)
@@ -70,8 +66,8 @@ void world_delete_chunk(int chunk_x, int chunk_z)
 	c.z = chunk_z;
 
 	cp = (struct chunk *) hashmap_get(chunk_map, &c);
-	world_renderer_free_chunk_rbufs(cp);
-	B_free(cp->data);
+	world_renderer_free_chunk_render_data(cp);
+	mem_free(cp->data);
 
 	hashmap_delete(chunk_map, &c);
 }
@@ -112,44 +108,31 @@ int inflate_data(u_byte *in, u_byte *out, size_t size_in, size_t size_out)
 	return Z_OK;
 }
 
-static void copy4to8(void *dest, void *src, size_t n)
-{
-	u_byte *in = src;
-	u_byte *out = dest;
-	while(n-- > 0) {
-		*out++ = (*in   & 0x0f);
-		*out++ = (*in++ & 0xf0) >> 4;
-	}
-}
-
 void world_load_region_data(int x, short y, int z, int size_x, int size_y, int size_z, int data_size, u_byte *data)
 {
 	int xStart, yStart, zStart;
 	int xEnd, yEnd, zEnd;
 	int dataPos;
+	int chunk_x = x >> 4;
+	int chunk_z = z >> 4;
 	struct chunk_data *chunk_data;
 	u_byte decomp[size_x * size_y * size_z * 5 / 2];
 
-	// this region is always contained within a single chunk
-	// i think xd
-	if(!world_chunk_exists(x >> 4, z >> 4)) {
-		world_prepare_chunk(x >> 4, z >> 4);
-	} else {
-		int chunk_x = x >> 4;
-		int chunk_z = z >> 4;
-		/* mark neighbours dirty */
-		world_mark_chunk_dirty(chunk_x + 1, chunk_z);
-		world_mark_chunk_dirty(chunk_x - 1, chunk_z);
-		world_mark_chunk_dirty(chunk_x, chunk_z + 1);
-		world_mark_chunk_dirty(chunk_x, chunk_z - 1);
-	}
+	if(!world_chunk_exists(chunk_x, chunk_z))
+		world_prepare_chunk(chunk_x, chunk_z);
+
+	world_mark_chunk_dirty(chunk_x, chunk_z);
+	world_mark_chunk_dirty(chunk_x + 1, chunk_z);
+	world_mark_chunk_dirty(chunk_x - 1, chunk_z);
+	world_mark_chunk_dirty(chunk_x, chunk_z + 1);
+	world_mark_chunk_dirty(chunk_x, chunk_z - 1);
 
 	if((dataPos = inflate_data(data, decomp, data_size, sizeof(decomp))) != Z_OK) {
 		con_printf(COLOR_RED"error while decompressing chunk data:"COLOR_WHITE"%s\n", zError(dataPos));
 		return;
 	}
 
-	chunk_data = world_get_chunk(x >> 4, z >> 4)->data;
+	chunk_data = world_get_chunk(chunk_x, chunk_z)->data;
 
 	xStart = x & 15;
 	yStart = y & 127;
@@ -158,8 +141,6 @@ void world_load_region_data(int x, short y, int z, int size_x, int size_y, int s
 	xEnd = xStart + size_x;
 	yEnd = yStart + size_y;
 	zEnd = zStart + size_z;
-
-	world_mark_chunk_dirty(x >> 4, z >> 4);
 
 	dataPos = 0;
 

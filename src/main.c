@@ -8,7 +8,7 @@
 #include "client/client.h"
 
 struct client_state cl = {0};
-void *_B_malloc(size_t sz, const char *file, int line)
+void *_mem_alloc_impl(size_t sz, const char *file, int line)
 {
 	void *ptr;
 

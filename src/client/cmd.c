@@ -79,9 +79,9 @@ void cmd_register(const char *name, void (*func)(void))
 	if(!func)
 		return;
 
-	c = B_malloc(sizeof(*c));
+	c = mem_alloc(sizeof(*c));
 
-	c->name = B_malloc(strlen(name) + 1);
+	c->name = mem_alloc(strlen(name) + 1);
 	strcpy(c->name, name);
 	c->func = func;
 
@@ -101,12 +101,12 @@ void alias_register(const char *name, const char *command)
 	if(alias_find(name))
 		alias_remove(name);
 
-	a = B_malloc(sizeof(*a));
+	a = mem_alloc(sizeof(*a));
 
-	a->name = B_malloc(strlen(name) + 1);
+	a->name = mem_alloc(strlen(name) + 1);
 	strcpy(a->name, name);
 
-	a->cmd = B_malloc(strlen(command) + 1);
+	a->cmd = mem_alloc(strlen(command) + 1);
 	strcpy(a->cmd, command);
 
 	a->server = cmd_is_stuffed();
@@ -134,9 +134,9 @@ void alias_remove(const char *name)
 	else
 		aliaslist = a->next;
 
-	B_free(a->name);
-	B_free(a->cmd);
-	B_free(a);
+	mem_free(a->name);
+	mem_free(a->cmd);
+	mem_free(a);
 }
 
 cvar *cvar_find(const char *name)
@@ -186,8 +186,8 @@ bool cvar_set_silent(const char *name, const char *value)
 
 	len = strlen(value);
 
-	B_free(cvar->string);
-	cvar->string = B_malloc(len + 1);
+	mem_free(cvar->string);
+	cvar->string = mem_alloc(len + 1);
 	memcpy(cvar->string, value, len);
 	cvar->string[len] = 0;
 
@@ -215,7 +215,7 @@ static char *copystr(char *s)
 {
 	char *s2;
 	size_t len = strlen(s);
-	s2 = B_malloc(len + 1);
+	s2 = mem_alloc(len + 1);
 	s2[len] = 0;
 	memcpy(s2, s, len);
 	return s2;
@@ -381,18 +381,18 @@ void cmd_exec_impl(char *text, bool from_server)
 
 // reset old args
 	for(i = 0; i < $argc; i++)
-		B_free($argv[i]);
+		mem_free($argv[i]);
 	$argc = 0;
 
 // make new args
 	// new var because strtok modifies the string
-	totok = B_malloc(4096);
+	totok = mem_alloc(4096);
 	memset(totok, 0, 4096);
 	strlcpy(totok, text, 4096);
 	replace_color_codes(totok);
 	for(tok = tokenize(totok); tok != NULL; tok = tokenize(NULL))
 		$argv[$argc++] = copystr(tok);
-	B_free(totok);
+	mem_free(totok);
 
 	if($argc == 0)
 		return;

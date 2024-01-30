@@ -30,7 +30,7 @@ HANDLER(PKT_LOGIN_REQUEST, int ent_id, string16 unused, long seed, byte dimensio
 	con_hide();
 	cl.game.our_id = ent_id;
 	vid_unlock_fps();
-	B_free(unused);
+	mem_free(unused);
 }
 
 HANDLER(PKT_HANDSHAKE, string16 conn_hash)
@@ -41,13 +41,13 @@ HANDLER(PKT_HANDSHAKE, string16 conn_hash)
 	// nah
 	NET_WRITE(PKT_LOGIN_REQUEST, PROTOCOL_VERSION, c16(cvar_name.string), 0, 0);
 	con_printf(COLOR_GRAY "awaiting login approval...\n");
-	B_free(conn_hash);
+	mem_free(conn_hash);
 }
 
 HANDLER(PKT_CHAT_MESSAGE, string16 message)
 {
 	con_printf("%s\n", c8(message));
-	B_free(message);
+	mem_free(message);
 }
 
 HANDLER(PKT_TIME_UPDATE, long time)
@@ -122,7 +122,7 @@ HANDLER(PKT_NAMED_ENTITY_SPAWN, int ent_id, string16 name, int x, int y, int z, 
 		cl.game.rot[0] = (float)(pitch * 360) / 256.0f;
 	}
 
-	B_free(name);
+	mem_free(name);
 }
 
 HANDLER(PKT_PICKUP_SPAWN, int ent_id, short item_id, byte count, short metadata, int x, int y, int z, byte yaw, byte pitch, byte roll)
@@ -147,7 +147,7 @@ HANDLER(PKT_MOB_SPAWN, int ent_id, byte type, int x, int y, int z, byte yaw, byt
 
 HANDLER(PKT_ENTITY_PAINTING, int ent_id, string16 title, int x, int y, int z, int direction)
 {
-	B_free(title);
+	mem_free(title);
 }
 
 HANDLER(PKT_ENTITY_VELOCITY, int ent_id, short vel_x, short vel_y, short vel_z)
@@ -293,7 +293,7 @@ HANDLER(PKT_THUNDERBOLT, int ent_id, bool unused, int x, int y, int z)
 
 HANDLER(PKT_OPEN_WINDOW, byte gui_id, byte gui_type, string8 gui_title, byte num_slots)
 {
-	B_free(gui_title);
+	mem_free(gui_title);
 }
 
 HANDLER(PKT_CLOSE_WINDOW, byte gui_id)
@@ -328,10 +328,10 @@ HANDLER(PKT_TRANSACTION, byte gui_id, short action, bool accepted)
 
 HANDLER(PKT_UPDATE_SIGN, int x, short y, int z, string16 line1, string16 line2, string16 line3, string16 line4)
 {
-	B_free(line1);
-	B_free(line2);
-	B_free(line3);
-	B_free(line4);
+	mem_free(line1);
+	mem_free(line2);
+	mem_free(line3);
+	mem_free(line4);
 }
 
 HANDLER(PKT_ITEM_DATA, short item_type, short item_id, u_byte data_size, byte *data)
@@ -353,7 +353,7 @@ HANDLER(PKT_DISCONNECT, string16 reason)
 	cmd_exec("disconnect", false);
 	cl.state = cl_disconnected;
 	vid_lock_fps();
-	B_free(reason);
+	mem_free(reason);
 }
 
 

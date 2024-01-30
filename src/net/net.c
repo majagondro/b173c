@@ -392,12 +392,11 @@ static bool net_read_packet(void)
 			sz = net_read_byte();
 
 			i = net_read_int();
-			b = B_malloc(i);
+			b = alloca(i);
 			net_read_buf(b, i);
 
 			net_handle_0x33(x, y, z, sx, sy, sz, i, b);
 
-			B_free(b);
 			break;
 		}
 		case PKT_MULTI_BLOCK_CHANGE: {
@@ -405,9 +404,9 @@ static bool net_read_packet(void)
 				cz = net_read_int();
 			short sz = net_read_short();
 
-			short *b1 = B_malloc(sz * sizeof(short));
-			byte *b2 = B_malloc(sz);
-			byte *b3 = B_malloc(sz);
+			short *b1 = mem_alloc(sz * sizeof(short));
+			byte *b2 = mem_alloc(sz);
+			byte *b3 = mem_alloc(sz);
 
 			for(i = 0; i < sz; i++)
 				b1[i] = net_read_short();
@@ -416,9 +415,9 @@ static bool net_read_packet(void)
 
 			net_handle_0x34(cx, cz, sz, b1, b2, b3);
 
-			B_free(b1);
-			B_free(b2);
-			B_free(b3);
+			mem_free(b1);
+			mem_free(b2);
+			mem_free(b3);
 
 			break;
 		}
@@ -448,13 +447,13 @@ static bool net_read_packet(void)
 			float r = net_read_float();
 			int n = net_read_int();
 
-			b = B_malloc(n * sizeof(*b));
+			b = mem_alloc(n * sizeof(*b));
 			for(i = 0; i < n; i++)
 				net_read_buf(&b[i], sizeof(b[i]));
 
 			net_handle_0x3C(x, y, z, r, n, b);
 
-			B_free(b);
+			mem_free(b);
 			break;
 		}
 		case PKT_SOUND_EFFECT: {
@@ -522,7 +521,7 @@ static bool net_read_packet(void)
 			struct ni_wi_payload *p;
 			byte gui = net_read_byte();
 			short cnt = net_read_short();
-			p = B_malloc(cnt * sizeof(*p));
+			p = mem_alloc(cnt * sizeof(*p));
 			for(i = 0; i < cnt; i++) {
 				p[i].item_id = net_read_short();
 				if(p[i].item_id != -1) {
@@ -531,7 +530,7 @@ static bool net_read_packet(void)
 				}
 			}
 			net_handle_0x68(gui, cnt, p);
-			B_free(p);
+			mem_free(p);
 			break;
 		}
 		case PKT_UPDATE_PROGRESS_BAR: {
@@ -566,10 +565,10 @@ static bool net_read_packet(void)
 			s[0] = net_read_short();
 			s[1] = net_read_short();
 			n = net_read_byte();
-			b = B_malloc(n);
+			b = mem_alloc(n);
 			net_read_buf(b, n);
 			net_handle_0x83(s[0], s[1], n, b);
-			B_free(b);
+			mem_free(b);
 			break;
 		}
 		case PKT_INCREMENT_STATISTIC: {
@@ -700,7 +699,7 @@ string8 net_read_string8(void)
 	short len;
 
 	len = net_read_short();
-	s = B_malloc(len+1);
+	s = mem_alloc(len + 1);
 	net_read_buf(s, len);
 	s[len] = 0;
 
@@ -715,7 +714,7 @@ string16 net_read_string16(void)
 
 	len = net_read_short();
 	size = (len + 1) * sizeof(char16);
-	s = B_malloc(size);
+	s = mem_alloc(size);
 	for(i = 0; i < len; i++) {
 		s[i] = SDL_Swap16(net_read_short());
 	}

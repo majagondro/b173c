@@ -90,8 +90,17 @@ void unalias_f(void)
 	alias_remove(cmd_argv(1));
 }
 
+#include "game/world.h"
 void echo_f(void)
 {
+	//void *d;
+	int x = ((int)cl.game.pos[0]) >> 4, z = ((int)cl.game.pos[2]) >> 4;
+	/*d = world_get_chunk(x,z)->data;
+	world_delete_chunk(x, z);
+	world_prepare_chunk(x, z);
+	world_get_chunk(x, z)->data = d;*/
+	world_mark_chunk_dirty(x, z);
+
 	con_printf("%s\n", cmd_args(1, cmd_argc()));
 }
 

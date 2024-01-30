@@ -6,6 +6,7 @@
 #include "game/world.h"
 #include "client/console.h"
 #include "hashmap.h"
+#include "vtxbuf.h"
 
 #include "ext/terrain.c"
 
@@ -13,8 +14,8 @@
 
 static mat4 view_mat = {0};
 static mat4 proj_mat = {0};
-static u_int vao, tex;
-static u_int loc_mode, loc_proj, loc_view, loc_nightlightmod;
+static u_int tex;
+static u_int loc_chunkpos, loc_proj, loc_view, loc_nightlightmod;
 
 struct {
 	struct plane {
@@ -48,28 +49,10 @@ void world_renderer_init(void)
 
 	recalculate_projection_matrix();
 
-	/* init vao */
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 0); // x
-	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 1); // y
-	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 2); // z
-	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 3); // texture index
-	glVertexAttribIFormat(0, 1, GL_UNSIGNED_BYTE, 4); // data
-
-	// allow reusage of vao for different vbos
-	glVertexAttribBinding(0, 0);
-	glVertexAttribBinding(1, 0);
-
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-
-	glBindVertexArray(0);
-
+	loc_chunkpos = glGetUniformLocation(gl.shader3d, "CHUNK_POS");
 	loc_view = glGetUniformLocation(gl.shader3d, "VIEW");
 	loc_proj = glGetUniformLocation(gl.shader3d, "PROJECTION");
-	loc_mode = glGetUniformLocation(gl.shader3d, "RENDER_MODE");
+
 	loc_nightlightmod = glGetUniformLocation(gl.shader3d, "NIGHTTIME_LIGHT_MODIFIER");
 
 	/* load terrain texture */
@@ -233,17 +216,24 @@ static int check_side(struct chunk *c, int x, int y, int z, u_byte idself, int s
 	return 0;
 }
 
+#define FACE_Y_POS 1
+#define FACE_Y_NEG 2
+#define FACE_X_POS 4
+#define FACE_X_NEG 8
+#define FACE_Z_POS 16
+#define FACE_Z_NEG 32
+
 static int visible_faces(int x, int y, int z, struct chunk *c, int block_id_self)
 {
 	if(c->data->blocks[IDX_FROM_COORDS(x, y, z)] == 0)
 		return 0; // air (id 0) isnt drawn
 
-	return check_side(c, x, y + 1, z, block_id_self, 1) |
-		   check_side(c, x, y - 1, z, block_id_self, 2) |
-		   check_side(c, x + 1, y, z, block_id_self, 4) |
-		   check_side(c, x - 1, y, z, block_id_self, 8) |
-		   check_side(c, x, y, z + 1, block_id_self, 16) |
-		   check_side(c, x, y, z - 1, block_id_self, 32);
+	return check_side(c, x, y + 1, z, block_id_self, FACE_Y_POS) |
+		   check_side(c, x, y - 1, z, block_id_self, FACE_Y_NEG) |
+		   check_side(c, x + 1, y, z, block_id_self, FACE_X_POS) |
+		   check_side(c, x - 1, y, z, block_id_self, FACE_X_NEG) |
+		   check_side(c, x, y, z + 1, block_id_self, FACE_Z_POS) |
+		   check_side(c, x, y, z - 1, block_id_self, FACE_Z_NEG);
 }
 
 static u_byte getbl_light(struct chunk *c, int x, int y, int z)
@@ -259,23 +249,23 @@ static int calc_light_data(int sides, int x, int y, int z, struct chunk *c)
 {
 	u_byte l[6] = {0};
 	if(sides & 1)
-		l[0] = getbl_light(c, x, y+1, z);
+		l[0] = getbl_light(c, x, y + 1, z);
 	if(sides & 2)
-		l[1] = getbl_light(c, x, y-1, z);
+		l[1] = getbl_light(c, x, y - 1, z);
 	if(sides & 4)
-		l[2] = getbl_light(c, x+1, y, z);
+		l[2] = getbl_light(c, x + 1, y, z);
 	if(sides & 8)
-		l[3] = getbl_light(c, x-1, y, z);
+		l[3] = getbl_light(c, x - 1, y, z);
 	if(sides & 16)
-		l[4] = getbl_light(c, x, y, z+1);
+		l[4] = getbl_light(c, x, y, z + 1);
 	if(sides & 32)
-		l[5] = getbl_light(c, x, y, z-1);
-	return  (l[0] & 15) |
-			(l[1] & 15) << 4 |
-			(l[2] & 15) << 8 |
-			(l[3] & 15) << 12 |
-			(l[4] & 15) << 16 |
-			(l[5] & 15) << 20;
+		l[5] = getbl_light(c, x, y, z - 1);
+	return (l[0] & 15) |
+		   (l[1] & 15) << 4 |
+		   (l[2] & 15) << 8 |
+		   (l[3] & 15) << 12 |
+		   (l[4] & 15) << 16 |
+		   (l[5] & 15) << 20;
 }
 
 struct render_buf {
@@ -297,44 +287,200 @@ static u_byte construct_fence_metadata(int x, int y, int z)
 	return nx | px | nz | pz;
 }
 
+/*static void emit_vertex(struct side **vbo_p, size_t *size_vbo, int x, int y, int z, int texture, int data)
+{
+	(*size_vbo)++;
+	(*vbo_p)->x = x;
+	(*vbo_p)->y = y;
+	(*vbo_p)->z = z;
+	(*vbo_p)->texture_index = texture;
+	(*vbo_p)->data = data;
+	(*vbo_p)++;
+}
+
+#define emit_face(...)    \
+emit_vertex(__VA_ARGS__), \
+emit_vertex(__VA_ARGS__), \
+emit_vertex(__VA_ARGS__), \
+emit_vertex(__VA_ARGS__), \
+emit_vertex(__VA_ARGS__), \
+emit_vertex(__VA_ARGS__)
+*/
+
+size_t total_size_vbos = 0;
+
 static void build_buffer_for_chunk(struct chunk *chunk)
 {
-	struct side *vbo_p;
+	struct vtxbuf *vtxbuf = &chunk->data->vtxbuf;
 
-	chunk->data->vbo = B_malloc(sizeof(struct side) * 16 * 16 * 128);
-	chunk->data->size_vbo = 0;
-
-	vbo_p = chunk->data->vbo;
+	//vtxbuf_free_leave_buffers(vtxbuf);
+	// vtxbuf_free(vtxbuf);
+	vtxbuf_new(vtxbuf, 0);
 
 	for(int x = 0; x < 16; x++) {
 		for(int z = 0; z < 16; z++) {
 			for(int y = 0; y < 128; y++) {
-				if(visible_faces(x, y, z, chunk, 1) > 0) {
-					chunk->data->size_vbo++;
-					vbo_p->x = x;
-					vbo_p->y = y;
-					vbo_p->z = z;
-					vbo_p++;
-				}
+
+				int self_id = getbl(chunk, x, y, z);
+				int face_flags = visible_faces(x, y, z, chunk, self_id);
+
+				//if(chunk->x == 0 && chunk->z == 0) {
+				//	if(x > 8) {
+				//		// printf("%d %d %d %d %d\n", x, y, z, self_id, face_flags);
+				//	}
+				//}
+
+				if(face_flags == 0)
+					continue;
+
+#define CHECK_FACE(face)                                            \
+do {                                                                \
+	if(face_flags & face) {                                         \
+		/* emit 6 verts for a quad */                               \
+		vtxbuf_emit_vertex(vtxbuf, vtx_make(x+(chunk->x<<4),y,z+(chunk->z<<4),0,face));         \
+		vtxbuf_emit_last(vtxbuf);                                   \
+		vtxbuf_emit_last(vtxbuf);                                   \
+		vtxbuf_emit_last(vtxbuf);                                   \
+		vtxbuf_emit_last(vtxbuf);                                   \
+		vtxbuf_emit_last(vtxbuf);                                   \
+	}                                                               \
+} while(0)
+
+				CHECK_FACE(FACE_Y_POS);
+				CHECK_FACE(FACE_Y_NEG);
+				CHECK_FACE(FACE_X_POS);
+				CHECK_FACE(FACE_X_NEG);
+				CHECK_FACE(FACE_Z_POS);
+				CHECK_FACE(FACE_Z_NEG);
 			}
 		}
 	}
 
-	glGenBuffers(1, &chunk->data->gl_vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, chunk->data->gl_vbo);
-	glBufferData(GL_ARRAY_BUFFER, chunk->data->size_vbo * sizeof(struct side), chunk->data->vbo, GL_STATIC_DRAW);
+	if(!chunk->data->gl_init) {
+		glGenVertexArrays(1, &chunk->data->gl_vao);
+		glGenBuffers(1, &chunk->data->gl_vbo);
+		glGenBuffers(1, &chunk->data->gl_ebo);
+
+		glBindVertexArray(chunk->data->gl_vao);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chunk->data->gl_ebo);
+			glBindBuffer(GL_ARRAY_BUFFER, chunk->data->gl_vbo);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct vtx), 0);
+			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(struct vtx), (void *) 12);
+//			glVertexAttribPointer(0, 1, GL_UNSIGNED_INT, GL_FALSE, sizeof(struct vtx), 0); // x,z
+//			glVertexAttribPointer(1, 1, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(struct vtx), 1); // y
+//			glVertexAttribPointer(2, 1, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(struct vtx), 2); // t
+//			glVertexAttribPointer(3, 1, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(struct vtx), 3); // d
+			glEnableVertexAttribArray(0);
+			glEnableVertexAttribArray(1);
+//			glEnableVertexAttribArray(2);
+//			glEnableVertexAttribArray(3);
+		glBindVertexArray(0);
+
+		chunk->data->gl_init = true;
+	}
+
+	glBindVertexArray(chunk->data->gl_vao);
+		/* update vertex buffer */
+		glBindBuffer(GL_ARRAY_BUFFER, chunk->data->gl_vbo);
+		glBufferData(GL_ARRAY_BUFFER,
+			/* size */ chunk->data->vtxbuf.vertex_count * sizeof(struct vtx),
+			/* data */ chunk->data->vtxbuf.vertices,
+			/* usag */ GL_STATIC_DRAW);
+
+		/* update index buffer */
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chunk->data->gl_ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+			/* size */ chunk->data->vtxbuf.index_count * sizeof(u_short),
+			/* data */ chunk->data->vtxbuf.indices,
+			/* usag */ GL_STATIC_DRAW);
+	glBindVertexArray(0);
+
+	con_printf("%d %d rebuilt - %d verts\n", chunk->x, chunk->z, chunk->data->vtxbuf.vertex_count);
+
+	// total_size_vbos += chunk->data->vtxbuf.vertex_count * sizeof(*chunk->data->vtxbuf.vertices);
+	// total_size_vbos += chunk->data->vtxbuf.index_count * sizeof(*chunk->data->vtxbuf.indices);
+
+	// vtxbuf_free(vtxbuf);
 }
 
-static void build_buffers(void)
-{
-	static bool built = false;
-	if(!built && world_chunk_exists(0, 0) && world_get_chunk(0, 0)->dirty) {
-		build_buffer_for_chunk(world_get_chunk(0, 0));
-		built = true;
+/*{
+struct side *vbo_p;
+struct hashmap *vert_hashmap;
+
+
+B_free(chunk->data->vbo);
+chunk->data->vbo = B_malloc(sizeof(struct side) * 16 * 16 * 128 * 6);
+chunk->data->size_vbo = 0;
+
+vbo_p = chunk->data->vbo;
+
+for(int x = 0; x < 16; x++) {
+	for(int z = 0; z < 16; z++) {
+		for(int y = 0; y < 128; y++) {
+			int self_id = getbl(chunk, x, y, z);
+			int face_flags = visible_faces(x, y, z, chunk, self_id);
+
+			if(face_flags == 0)
+				continue;
+
+#define CHECK_FACE(face)                                             \
+do {                                                                 \
+if(face_flags & face) {                                          \
+	emit_face(&vbo_p, &chunk->data->size_vbo, x, y, z, 1, face); \
+}                                                                \
+} while(0)
+
+			CHECK_FACE(FACE_Y_POS);
+			CHECK_FACE(FACE_Y_NEG);
+			CHECK_FACE(FACE_X_POS);
+			CHECK_FACE(FACE_X_NEG);
+			CHECK_FACE(FACE_Z_POS);
+			CHECK_FACE(FACE_Z_NEG);
+		}
 	}
 }
 
-int wr_total_faces;
+chunk->dirty = false;
+
+// con_printf("%d\n", chunk->data->size_vbo);
+
+glGenBuffers(1, &chunk->data->gl_vbo);
+glGenBuffers(1, &chunk->data->gl_ebo);
+
+glBindBuffer(GL_ARRAY_BUFFER, chunk->data->gl_vbo);
+glBufferData(GL_ARRAY_BUFFER, chunk->data->size_vbo * sizeof(struct side), chunk->data->vbo, GL_STATIC_DRAW);
+glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chunk->data->gl_ebo);
+glBufferData(GL_ELEMENT_ARRAY_BUFFER, chunk->data->size_ebo * sizeof(uint), chunk->data->ebo, GL_STATIC_DRAW);
+glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+total_size_vbos += chunk->data->size_vbo * sizeof(struct side);
+//con_printf("size = %d bytes\n", chunk->data->size_vbo * sizeof(struct side));
+
+// glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chunk->data->gl_ebo);
+
+
+
+}*/
+
+void build_buffers(void)
+{
+	size_t i = 0;
+	void *it;
+
+	while(hashmap_iter(chunk_map, &i, &it)) {
+		struct chunk *c = (struct chunk *) it;
+
+		if(!c->dirty)
+			continue;
+		build_buffer_for_chunk(c);
+		c->dirty = false;
+	}
+	//con_printf("VBO total size: %zu (%zu on avg)\n", total_size_vbos, total_size_vbos / hashmap_count(chunk_map));
+}
+
+int wr_total_vertices;
 int wr_draw_calls;
 
 void world_render(void)
@@ -342,7 +488,7 @@ void world_render(void)
 	size_t i = 0;
 	void *it;
 
-	wr_total_faces = 0;
+	wr_total_vertices = 0;
 	wr_draw_calls = 0;
 
 	if(cl.state < cl_connected)
@@ -360,8 +506,10 @@ void world_render(void)
 	else
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
+	glPointSize(2.0f);
+
+	//glEnable(GL_CULL_FACE);
+	//glCullFace(GL_BACK);
 
 	glUniformMatrix4fv(loc_view, 1, GL_FALSE, (const GLfloat *) view_mat);
 	glUniformMatrix4fv(loc_proj, 1, GL_FALSE, (const GLfloat *) proj_mat);
@@ -369,39 +517,38 @@ void world_render(void)
 
 	glBindTexture(GL_TEXTURE_2D, tex);
 
-	glBindVertexArray(vao);
-
-
-
 	while(hashmap_iter(chunk_map, &i, &it)) {
 		struct chunk *c = (struct chunk *) it;
 
-		if(!c->visible)
-			continue;
+		if(c->data->gl_init) {
+			vec2 chunk_pos = {c->x, c->z};
+			glUniform2fv(loc_chunkpos, 1, chunk_pos);
 
-	}
+			glBindVertexArray(c->data->gl_vao);
+			//glDrawElements(GL_POINTS, c->data->vtxbuf.index_count, GL_UNSIGNED_SHORT, c->data->vtxbuf.indices);
+			glDrawArrays(GL_TRIANGLES, 0, c->data->vtxbuf.vertex_count);
 
-	i = 0;
-	while(hashmap_iter(chunk_map, &i, &it)) {
-		struct chunk *c = (struct chunk *) it;
-
-		if(!c->visible)
-			continue;
-
+			wr_total_vertices += c->data->vtxbuf.vertex_count;
+			wr_draw_calls++;
+		}
 	}
 
 	/* done */
 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glDisable(GL_CULL_FACE);
+	//glDisable(GL_CULL_FACE);
 }
 
-void world_renderer_free_chunk_rbufs(struct chunk *c)
+void world_renderer_free_chunk_render_data(struct chunk *c)
 {
-
+	if(c->data->gl_init) {
+		glDeleteBuffers(1, &c->data->gl_ebo);
+		glDeleteBuffers(1, &c->data->gl_vbo);
+		glDeleteVertexArrays(1, &c->data->gl_vao);
+	}
+	vtxbuf_free(&c->data->vtxbuf);
 }
 
 void world_renderer_shutdown(void)
 {
-	glDeleteBuffers(1, &vao);
 }

@@ -30,12 +30,12 @@ static bool check_shader_compile_impl(uint h, const char *name)
 	glGetShaderiv(h, GL_COMPILE_STATUS, &ok);
 	if(!ok) {
 		glGetShaderiv(h, GL_INFO_LOG_LENGTH, &loglen);
-		log = B_malloc(loglen + 1);
+		log = mem_alloc(loglen + 1);
 		memset(log, 0, loglen + 1);
 		glGetShaderInfoLog(h, loglen, &loglen, log);
 		con_printf("shader '%s' failed to compile: %s\n", name, log);
 		glDeleteShader(h);
-		B_free(log);
+		mem_free(log);
 	}
 
 	return ok;
@@ -49,11 +49,11 @@ static uint check_program_compile(uint h, uint h_vs, uint h_fs)
 	glGetProgramiv(h, GL_LINK_STATUS, &ok);
 	if(!ok) {
 		glGetProgramiv(h, GL_INFO_LOG_LENGTH, &loglen);
-		log = B_malloc(loglen + 1);
+		log = mem_alloc(loglen + 1);
 		memset(log, 0, loglen + 1);
 		glGetProgramInfoLog(h, loglen, &loglen, log);
 		con_printf("shader program failed to compile:\n%s\n", log);
-		B_free(log);
+		mem_free(log);
 
 		glDeleteProgram(h);
 		glDeleteShader(h_vs);
@@ -118,8 +118,8 @@ void vid_init(void)
 		con_printf("SDL error: %s", SDL_GetError());
 
 	SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, true);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
 	flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL | SDL_WINDOW_INPUT_FOCUS | SDL_WINDOW_SHOWN;
@@ -165,7 +165,7 @@ void vid_unlock_fps(void)
 
 void vid_shutdown(void)
 {
-	// SDL_GL_DeleteContext(glcontext);
+	SDL_GL_DeleteContext(glcontext);
 	SDL_DestroyWindow(window_handle);
 
 	SDL_Quit();
@@ -205,6 +205,7 @@ void vid_display_frame(void)
 	int e;
 	float *clearcolor = world_get_sky_color();
 	glClearColor(clearcolor[0], clearcolor[1], clearcolor[2], 1.0f);
+	// glClearColor(0.1f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	/* draw 3d stuff */

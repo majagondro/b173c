@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -ggdb -Wall -Wpedantic -Wextra -Wdeclaration-after-statement -Iinclude -Wno-unused-parameter
+CFLAGS := -ggdb3 -Wall -Wpedantic -Wextra -Wdeclaration-after-statement -Iinclude -Wno-unused-parameter
 # CFLAGS += -fsanitize=address
 LDFLAGS := -lm
 

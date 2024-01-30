@@ -24,6 +24,7 @@ typedef float mat4[4][4];
 
 void mat_multiply(mat4 dest, const mat4 a, const mat4 b);
 void mat_identity(mat4 dest);
+void mat_translate(mat4 dest, float x, float y, float z);
 void mat_view(mat4 dest, const vec3 pos, vec3 ang);
 void mat_frustrum(mat4 dest, float l, float r, float b, float t, float n, float f);
 void mat_projection(mat4 dest, float fov, float aspect, float znear, float zfar);

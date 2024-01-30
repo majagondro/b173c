@@ -28,8 +28,16 @@ void mat_identity(float dest[4][4])
 {
 	int i;
 	memset(dest, 0, 16 * sizeof(float));
-	for(i = 0; i < 4; i++)
+	for(i = 0; i < 4; i++) {
 		dest[i][i] = 1;
+	}
+}
+
+void mat_translate(mat4 dest, float x, float y, float z)
+{
+	dest[0][3] = x;
+	dest[1][3] = y;
+	dest[2][3] = z;
 }
 
 void cam_angles(vec3 fwd, vec3 side, vec3 up, float yaw, float pitch)

@@ -438,12 +438,12 @@ void key_bind(int key, char *bind)
 	size_t len;
 
 	len = strlen(bind);
-	tmp = B_malloc(len + 1);
+	tmp = mem_alloc(len + 1);
 	strncpy(tmp, bind, len);
 	tmp[len] = 0;
 
 	if (input_keys[key].binding)
-		B_free(input_keys[key].binding);
+		mem_free(input_keys[key].binding);
 
 	input_keys[key].binding = tmp;
 }

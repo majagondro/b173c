@@ -17,9 +17,9 @@ typedef unsigned long u_long;
 typedef char *string8;
 typedef char16 *string16;
 
-void *_B_malloc(size_t sz, const char *file, int line);
-#define B_malloc(size) _B_malloc(size, __FILE__, __LINE__)
-#define B_free(p) free(p), p = NULL
+void *_mem_alloc_impl(size_t sz, const char *file, int line);
+#define mem_alloc(size) _mem_alloc_impl(size, __FILE__, __LINE__)
+#define mem_free(p) do { if(p) free(p); p = NULL; } while(0)
 
 void con_printf(char *text, ...);
 

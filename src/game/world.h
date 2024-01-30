@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "mathlib.h"
+#include "vtxbuf.h"
 
 #define IDX_FROM_COORDS(x, y, z) ((((x) & 15) << 11) | (((z) & 15) << 7) | ((y) & 127))
 #define GET4BIT(arr, idx) (((arr)[(idx) >> 1] >> ((idx & 1) ? 4 : 0)) & 15)
@@ -15,17 +16,9 @@ struct chunk_data {
 	u_byte skylight  [16 * 16 * 64];
 	u_byte blocklight[16 * 16 * 64];
 
-	u_int gl_vbo, gl_ebo;
-	u_int *ebo;
-	struct side {
-		// local pos (0-16), global is passed in model matrix
-		u_byte x, y, z;
-		// 0-256
-		u_byte texture_index;
-		// light etc,, 0 for now
-		u_byte data;
-	} __attribute__((__packed__)) *vbo;
-	size_t size_ebo, size_vbo;
+	bool gl_init;
+	u_int gl_vbo, gl_ebo, gl_vao;
+	struct vtxbuf vtxbuf;
 };
 
 struct chunk {

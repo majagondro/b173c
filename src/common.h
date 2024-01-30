@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include "char16.h"
 
+#define attr(a) __attribute__((__##a##__))
+
 typedef char byte;
 typedef unsigned char u_byte;
 typedef unsigned short u_short;

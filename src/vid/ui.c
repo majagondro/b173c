@@ -119,30 +119,31 @@ void ui_init(void)
 	// setup font image
 	glGenTextures(1, &fonttex);
 	glBindTexture(GL_TEXTURE_2D, fonttex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 128, 128, 0, GL_RGBA, GL_UNSIGNED_BYTE, q_conchars.pixel_data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 128, 128, 0, GL_RGBA, GL_UNSIGNED_BYTE, q_conchars.pixel_data);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// setup font buffers
 	glGenVertexArrays(1, &fontvao);
 	glGenBuffers(1, &fontvbo);
 	glGenBuffers(1, &fontdatavbo);
 	glBindVertexArray(fontvao);
-	glBindBuffer(GL_ARRAY_BUFFER, fontvbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glyph_vertices), glyph_vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(vec2), (void *) 0);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(vec2), (void *) sizeof(vec2));
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
+		glBindBuffer(GL_ARRAY_BUFFER, fontvbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(glyph_vertices), glyph_vertices, GL_STATIC_DRAW);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(vec2), (void *) 0);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(vec2), (void *) sizeof(vec2));
+		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
 
-	// instance data
-	glEnableVertexAttribArray(2);
-	glBindBuffer(GL_ARRAY_BUFFER, fontdatavbo);
-	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(vec4), (void *) 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glVertexAttribDivisor(2, 1);
+		// instance data
+		glBindBuffer(GL_ARRAY_BUFFER, fontdatavbo);
+		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(vec4), (void *) 0);
+		glEnableVertexAttribArray(2);
+		glVertexAttribDivisor(2, 1);
+	glBindVertexArray(0);
 
 	ui_update_size(vid_width.integer, vid_height.integer);
 

@@ -3,7 +3,6 @@
 
 #include "common.h"
 #include "mathlib.h"
-#include "vtxbuf.h"
 
 #define IDX_FROM_COORDS(x, y, z) ((((x) & 15) << 11) | (((z) & 15) << 7) | ((y) & 127))
 #define GET4BIT(arr, idx) (((arr)[(idx) >> 1] >> ((idx & 1) ? 4 : 0)) & 15)
@@ -16,9 +15,15 @@ struct chunk_data {
 	u_byte skylight  [16 * 16 * 64];
 	u_byte blocklight[16 * 16 * 64];
 
+	// todo: maybe hide this or move somewhere or idk
 	bool gl_init;
-	u_int gl_vbo, gl_ebo, gl_vao;
-	struct vtxbuf vtxbuf;
+	u_int gl_vbo;
+	struct block_vertex {
+		/* modified me? change vao init in world_renderer.c as well */
+		float x, y, z;
+		float tx_idx, face;
+	} *verts;
+	size_t num_verts;
 };
 
 struct chunk {

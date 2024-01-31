@@ -34,7 +34,7 @@ const char *shader_vertex2d = GLSL_VERSION stringify(
 
 		if(FONTCOLOR < 0) {
 			/* shadow - draw behind */
-			gl_Position.z += 1.0f;
+			gl_Position.z += 0.001f;
 		}
 	}
 );

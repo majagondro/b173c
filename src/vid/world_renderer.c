@@ -6,6 +6,7 @@
 #include "game/world.h"
 #include "client/console.h"
 #include "hashmap.h"
+#include "meshbuilder.h"
 
 #include "ext/terrain.c"
 
@@ -14,8 +15,8 @@
 static mat4 view_mat = {0};
 static mat4 proj_mat = {0};
 static uint gl_world_vao;
-static u_int gl_world_texture; // fixme
-static u_int loc_chunkpos, loc_proj, loc_view, loc_nightlightmod;
+static uint gl_world_texture; // fixme
+static uint loc_chunkpos, loc_proj, loc_view, loc_nightlightmod;
 
 struct {
 	struct plane {
@@ -34,54 +35,12 @@ static void recalculate_projection_matrix(void);
 cvar fov = {"fov", "90", recalculate_projection_matrix};
 cvar r_zfar = {"r_zfar", "256", recalculate_projection_matrix};
 cvar r_znear = {"r_znear", "0.1", recalculate_projection_matrix};
+cvar r_max_remeshes = {"r_max_remeshes", "2"};
 cvar gl_polygon_mode = {"gl_polygon_mode", "GL_FILL"};
 
 extern cvar vid_width, vid_height;
 
 extern struct gl_state gl;
-
-void world_renderer_init(void)
-{
-	cvar_register(&fov);
-	cvar_register(&r_zfar);
-	cvar_register(&r_znear);
-	cvar_register(&gl_polygon_mode);
-
-	recalculate_projection_matrix();
-
-	loc_chunkpos = glGetUniformLocation(gl.shader3d, "CHUNK_POS");
-	loc_view = glGetUniformLocation(gl.shader3d, "VIEW");
-	loc_proj = glGetUniformLocation(gl.shader3d, "PROJECTION");
-
-	loc_nightlightmod = glGetUniformLocation(gl.shader3d, "NIGHTTIME_LIGHT_MODIFIER");
-
-	/* init vao */
-	glGenVertexArrays(1, &gl_world_vao);
-
-	glBindVertexArray(gl_world_vao);
-		/* modified me? change block_vertex struct in world.h as well */
-		/*                  idx sz  type       norm   offs */
-		glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0);
-		glVertexAttribFormat(1, 2, GL_FLOAT, GL_FALSE, 12);
-
-		/*                  idx  bind_idx */
-		glVertexAttribBinding(0, 0);
-		glVertexAttribBinding(1, 0);
-
-		glEnableVertexAttribArray(0);
-		glEnableVertexAttribArray(1);
-	glBindVertexArray(0);
-
-	/* load terrain texture */
-	glGenTextures(1, &gl_world_texture);
-	glBindTexture(GL_TEXTURE_2D, gl_world_texture);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, terrain_png.width, terrain_png.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, terrain_png.pixel_data);
-	glBindTexture(GL_TEXTURE_2D, 0);
-}
 
 static float get_dist_to_plane(const struct plane *p, const vec3 point)
 {
@@ -107,7 +66,8 @@ static bool is_visible_on_frustum(const vec3 point, float radius)
 		get_dist_to_plane(&frustum.near, point) > -radius;
 }
 
-static void update_view_matrix(void)
+void world_renderer_update_chunk_visibility(world_chunk *chunk);
+static void update_view_matrix_and_frustum(void)
 {
 	float half_h = r_zfar.value * tanf(DEG2RAD(fov.value) * 0.5f);
 	float half_w = half_h * (vid_width.value / vid_height.value);
@@ -116,13 +76,14 @@ static void update_view_matrix(void)
 	vec3 normal;
 	vec3 tmp;
 
+	cl.game.pos[1] += VIEW_HEIGHT;
+
+	/* find camera vectors */
 	cam_angles(forward, right, up, cl.game.rot[1], cl.game.rot[0]);
 	vec3_mul_scalar(fwdFar, forward, r_zfar.value);
 	vec3_mul_scalar(fwdNear, forward, r_znear.value);
 
-	cl.game.pos[1] += VIEW_HEIGHT;
-
-	// update frustum
+	/* update frustum */
 	vec3_add(tmp, cl.game.pos, fwdFar);
 	vec3_invert(normal, forward);
 	frustum.far = make_plane(tmp, normal);
@@ -151,301 +112,316 @@ static void update_view_matrix(void)
 	vec3_cross(normal, tmp, right);
 	frustum.bottom = make_plane(cl.game.pos, normal);
 
-	// update view matrix
+	/* update view matrix */
 	mat_view(view_mat, cl.game.pos, cl.game.rot);
 
-	// view offset
 	cl.game.pos[1] -= VIEW_HEIGHT;
+
+	/* update visibility of chunks */
+	if(world_chunk_map != NULL && hashmap_count(world_chunk_map) > 0) {
+		size_t i = 0;
+		void *it;
+		while(hashmap_iter(world_chunk_map, &i, &it)) {
+			world_chunk *chunk = (world_chunk *) it;
+			world_renderer_update_chunk_visibility(chunk);
+		}
+	}
 }
 
 static void recalculate_projection_matrix(void)
 {
 	mat_projection(proj_mat, fov.value, (vid_width.value / vid_height.value), r_znear.value, r_zfar.value);
-	update_view_matrix();
+	update_view_matrix_and_frustum();
 }
 
-static bool alpha_blocks[256] = {
-	[0] = true,
-	[6] = true,
-	[8] = true,
-	[9] = true,
-	[10] = true,
-	[11] = true,
-	[18] = true,
-	[20] = true,
-	[26] = true,
-	[27] = true,
-	[28] = true,
-	[30] = true,
-	[31] = true,
-	[32] = true,
-	[37] = true,
-	[38] = true,
-	[39] = true,
-	[40] = true,
-	[44] = true,
-	[50] = true,
-	[52] = true,
-	[53] = true,
-	[55] = true,
-	[59] = true,
-	[60] = true,
-	[64] = true,
-	[65] = true,
-	[66] = true,
-	[67] = true,
-	[69] = true,
-	[70] = true,
-	[72] = true,
-	[75] = true,
-	[76] = true,
-	[77] = true,
-	[78] = true,
-	[79] = true,
-	[81] = true,
-	[83] = true,
-	[85] = true,
-	[88] = true,
-	[90] = true,
-	[92] = true,
-	[96] = true
-};
-
-static bool is_water(u_byte block_id)
+void world_renderer_init(void)
 {
-	// todo: nether portal block too?
-	return block_id == 8 || block_id == 9;
+	cvar_register(&fov);
+	cvar_register(&r_zfar);
+	cvar_register(&r_znear);
+	cvar_register(&r_max_remeshes);
+	cvar_register(&gl_polygon_mode);
+
+	recalculate_projection_matrix();
+
+	loc_chunkpos = glGetUniformLocation(gl.shader3d, "CHUNK_POS");
+	loc_view = glGetUniformLocation(gl.shader3d, "VIEW");
+	loc_proj = glGetUniformLocation(gl.shader3d, "PROJECTION");
+
+	loc_nightlightmod = glGetUniformLocation(gl.shader3d, "NIGHTTIME_LIGHT_MODIFIER");
+
+	/* init vao */
+	glGenVertexArrays(1, &gl_world_vao);
+
+	glBindVertexArray(gl_world_vao);
+	glVertexAttribIFormat(0, 1, GL_UNSIGNED_INT, 0);
+	glVertexAttribBinding(0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+
+	/* load terrain texture */
+	glGenTextures(1, &gl_world_texture);
+	glBindTexture(GL_TEXTURE_2D, gl_world_texture);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, terrain_png.width, terrain_png.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, terrain_png.pixel_data);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-static u_byte getbl(struct chunk *c, int x, int y, int z)
+void world_renderer_shutdown(void)
 {
-	if(x < 0 || x > 15 || z < 0 || z > 15)
-		return world_get_block(x + (c->x << 4), y, z + (c->z << 4));
-	return c->data->blocks[IDX_FROM_COORDS(x, y, z)];
 }
 
-static int check_side(struct chunk *c, int x, int y, int z, u_byte idself, int side)
+static void add_block_face(struct world_vertex v, block_face face)
 {
-	int id = getbl(c, x, y, z);
-	if(alpha_blocks[id] && ((idself == 18) || (id != idself)))
-		return side;
-	return 0;
+	const vec3 offsets[6][4] = {
+		[BLOCK_FACE_Y_NEG] = {{0, 0, 0}, {0, 0, 1}, {1, 0, 0}, {1, 0, 1}},
+		[BLOCK_FACE_Y_POS] = {{0, 1, 0}, {1, 1, 0}, {0, 1, 1}, {1, 1, 1}},
+		[BLOCK_FACE_Z_NEG] = {{1, 1, 0}, {0, 1, 0}, {1, 0, 0}, {0, 0, 0}},
+		[BLOCK_FACE_Z_POS] = {{0, 1, 1}, {1, 1, 1}, {0, 0, 1}, {1, 0, 1}},
+		[BLOCK_FACE_X_NEG] = {{0, 1, 0}, {0, 1, 1}, {0, 0, 0}, {0, 0, 1}},
+		[BLOCK_FACE_X_POS] = {{1, 1, 1}, {1, 1, 0}, {1, 0, 1}, {1, 0, 0}}
+	};
+
+	struct world_vertex tl, tr, bl, br;
+
+	tl = v;
+	tr = v;
+	bl = v;
+	br = v;
+
+	tl.x += offsets[face][0][0];
+	tl.y += offsets[face][0][1];
+	tl.z += offsets[face][0][2];
+
+	tr.x += offsets[face][1][0];
+	tr.y += offsets[face][1][1];
+	tr.z += offsets[face][1][2];
+
+	bl.x += offsets[face][2][0];
+	bl.y += offsets[face][2][1];
+	bl.z += offsets[face][2][2];
+
+	br.x += offsets[face][3][0];
+	br.y += offsets[face][3][1];
+	br.z += offsets[face][3][2];
+
+	meshbuilder_add_quad(&tl, &tr, &bl, &br);
 }
 
-#define FACE_Y_POS 1
-#define FACE_Y_NEG 2
-#define FACE_X_POS 4
-#define FACE_X_NEG 8
-#define FACE_Z_POS 16
-#define FACE_Z_NEG 32
-
-static int visible_faces(int x, int y, int z, struct chunk *c, int block_id_self)
+void remesh_chunk(world_chunk *chunk)
 {
-	if(c->data->blocks[IDX_FROM_COORDS(x, y, z)] == 0)
-		return 0; // air (id 0) isnt drawn
+	static const vec3 axes[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
-	return check_side(c, x, y + 1, z, block_id_self, FACE_Y_POS) |
-		   check_side(c, x, y - 1, z, block_id_self, FACE_Y_NEG) |
-		   check_side(c, x + 1, y, z, block_id_self, FACE_X_POS) |
-		   check_side(c, x - 1, y, z, block_id_self, FACE_X_NEG) |
-		   check_side(c, x, y, z + 1, block_id_self, FACE_Z_POS) |
-		   check_side(c, x, y, z - 1, block_id_self, FACE_Z_NEG);
-}
+	world_renderer_update_chunk_visibility(chunk);
 
-static u_byte getbl_light(struct chunk *c, int x, int y, int z)
-{
-	if(y < 0 || y > 127)
-		return 0;
-	if(x < 0 || x > 15 || z < 0 || z > 15)
-		return world_get_block_lighting(x + (c->x << 4), y, z + (c->z << 4));
-	return chunk_get_block_lighting(c, x, y, z);
-}
+	for(int bufidx = 7; bufidx >= 0; bufidx--) {
+		struct world_chunk_glbuf *glbuf = &chunk->glbufs[bufidx];
 
-static int calc_light_data(int sides, int x, int y, int z, struct chunk *c)
-{
-	u_byte l[6] = {0};
-	if(sides & 1)
-		l[0] = getbl_light(c, x, y + 1, z);
-	if(sides & 2)
-		l[1] = getbl_light(c, x, y - 1, z);
-	if(sides & 4)
-		l[2] = getbl_light(c, x + 1, y, z);
-	if(sides & 8)
-		l[3] = getbl_light(c, x - 1, y, z);
-	if(sides & 16)
-		l[4] = getbl_light(c, x, y, z + 1);
-	if(sides & 32)
-		l[5] = getbl_light(c, x, y, z - 1);
-	return (l[0] & 15) |
-		   (l[1] & 15) << 4 |
-		   (l[2] & 15) << 8 |
-		   (l[3] & 15) << 12 |
-		   (l[4] & 15) << 16 |
-		   (l[5] & 15) << 20;
-}
+		/* free old data */
+		mem_free(glbuf->vertices);
+		mem_free(glbuf->indices);
+		mem_free(glbuf->alpha_vertices);
+		mem_free(glbuf->alpha_indices);
 
-struct render_buf {
-	byte dirty;
-	bool visible;
-	int num_opaq_faces, num_alpha_faces;
-	u_int gl_buf_opaq, gl_buf_alpha;
-	struct block *opaque_faces, *alpha_faces;
-};
+		meshbuilder_start(sizeof(*glbuf->vertices));
 
-extern struct hashmap *chunk_map;
+		for(int xoff = 0; xoff < WORLD_CHUNK_SIZE; xoff++) {
+			for(int zoff = 0; zoff < WORLD_CHUNK_SIZE; zoff++) {
+				for(int yoff = 0; yoff < WORLD_CHUNK_SIZE; yoff++) {
+					int x = (chunk->x << 4) + xoff;
+					int y = bufidx * WORLD_CHUNK_SIZE + yoff;
+					int z = (chunk->z << 4) + zoff;
+					block_data block = world_get_block(x, y, z);
 
-static u_byte construct_fence_metadata(int x, int y, int z)
-{
-	u_byte nx = world_get_block(x - 1, y, z) == 85 ? 1 : 0;
-	u_byte px = world_get_block(x + 1, y, z) == 85 ? 2 : 0;
-	u_byte nz = world_get_block(x, y, z - 1) == 85 ? 4 : 0;
-	u_byte pz = world_get_block(x, y, z + 1) == 85 ? 8 : 0;
-	return nx | px | nz | pz;
-}
+					if(block_is_semi_transparent(block))
+						continue;
 
-/*static void emit_vertex(struct side **vbo_p, size_t *size_vbo, int x, int y, int z, int texture, int data)
-{
-	(*size_vbo)++;
-	(*vbo_p)->x = x;
-	(*vbo_p)->y = y;
-	(*vbo_p)->z = z;
-	(*vbo_p)->texture_index = texture;
-	(*vbo_p)->data = data;
-	(*vbo_p)++;
-}
+					if(!block_is_empty(block)) {
+						block_properties props = block_get_properties(block.id);
 
-#define emit_face(...)    \
-emit_vertex(__VA_ARGS__), \
-emit_vertex(__VA_ARGS__), \
-emit_vertex(__VA_ARGS__), \
-emit_vertex(__VA_ARGS__), \
-emit_vertex(__VA_ARGS__), \
-emit_vertex(__VA_ARGS__)
-*/
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_NEG)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_Y_NEG],
+								BLOCK_FACE_Y_NEG), BLOCK_FACE_Y_NEG
+							);
+						}
 
-size_t total_size_vbos = 0;
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_POS)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_Y_POS],
+								BLOCK_FACE_Y_POS), BLOCK_FACE_Y_POS
+							);
+						}
 
-static void add_vertex(struct chunk *c, struct block_vertex v)
-{
-	c->data->verts[c->data->num_verts++] = v;
-}
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_POS)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_X_POS],
+								BLOCK_FACE_X_POS), BLOCK_FACE_X_POS
+							);
+						}
 
-static void build_buffer_for_chunk(struct chunk *chunk)
-{
-	mem_free(chunk->data->verts);
-	chunk->data->verts = mem_alloc(16*16*128*6*sizeof(*chunk->data->verts));
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_NEG)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_X_NEG],
+								BLOCK_FACE_X_NEG), BLOCK_FACE_X_NEG
+							);
+						}
 
-	for(int x = 0; x < 16; x++) {
-		for(int z = 0; z < 16; z++) {
-			for(int y = 0; y < 128; y++) {
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_POS)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_Z_POS],
+								BLOCK_FACE_Z_POS), BLOCK_FACE_Z_POS
+							);
+						}
 
-				int self_id = getbl(chunk, x, y, z);
-				int face_flags = visible_faces(x, y, z, chunk, self_id);
-
-				if(face_flags == 0)
-					continue;
-
-#define CHECK_FACE(face)                                                   \
-do {                                                                       \
-	if(face_flags & face) {                                                \
-		/* emit 6 verts for a quad */                                      \
-		add_vertex(chunk, (struct block_vertex){x,y,z,1,face});            \
-		add_vertex(chunk, chunk->data->verts[chunk->data->num_verts - 1]); \
-		add_vertex(chunk, chunk->data->verts[chunk->data->num_verts - 1]); \
-		add_vertex(chunk, chunk->data->verts[chunk->data->num_verts - 1]); \
-		add_vertex(chunk, chunk->data->verts[chunk->data->num_verts - 1]); \
-		add_vertex(chunk, chunk->data->verts[chunk->data->num_verts - 1]); \
-	}                                                                      \
-} while(0)
-
-				CHECK_FACE(FACE_Y_POS);
-				CHECK_FACE(FACE_Y_NEG);
-				CHECK_FACE(FACE_X_POS);
-				CHECK_FACE(FACE_X_NEG);
-				CHECK_FACE(FACE_Z_POS);
-				CHECK_FACE(FACE_Z_NEG);
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_NEG)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_Z_NEG],
+								BLOCK_FACE_Z_NEG), BLOCK_FACE_Z_NEG
+							);
+						}
+					}
+				}
 			}
 		}
-	}
 
-	if(chunk->data->num_verts <= 0)
-		return; // :-|
+		meshbuilder_finish(&glbuf->vertices, &glbuf->num_vertices, &glbuf->indices, &glbuf->num_indices);
 
-	// fixme realloc(): invalid next size for some reason (that was before i changed == 0 to <= 0 above)
-	chunk->data->verts = reallocarray(chunk->data->verts, chunk->data->num_verts, sizeof(*chunk->data->verts));
-
-	if(!chunk->data->gl_init) {
-		glGenBuffers(1, &chunk->data->gl_vbo);
-		chunk->data->gl_init = true;
-	}
-
-	/* update vertex buffer */
-	glBindBuffer(GL_ARRAY_BUFFER, chunk->data->gl_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, glbuf->vbo);
 		glBufferData(GL_ARRAY_BUFFER,
-			/* size */ chunk->data->num_verts * sizeof(*chunk->data->verts),
-			/* data */ chunk->data->verts,
+			/* size */ glbuf->num_vertices * sizeof(*glbuf->vertices),
+			/* data */ glbuf->vertices,
 			/* usag */ GL_DYNAMIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+
+		/* semi-transparent faces */
+
+		/*meshbuilder_start(sizeof(*glbuf->alpha_vertices));
+
+		for(int xoff = 0; xoff < WORLD_CHUNK_SIZE; xoff++) {
+			for(int zoff = 0; zoff < WORLD_CHUNK_SIZE; zoff++) {
+				for(int yoff = 0; yoff < WORLD_CHUNK_SIZE; yoff++) {
+					int x = (chunk->x << 4) + xoff;
+					int y = bufidx * WORLD_CHUNK_SIZE + yoff;
+					int z = (chunk->z << 4) + zoff;
+					block_data block = world_get_block(x, y, z);
+
+					if(!block_is_semi_transparent(block))
+						continue;
+
+					if(!block_is_empty(block)) {
+						block_properties props = block_get_properties(block.id);
+
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_NEG)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_Y_NEG],
+								BLOCK_FACE_Y_NEG)
+							);
+						}
+
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_POS)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_Y_POS],
+								BLOCK_FACE_Y_POS)
+							);
+						}
+
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_POS)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_X_POS],
+								BLOCK_FACE_X_POS)
+							);
+						}
+
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_NEG)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_X_NEG],
+								BLOCK_FACE_X_NEG)
+							);
+						}
+
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_POS)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_Z_POS],
+								BLOCK_FACE_Z_POS)
+							);
+						}
+
+						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_NEG)) {
+							add_block_face(world_make_vertex(
+								xoff, yoff, zoff,
+								props.texture_indices[BLOCK_FACE_Z_NEG],
+								BLOCK_FACE_Z_NEG)
+							);
+						}
+					}
+				}
+			}
+		}
+
+		meshbuilder_finish(&glbuf->alpha_vertices, &glbuf->num_alpha_vertices, &glbuf->alpha_indices, &glbuf->num_alpha_indices);
+
+		glBindBuffer(GL_ARRAY_BUFFER, chunk->alpha_vbo);
+		glbuf->alpha_basevertex = bufidx * (MAX_GLBUF_SIZE / sizeof(struct world_vertex));
+		glBufferSubData(GL_ARRAY_BUFFER,       */
+//			/* offs */ bufidx * MAX_GLBUF_SIZE,
+//			/* size */ glbuf->num_alpha_vertices * sizeof(*glbuf->alpha_vertices),
+//			/* data */ glbuf->alpha_vertices);
+//		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
 }
 
-static bool frustum_chunk_check(int x, int z)
+void world_renderer_update_chunk_visibility(world_chunk *chunk)
 {
-	static const float cube_diagonal = 1.7321f /* sqrt(3) */ * 16.0f * 0.5f;
-	// convert to block coordinates
-	x <<= 4;
-	z <<= 4;
-	// move to center of chunk
-	x += 8;
-	z += 8;
-	for(int y = 8; y < 128; y += 8) {
-		if(is_visible_on_frustum((vec3){x, y, z}, cube_diagonal)) {
-			return true;
+	static const float cube_diagonal_half = SQRT_3 * WORLD_CHUNK_SIZE / 2.0f;
+
+	int x_center = chunk->x * WORLD_CHUNK_SIZE + WORLD_CHUNK_SIZE / 2;
+	int z_center = chunk->z * WORLD_CHUNK_SIZE + WORLD_CHUNK_SIZE / 2;
+
+	chunk->visible = false;
+
+	for(int bufidx = 0; bufidx < 8; bufidx++) {
+		struct world_chunk_glbuf *glbuf = &chunk->glbufs[bufidx];
+		int y_center = bufidx * WORLD_CHUNK_SIZE + WORLD_CHUNK_SIZE / 2;
+
+		glbuf->visible = is_visible_on_frustum((float[]){x_center, y_center, z_center}, cube_diagonal_half);
+
+		/* if at least 1 glbuf is visible, mark the chunk as visible too */
+		if(glbuf->visible) {
+			chunk->visible = true;
 		}
 	}
-	return false;
 }
-
-void build_buffers(void)
-{
-	size_t i = 0;
-	void *it;
-	bool built = false;
-
-	while(hashmap_iter(chunk_map, &i, &it)) {
-		struct chunk *c = (struct chunk *) it;
-
-		c->visible = frustum_chunk_check(c->x, c->z);
-
-		if(!c->dirty)
-			continue;
-
-		if(!built) {
-			build_buffer_for_chunk(c);
-			c->dirty = false;
-			// only build 1 chunk per frame to avoid lag spikes
-			built = true;
-		}
-	}
-}
-
-int wr_total_vertices;
-int wr_draw_calls;
 
 void world_render(void)
 {
-	size_t i = 0;
+	size_t i;
 	void *it;
-
-	wr_total_vertices = 0;
-	wr_draw_calls = 0;
+	int num_remeshed;
 
 	if(cl.state < cl_connected)
 		return;
 
 	if(cl.game.rotated || cl.game.moved)
 		recalculate_projection_matrix();
-
-	build_buffers();
 
 	if(!strcasecmp(gl_polygon_mode.string, "GL_LINE"))
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -455,48 +431,95 @@ void world_render(void)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 	glPointSize(5.0f);
-	glLineWidth(2.0f);
-
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
 
 	glUniformMatrix4fv(loc_view, 1, GL_FALSE, (const GLfloat *) view_mat);
 	glUniformMatrix4fv(loc_proj, 1, GL_FALSE, (const GLfloat *) proj_mat);
-	glUniform1f(loc_nightlightmod, world_get_light_modifier());
+	glUniform1f(loc_nightlightmod, world_calculate_sky_light_modifier());
 
 	glBindTexture(GL_TEXTURE_2D, gl_world_texture);
-
 	glBindVertexArray(gl_world_vao);
 
-	while(hashmap_iter(chunk_map, &i, &it)) {
-		struct chunk *c = (struct chunk *) it;
+	i = 0;
+	num_remeshed = 0;
+	while(hashmap_iter(world_chunk_map, &i, &it)) {
+		world_chunk *chunk = (world_chunk *) it;
 
-		if(c->data->gl_init && c->visible) {
-			vec2 chunk_pos = {c->x << 4, c->z << 4};
-			glUniform2fv(loc_chunkpos, 1, chunk_pos);
+		if(chunk->needs_remesh && num_remeshed < r_max_remeshes.integer) {
+			remesh_chunk(chunk);
+			chunk->needs_remesh = false;
+			num_remeshed++;
+		}
 
-			glBindVertexBuffer(0, c->data->gl_vbo, 0, sizeof(*c->data->verts));
-			glDrawArrays(GL_TRIANGLES, 0, c->data->num_verts);
+		if(chunk->visible) {
+			/* go from top to bottom so that the gpu can discard pixels of cave meshes which won't be seen */
+			for(int j = 7; j >= 0; j--) {
+				vec3 chunk_pos = {chunk->x << 4, j << 4, chunk->z << 4};
+				glUniform3fv(loc_chunkpos, 1, chunk_pos);
 
-			wr_total_vertices += c->data->num_verts;
-			wr_draw_calls++;
+				if(!chunk->glbufs[j].visible || chunk->glbufs[j].num_vertices <= 0)
+					continue;
+
+				glBindVertexBuffer(0, chunk->glbufs[j].vbo, 0, sizeof(struct world_vertex));
+				glDrawArrays(GL_TRIANGLES, 0, chunk->glbufs[j].num_vertices);
+			}
+		}
+	}
+
+	i = 0;
+	while(hashmap_iter(world_chunk_map, &i, &it)) {
+		world_chunk *chunk = (world_chunk *) it;
+
+		if(chunk->visible) {
+			/* go from top to bottom so that the gpu can discard pixels of cave meshes which won't be seen */
+			for(int j = 7; j >= 0; j--) {
+				vec3 chunk_pos = {chunk->x << 4, j << 4, chunk->z << 4};
+				glUniform3fv(loc_chunkpos, 1, chunk_pos);
+
+				if(!chunk->glbufs[j].visible || chunk->glbufs[j].num_alpha_vertices <= 0)
+					continue;
+
+				glBindVertexBuffer(0, chunk->glbufs[j].alpha_vbo, 0, sizeof(struct world_vertex));
+				glDrawArrays(GL_TRIANGLES, 0, chunk->glbufs[j].num_alpha_vertices);
+			}
 		}
 	}
 
 	/* done */
-	glBindVertexArray(0);
+ 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glDisable(GL_CULL_FACE);
 }
 
-void world_renderer_free_chunk_render_data(struct chunk *c)
+void world_init_chunk_glbufs(world_chunk *chunk)
 {
-	if(c->data->gl_init) {
-		glDeleteBuffers(1, &c->data->gl_vbo);
+	for(int i = 0; i < 8; i++) {
+		memset(&chunk->glbufs[i], 0, sizeof(chunk->glbufs[i]));
+		glGenBuffers(1, &chunk->glbufs[i].vbo);
+		glGenBuffers(1, &chunk->glbufs[i].alpha_vbo);
 	}
-	mem_free(c->data->verts);
 }
 
-void world_renderer_shutdown(void)
+void world_free_chunk_glbufs(world_chunk *chunk)
 {
+	for(int i = 0; i < 8; i++) {
+		mem_free(chunk->glbufs[i].vertices);
+		mem_free(chunk->glbufs[i].alpha_vertices);
+		mem_free(chunk->glbufs[i].indices);
+		mem_free(chunk->glbufs[i].alpha_indices);
+		glDeleteBuffers(1, &chunk->glbufs[i].vbo);
+		glDeleteBuffers(1, &chunk->glbufs[i].alpha_vbo);
+		memset(&chunk->glbufs[i], 0, sizeof(chunk->glbufs[i]));
+	}
+}
+
+struct world_vertex world_make_vertex(ubyte x, ubyte y, ubyte z, ubyte texture_index, ubyte data)
+{
+	struct world_vertex v = {0};
+
+	v.x = x & 15;
+	v.y = y & 15;
+	v.z = z & 15;
+	v.texture_index = texture_index;
+	v.data = data;
+
+	return v;
 }

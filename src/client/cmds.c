@@ -93,13 +93,12 @@ void unalias_f(void)
 #include "game/world.h"
 void echo_f(void)
 {
-	//void *d;
-	int x = ((int)cl.game.pos[0]) >> 4, z = ((int)cl.game.pos[2]) >> 4;
-	/*d = world_get_chunk(x,z)->data;
-	world_delete_chunk(x, z);
-	world_prepare_chunk(x, z);
-	world_get_chunk(x, z)->data = d;*/
-	world_mark_chunk_dirty(x, z);
+	void *it;
+	size_t i = 0;
+	while(hashmap_iter(world_chunk_map, &i, &it)) {
+		world_chunk *c = it;
+		c->needs_remesh = true;
+	}
 
 	con_printf("%s\n", cmd_args(1, cmd_argc()));
 }

@@ -46,7 +46,7 @@ void con_init(void)
 	cmd_register("toggleconsole", toggleconsole_f);
 }
 
-static void con_putinc(u_byte c)
+static void con_putinc(ubyte c)
 {
 	if(input_pos < CONSOLE_MAX_LINE) {
 		if(strnlen(input_line, CONSOLE_MAX_LINE) == CONSOLE_MAX_LINE) {
@@ -109,7 +109,7 @@ bool con_handle_key(int key, int keymod)
 		}
 
 		c = (char) ((key - KEY_A) + 'a' - (caps_strength * ('a' - 'A')));
-		con_putinc((u_byte) c);
+		con_putinc((ubyte) c);
 		return true;
 	}
 
@@ -262,7 +262,7 @@ static void draw_input_line(int y)
 {
 	// todo: always show cursor while the user is typing
 	static ulong blink_tick = 0;
-	static u_byte blink_char = '|';
+	static ubyte blink_char = '|';
 	static bool blink = false;
 
 	if(blink)

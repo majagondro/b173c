@@ -11,10 +11,7 @@
 #define attr(a) __attribute__((__##a##__))
 
 typedef char byte;
-typedef unsigned char u_byte;
-typedef unsigned short u_short;
-typedef unsigned int u_int;
-typedef unsigned long u_long;
+typedef unsigned char ubyte;
 
 typedef char *string8;
 typedef char16 *string16;

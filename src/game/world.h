@@ -3,49 +3,74 @@
 
 #include "common.h"
 #include "mathlib.h"
+#include "hashmap.h"
+#include "block.h"
+
+#define WORLD_CHUNK_SIZE 16
+#define WORLD_CHUNK_HEIGHT 128
 
 #define IDX_FROM_COORDS(x, y, z) ((((x) & 15) << 11) | (((z) & 15) << 7) | ((y) & 127))
-#define GET4BIT(arr, idx) (((arr)[(idx) >> 1] >> ((idx & 1) ? 4 : 0)) & 15)
 
-struct chunk_data {
-	// laid out y,z,x
-	u_byte blocks[16*16*128];
-	// :-( these values are 4-bit...
-	u_byte metadata  [16 * 16 * 64];
-	u_byte skylight  [16 * 16 * 64];
-	u_byte blocklight[16 * 16 * 64];
-
-	// todo: maybe hide this or move somewhere or idk
-	bool gl_init;
-	u_int gl_vbo;
-	struct block_vertex {
-		/* modified me? change vao init in world_renderer.c as well */
-		float x, y, z;
-		float tx_idx, face;
-	} *verts;
-	size_t num_verts;
-};
-
-struct chunk {
+typedef struct {
 	int x, z;
-	bool dirty, visible;
-	struct chunk_data *data;
-};
+
+	/* heap allocated, always has WORLD_CHUNK_SIZE * WORLD_CHUNK_SIZE * WORLD_CHUNK_HEIGHT elements */
+	block_data *data;
+
+	/* rendering related */
+	bool needs_remesh;
+	bool visible;
+	struct world_chunk_glbuf {
+		bool visible;
+		struct world_vertex {
+			ubyte x : 5;
+			ubyte y : 5;
+			ubyte z : 5;
+			ubyte padding : 1 attr(unused);
+			ubyte texture_index;
+			ubyte data;
+		} attr(packed)
+		*vertices, *alpha_vertices;
+		ushort *indices, *alpha_indices;
+		size_t num_vertices, num_alpha_vertices;
+		size_t num_indices, num_alpha_indices;
+		uint basevertex, alpha_basevertex;
+		uint vbo, alpha_vbo;
+	} glbufs[8]; /* each glbuf covers 16x16x16 blocks */
+} world_chunk;
+
+extern struct hashmap *world_chunk_map;
 
 void world_init(void);
-byte world_get_block(int x, int y, int z);
-void world_set_block(int x, int y, int z, byte id);
-void world_set_metadata(int x, int y, int z, byte metadata);
+void world_shutdown(void); // todo: rename me to cleanup or something?
+
+/* chunks */
+void world_alloc_chunk(int chunk_x, int chunk_z);
+void world_free_chunk(int chunk_x, int chunk_z);
 bool world_chunk_exists(int chunk_x, int chunk_z);
-void world_prepare_chunk(int chunk_x, int chunk_z);
-void world_delete_chunk(int chunk_x, int chunk_z);
-struct chunk *world_get_chunk(int chunk_x, int chunk_z);
-void world_load_region_data(int x, short y, int z, int size_x, int size_y, int size_z, int data_size, u_byte *data);
-void world_set_time(long t);
-float *world_get_sky_color(void);
-float world_get_light_modifier(void);
-void world_mark_chunk_dirty(int chunk_x, int chunk_z);
-u_byte world_get_block_lighting(int x, int y, int z);
-u_byte chunk_get_block_lighting(struct chunk *c, int x, int y, int z);
+world_chunk *world_get_chunk(int chunk_x, int chunk_z);
+void world_mark_chunk_for_remesh(int chunk_x, int chunk_z);
+void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_y, int size_z, size_t data_size, ubyte *data);
+
+/* blocks */
+block_data world_get_block(int x, int y, int z);
+void world_set_block(int x, int y, int z, block_data data);
+void world_set_block_id(int x, int y, int z, block_id id);
+void world_set_block_metadata(int x, int y, int z, byte new_metadata);
+
+/* time, daylight cycle, etc. */
+void world_set_time(ulong time);
+ulong world_get_time(void);
+float *world_calculate_sky_color(void); // fixme: 'color' type
+float world_calculate_sun_angle(void);
+float world_calculate_sky_light_modifier(void);
+
+/* rendering */
+void world_renderer_init(void);
+void world_renderer_shutdown(void);
+void world_render(void);
+void world_init_chunk_glbufs(world_chunk *c);
+void world_free_chunk_glbufs(world_chunk *c);
+struct world_vertex world_make_vertex(ubyte x, ubyte y, ubyte z, ubyte texture_index, ubyte data);
 
 #endif

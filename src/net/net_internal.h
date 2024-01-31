@@ -21,7 +21,7 @@ string8 net_read_string8(void);
 string16 net_read_string16(void);
 
 void net_write_buf(const void *buf, size_t n);
-void net_write_byte(u_byte v);
+void net_write_byte(ubyte v);
 void net_write_short(short v);
 void net_write_int(int v);
 void net_write_long(long v);
@@ -143,7 +143,7 @@ HANDLER(PKT_ENTITY_STATUS, int ent_id, byte status);
 HANDLER(PKT_ATTACH_ENTITY, int ent_id, int vehicle_id);
 HANDLER(PKT_ENTITY_METADATA, int ent_id, ...);
 HANDLER(PKT_PRE_CHUNK, int chunk_x, int chunk_z, bool load);
-HANDLER(PKT_MAP_CHUNK, int x, short y, int z, byte size_x, byte size_y, byte size_z, int data_size, byte *data);
+HANDLER(PKT_MAP_CHUNK, int x, short y, int z, byte size_x, byte size_y, byte size_z, int data_size, ubyte *data);
 HANDLER(PKT_MULTI_BLOCK_CHANGE, int chunk_x, int chunk_z, short array_size, short *coord_array, byte *id_array, byte *metadata_array);
 HANDLER(PKT_BLOCK_CHANGE, int x, byte y, int z, byte block_id, byte metadata);
 HANDLER(PKT_BLOCK_ACTION, int x, short y, int z, byte data1, byte data2); // noteblock: data1 = instrument data2 = pitch      piston: data1 = state     data2 = direction
@@ -159,7 +159,7 @@ HANDLER(PKT_WINDOW_ITEMS, byte gui_id, short count, struct ni_wi_payload *payloa
 HANDLER(PKT_UPDATE_PROGRESS_BAR, byte gui_id, short type, short progress);
 HANDLER(PKT_TRANSACTION, byte gui_id, short action, bool accepted);
 HANDLER(PKT_UPDATE_SIGN, int x, short y, int z, string16 line1, string16 line2, string16 line3, string16 line4);
-HANDLER(PKT_ITEM_DATA, short item_type, short item_id, u_byte data_size, byte *data);
+HANDLER(PKT_ITEM_DATA, short item_type, short item_id, ubyte data_size, byte *data);
 HANDLER(PKT_INCREMENT_STATISTIC, int stat_id, byte amount);
 HANDLER(PKT_DISCONNECT, string16 reason);
 

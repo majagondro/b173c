@@ -23,20 +23,23 @@ static struct {
 } indices;
 
 struct meshbuilder_pair {
-	MESHBUILDER_INDEX_TYPE index;
 	void *vertex;
+	MESHBUILDER_INDEX_TYPE index;
 };
 
 static struct hashmap *vtx_2_idx_map;
+static bool hashmap_init = false;
 
 int cmpfunc(const void *v1, const void *v2, void *_ attr(unused))
 {
-	return memcmp(v1, v2, vertices.elem_size);
+	const struct meshbuilder_pair *p1 = v1, *p2 = v2;
+	return memcmp(p1->vertex, p2->vertex, vertices.elem_size);
 }
 
 uint64_t hashfunc(const void *v, uint64_t seed0, uint64_t seed1)
 {
-	return hashmap_xxhash3(v, vertices.elem_size, seed0, seed1);
+	const struct meshbuilder_pair *p = v;
+	return hashmap_xxhash3(p->vertex, vertices.elem_size, seed0, seed1);
 }
 
 void meshbuilder_start(size_t vtx_size)
@@ -50,7 +53,10 @@ void meshbuilder_start(size_t vtx_size)
 	indices.capacity = DEFAULT_CAPACITY;
 	indices.data = mem_alloc(indices.capacity * sizeof(MESHBUILDER_INDEX_TYPE));
 
-	vtx_2_idx_map = hashmap_new(sizeof(struct meshbuilder_pair), 0, 0, 0, hashfunc, cmpfunc, NULL, NULL);
+	if(!hashmap_init) {
+		vtx_2_idx_map = hashmap_new(sizeof(struct meshbuilder_pair), 0, 0, 0, hashfunc, cmpfunc, NULL, NULL);
+		hashmap_init = true;
+	}
 }
 
 void meshbuilder_finish(void **verts_dest, size_t *num_verts_dest, MESHBUILDER_INDEX_TYPE **indices_dest, size_t *num_indices_dest)
@@ -64,7 +70,7 @@ void meshbuilder_finish(void **verts_dest, size_t *num_verts_dest, MESHBUILDER_I
 	memset(&vertices, 0, sizeof(vertices));
 	memset(&indices, 0, sizeof(indices));
 
-	hashmap_free(vtx_2_idx_map);
+	hashmap_clear(vtx_2_idx_map, false);
 }
 
 void meshbuilder_add_index(MESHBUILDER_INDEX_TYPE idx)
@@ -83,14 +89,13 @@ void meshbuilder_add_vert(void *v)
 	struct meshbuilder_pair key = {.vertex = v};
 	const struct meshbuilder_pair *value;
 
-	if((value = hashmap_get(vtx_2_idx_map, &key))) {
-		/* vertex already exists */
+	/*if((value = hashmap_get(vtx_2_idx_map, &key))) {
+		/* vertex already exists * /
 		meshbuilder_add_index(value->index);
 		return;
-	}
+	}*/
 
-	/* arithmetic on void pointer is a GNU extension blah blah blah... */
-	memcpy((char *) vertices.data + vertices.count * vertices.elem_size, v, vertices.elem_size);
+	memcpy(vertices.data + vertices.count * vertices.elem_size, v, vertices.elem_size);
 	meshbuilder_add_index(vertices.count);
 	vertices.count++;
 

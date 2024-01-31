@@ -71,7 +71,7 @@ static void calculate_char_widths(void)
 {
 	int i;
 	for(i = 0; i < 256; i++) {
-		u_byte c = i & 255;
+		ubyte c = i & 255;
 		int x, x2, y, y2, alpha_idx, xs, xe;
 		bool start_set = false;
 
@@ -176,10 +176,6 @@ static char *statestr(void)
 void ui_commit(void)
 {
 	if(developer.integer) {
-		extern int wr_total_vertices;
-		extern int wr_draw_calls;
-
-		ui_printf(8, ui_h - 48, "3d: %d draw calls / %d vertices (avg %d)", wr_draw_calls, wr_total_vertices, wr_total_vertices / (wr_draw_calls + 1));
 		ui_printf(8, ui_h - 40, "net: %s", statestr());
 
 		ui_printf(8, ui_h - 32, "%f %f %f / %f %f %f",
@@ -203,7 +199,7 @@ void ui_commit(void)
 	fontcharcount = 0;
 }
 
-int ui_charwidth(u_byte c)
+int ui_charwidth(ubyte c)
 {
 	return charwidths[c];
 }
@@ -218,7 +214,7 @@ int ui_strwidth(const char *text)
 	return w;
 }
 
-bool ui_drawchar(u_byte c, int x, int y, int color)
+bool ui_drawchar(ubyte c, int x, int y, int color)
 {
 	int b = c;
 

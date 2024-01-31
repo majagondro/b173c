@@ -4,75 +4,99 @@
 #include "vid/vid.h"
 #include "hashmap.h"
 
-int chunk_compare(const void *a, const void *b, void *udata)
+#define GET4BIT(arr, idx) (((arr)[(idx) >> 1] >> ((idx & 1) ? 4 : 0)) & 15)
+
+const static block_data AIR_BLOCK_DATA = {.id = 0, .metadata = 0, .skylight = 15, .blocklight = 0};
+const static block_data EMPTY_BLOCK_DATA = {.id = 0, .metadata = 0, .skylight = 0, .blocklight = 0};
+const static block_data SOLID_BLOCK_DATA = {.id = 1, .metadata = 0, .skylight = 0, .blocklight = 0};
+
+struct hashmap *world_chunk_map = NULL;
+ulong time = 0;
+
+/* functions for the hashmap */
+int chunk_compare(const void *a, const void *b, void *udata attr(unused))
 {
-	// 0 if equals i think
-	const struct chunk *ca = a, *cb = b;
+	const world_chunk *ca = a, *cb = b;
 	return !(ca->x == cb->x && ca->z == cb->z);
 }
 
 uint64_t chunk_hash(const void *item, uint64_t seed0, uint64_t seed1)
 {
-	const struct chunk *c = item;
-	union {
-		uint64_t hash;
-		byte data[sizeof(uint64_t)];
-		struct {
-			int x, z;
-		};
-	} data;
-	data.x = c->x;
-	data.z = c->z;
-	return hashmap_xxhash3(data.data, sizeof(data.data), seed0, seed1);
+	const world_chunk *c = item;
+	struct {
+		int x, z;
+	} coords = {c->x, c->z};
+	return hashmap_xxhash3(&coords, sizeof(coords), seed0, seed1);
 }
 
-struct hashmap *chunk_map;
-long time = 0;
+void chunk_free(void *c)
+{
+	world_chunk *chunk = c;
+
+	world_free_chunk_glbufs(chunk);
+	mem_free(chunk->data);
+}
 
 void world_init(void)
 {
-	chunk_map = hashmap_new(sizeof(struct chunk), 0, 0, 0, chunk_hash, chunk_compare, NULL, NULL);
+	world_chunk_map = hashmap_new(sizeof(world_chunk), 0, 0, 0, chunk_hash, chunk_compare, chunk_free, NULL);
 }
 
-void world_mark_chunk_dirty(int chunk_x, int chunk_z)
+void world_shutdown(void)
 {
-	struct chunk *c;
-	c = world_get_chunk(chunk_x, chunk_z);
-	if(c != NULL) {
-		c->dirty = true;
+	hashmap_free(world_chunk_map);
+}
+
+void world_alloc_chunk(int chunk_x, int chunk_z)
+{
+	world_chunk chunk = {0};
+
+	if(world_chunk_exists(chunk_x, chunk_z))
+		world_free_chunk(chunk_x, chunk_z);
+
+	chunk.x = chunk_x;
+	chunk.z = chunk_z;
+	chunk.data = mem_alloc(WORLD_CHUNK_SIZE * WORLD_CHUNK_SIZE * WORLD_CHUNK_HEIGHT * sizeof(block_data));
+	world_init_chunk_glbufs(&chunk);
+
+	/* the chunk is copied by hashmap_set, so it is fine to allocate it on the stack */
+	hashmap_set(world_chunk_map, &chunk);
+}
+
+void world_free_chunk(int chunk_x, int chunk_z)
+{
+	world_chunk key = {.x = chunk_x, .z = chunk_z};
+	world_chunk *value;
+
+	value = (world_chunk *) hashmap_get(world_chunk_map, &key);
+	if(!value)
+		return;
+
+	chunk_free(value);
+
+	hashmap_delete(world_chunk_map, &key);
+}
+
+bool world_chunk_exists(int chunk_x, int chunk_z)
+{
+	return world_get_chunk(chunk_x, chunk_z) != NULL;
+}
+
+world_chunk *world_get_chunk(int chunk_x, int chunk_z)
+{
+	world_chunk key = {.x = chunk_x, .z = chunk_z};
+	return (world_chunk *) hashmap_get(world_chunk_map, &key);
+}
+
+void world_mark_chunk_for_remesh(int chunk_x, int chunk_z)
+{
+	world_chunk *chunk = world_get_chunk(chunk_x, chunk_z);
+	if(chunk != NULL) {
+		chunk->needs_remesh = true;
 	}
 }
 
-void world_prepare_chunk(int chunk_x, int chunk_z)
-{
-	struct chunk c = {0};
-
-	if(world_chunk_exists(chunk_x, chunk_z))
-		return;
-
-	c.x = chunk_x;
-	c.z = chunk_z;
-	c.data = mem_alloc(sizeof(struct chunk_data));
-
-	/* chunk is copied by hashmap_set, so it can be allocated on the stack */
-	hashmap_set(chunk_map, &c);
-}
-
-void world_delete_chunk(int chunk_x, int chunk_z)
-{
-	struct chunk c;
-	struct chunk *cp;
-	c.x = chunk_x;
-	c.z = chunk_z;
-
-	cp = (struct chunk *) hashmap_get(chunk_map, &c);
-	world_renderer_free_chunk_render_data(cp);
-	mem_free(cp->data);
-
-	hashmap_delete(chunk_map, &c);
-}
-
-int inflate_data(u_byte *in, u_byte *out, size_t size_in, size_t size_out)
+static int inflate_data(ubyte *in, ubyte *out, size_t size_in, size_t size_out)
 {
 	int ret;
 	z_stream strm;
@@ -108,96 +132,115 @@ int inflate_data(u_byte *in, u_byte *out, size_t size_in, size_t size_out)
 	return Z_OK;
 }
 
-void world_load_region_data(int x, short y, int z, int size_x, int size_y, int size_z, int data_size, u_byte *data)
+void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_y, int size_z, size_t data_size, ubyte *data)
 {
-	int xStart, yStart, zStart;
-	int xEnd, yEnd, zEnd;
-	int dataPos;
+	int x_start, y_start, z_start;
+	int x_end, y_end, z_end;
 	int chunk_x = x >> 4;
 	int chunk_z = z >> 4;
-	struct chunk_data *chunk_data;
-	u_byte decomp[size_x * size_y * size_z * 5 / 2];
+	// 1 byte id, 0.5 byte metadata, 2x0.5 byte light data
+	ubyte decompressed[size_x * size_y * size_z * 5 / 2];
+	ubyte *data_ptr;
+	world_chunk *chunk;
+	int err;
 
-	if(!world_chunk_exists(chunk_x, chunk_z))
-		world_prepare_chunk(chunk_x, chunk_z);
+	world_alloc_chunk(chunk_x, chunk_z);
+	chunk = world_get_chunk(chunk_x, chunk_z);
 
-	world_mark_chunk_dirty(chunk_x, chunk_z);
-	world_mark_chunk_dirty(chunk_x + 1, chunk_z);
-	world_mark_chunk_dirty(chunk_x - 1, chunk_z);
-	world_mark_chunk_dirty(chunk_x, chunk_z + 1);
-	world_mark_chunk_dirty(chunk_x, chunk_z - 1);
-
-	if((dataPos = inflate_data(data, decomp, data_size, sizeof(decomp))) != Z_OK) {
-		con_printf(COLOR_RED"error while decompressing chunk data:"COLOR_WHITE"%s\n", zError(dataPos));
+	if((err = inflate_data(data, decompressed, data_size, sizeof(decompressed))) != Z_OK) {
+		con_printf(COLOR_RED"error while decompressing chunk data:"COLOR_WHITE"%s\n", zError(err)); //should this print?
 		return;
 	}
 
-	chunk_data = world_get_chunk(chunk_x, chunk_z)->data;
+	/* mark for remeshing */
+	world_mark_chunk_for_remesh(chunk_x, chunk_z);
+	world_mark_chunk_for_remesh(chunk_x + 1, chunk_z);
+	world_mark_chunk_for_remesh(chunk_x - 1, chunk_z);
+	world_mark_chunk_for_remesh(chunk_x, chunk_z + 1);
+	world_mark_chunk_for_remesh(chunk_x, chunk_z - 1);
 
-	xStart = x & 15;
-	yStart = y & 127;
-	zStart = z & 15;
+	/* local coordinates */
+	x_start = x & (WORLD_CHUNK_SIZE - 1);
+	y_start = y & (WORLD_CHUNK_HEIGHT - 1);
+	z_start = z & (WORLD_CHUNK_SIZE - 1);
+	x_end = x_start + size_x;
+	y_end = y_start + size_y;
+	z_end = z_start + size_z;
 
-	xEnd = xStart + size_x;
-	yEnd = yStart + size_y;
-	zEnd = zStart + size_z;
+	data_ptr = decompressed;
 
-	dataPos = 0;
-
-	for(x = xStart; x < xEnd; ++x) {
-		for(z = zStart; z < zEnd; ++z) {
-			int index = x << 11 | z << 7 | yStart;
-			int ySize = yEnd - yStart;
-			memcpy(chunk_data->blocks + index, decomp + dataPos, ySize);
-			dataPos += ySize;
+	/* block ids */
+	for(x = x_start; x < x_end; x++) {
+		for(z = z_start; z < z_end; z++) {
+			for(y = y_start; y < y_end; y++, data_ptr++) {
+				int index = IDX_FROM_COORDS(x, y, z);
+				chunk->data[index].id = *data_ptr;
+			}
 		}
 	}
 
-	for(x = xStart; x < xEnd; ++x) {
-		for(z = zStart; z < zEnd; ++z) {
-			int index = (x << 11 | z << 7 | yStart) >> 1;
-			int ySize = (yEnd - yStart) / 2;
-			memcpy(chunk_data->metadata + index, decomp + dataPos, ySize);
-			dataPos += ySize;
-		}
-	}
 
-	for(x = xStart; x < xEnd; ++x) {
-		for(z = zStart; z < zEnd; ++z) {
-			int index = (x << 11 | z << 7 | yStart) >> 1;
-			int ySize = (yEnd - yStart) / 2;
-			memcpy(chunk_data->blocklight + index, decomp + dataPos, ySize);
-			dataPos += ySize;
+	/* metadata */
+	/*for(x = x_start; x < x_end; ++x) {
+		for(z = z_start; z < z_end; ++z) {
+			for(y = y_start; y < y_end; y += 2, data_ptr++) {
+				int i1 = IDX_FROM_COORDS(x, y, z);
+				int i2 = IDX_FROM_COORDS(x, y + 1, z);
+				chunk->data[i1].metadata = GET4BIT(data_ptr, i1);
+				chunk->data[i2].metadata = GET4BIT(data_ptr, i2);
+			}
 		}
-	}
+	}*/
 
-	for(x = xStart; x < xEnd; ++x) {
-		for(z = zStart; z < zEnd; ++z) {
-			int index = (x << 11 | z << 7 | yStart) >> 1;
-			int ySize = (yEnd - yStart) / 2;
-			memcpy(chunk_data->skylight + index, decomp + dataPos, ySize);
-			dataPos += ySize;
+	/* block light */
+	/*for(x = x_start; x < x_end; ++x) {
+		for(z = z_start; z < z_end; ++z) {
+			for(y = y_start; y < y_end; y += 2, data_ptr++) {
+				int i1 = IDX_FROM_COORDS(x, y, z);
+				int i2 = IDX_FROM_COORDS(x, y + 1, z);
+				chunk->data[i1].blocklight = GET4BIT(data_ptr, i1);
+				chunk->data[i2].blocklight = GET4BIT(data_ptr, i2);
+			}
 		}
-	}
+	}*/
+
+	/* sky light */
+	/*for(x = x_start; x < x_end; ++x) {
+		for(z = z_start; z < z_end; ++z) {
+			for(y = y_start; y < y_end; y += 2, data_ptr++) {
+				int i1 = IDX_FROM_COORDS(x, y, z);
+				int i2 = IDX_FROM_COORDS(x, y + 1, z);
+				chunk->data[i1].skylight = GET4BIT(data_ptr, i1);
+				chunk->data[i2].skylight = GET4BIT(data_ptr, i2);
+			}
+		}
+	}*/
 }
 
-byte chunk_get_block(struct chunk *c, int x, int y, int z)
+block_data world_get_block(int x, int y, int z)
 {
-	return c->data->blocks[IDX_FROM_COORDS(x, y, z)];
-}
+	static struct {
+		int x, z;
+		world_chunk *chunk;
+	} cache;
 
-byte world_get_block(int x, int y, int z)
-{
-	struct chunk *cp;
-	if(y < 0 || y >= 128)
-		return 0;
-	cp = world_get_chunk(x >> 4, z >> 4);
-	if(!cp)
-		return 1;
-	return chunk_get_block(cp, x & 15, y, z & 15);
-}
+	if(y < 0) // below the world
+		return SOLID_BLOCK_DATA; // returning solid helps avoid creating mesh faces which won't be seen
+	if(y >= 128) // way up in the sky
+		return AIR_BLOCK_DATA;
 
-u_byte chunk_get_block_lighting(struct chunk *c, int x, int y, int z)
+	if(cache.x != (x >> 4) || cache.z != (z >> 4)) {
+		cache.x = (x >> 4);
+		cache.z = (z >> 4);
+		cache.chunk = world_get_chunk(cache.x, cache.z);
+	}
+
+	if(cache.chunk != NULL)
+		return cache.chunk->data[IDX_FROM_COORDS(x, y, z)];
+	return EMPTY_BLOCK_DATA;
+}
+/*
+ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z)
 {
 	int i = IDX_FROM_COORDS(x, y, z);
 	int block_id = c->data->blocks[i];
@@ -215,9 +258,9 @@ u_byte chunk_get_block_lighting(struct chunk *c, int x, int y, int z)
 	return (bl > l ? bl : l) & 15;
 }
 
-u_byte world_get_block_lighting(int x, int y, int z)
+ubyte world_get_block_lighting(int x, int y, int z)
 {
-	struct chunk *cp;
+	world_chunk *cp;
 	if(y < 0)
 		return 0;
 	if(y >= 128)
@@ -227,59 +270,51 @@ u_byte world_get_block_lighting(int x, int y, int z)
 		return 15;
 	return chunk_get_block_lighting(cp, x & 15, y, z & 15);
 }
+*/
 
-
-void world_set_block(int x, int y, int z, byte id)
+void world_set_block(int x, int y, int z, block_data data)
 {
-	struct chunk *c;
-	if(!world_chunk_exists(x >> 4, z >> 4))
-		return;
+	world_chunk *chunk;
+
 	if(y < 0 || y >= 128)
 		return;
 
-	c = world_get_chunk(x >> 4, z >> 4);
-
-	world_mark_chunk_dirty(x >> 4, z >> 4);
-
-	c->data->blocks[IDX_FROM_COORDS(x & 15, y, z & 15)] = id;
-}
-
-void world_set_metadata(int x, int y, int z, byte metadata)
-{
-	struct chunk *c;
-	if(!world_chunk_exists(x >> 4, z >> 4))
-		return;
-	if(y < 0 || y >= 128)
+	chunk = world_get_chunk(x >> 4, z >> 4);
+	if(!chunk)
 		return;
 
-	c = world_get_chunk(x >> 4, z >> 4);
+	world_mark_chunk_for_remesh(x >> 4, z >> 4);
 
-	world_mark_chunk_dirty(x >> 4, z >> 4);
-
-	c->data->metadata[IDX_FROM_COORDS(x & 15, y, z & 15) >> 1] = metadata;
+	chunk->data[IDX_FROM_COORDS(x, y, z)] = data;
 }
 
-bool world_chunk_exists(int chunk_x, int chunk_z)
+void world_set_block_id(int x, int y, int z, block_id new_id)
 {
-	return world_get_chunk(chunk_x, chunk_z) != NULL;
+	block_data data = world_get_block(x, y, z);
+	data.id = new_id;
+	world_set_block(x, y, z, data);
 }
 
-struct chunk *world_get_chunk(int chunk_x, int chunk_z)
+void world_set_block_metadata(int x, int y, int z, byte new_metadata)
 {
-	struct chunk c;
-	c.x = chunk_x;
-	c.z = chunk_z;
-	return (struct chunk *) hashmap_get(chunk_map, &c);
+	block_data data = world_get_block(x, y, z);
+	data.metadata = new_metadata;
+	world_set_block(x, y, z, data);
 }
 
-void world_set_time(long t)
+void world_set_time(ulong t)
 {
 	time = t;
 }
 
-#define is_between(t, a, b) t >= a && t <= b
+ulong world_get_time(void)
+{
+	return time;
+}
 
-float *world_get_sky_color(void)
+
+#define is_between(t, a, b) t >= a && t <= b
+float *world_calculate_sky_color(void)
 {
 	static vec3 color;
 
@@ -314,7 +349,12 @@ float *world_get_sky_color(void)
 	return color;
 }
 
-float world_get_light_modifier(void)
+float world_calculate_sun_angle(void)
+{
+	return 0.0f; // todo
+}
+
+float world_calculate_sky_light_modifier(void)
 {
 	float lmod;
 	int t = time % 24000;

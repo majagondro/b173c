@@ -17,8 +17,8 @@ extern struct client_state {
 
 	bool done, active;
 
-	u_long fps;
-	u_long time;
+	ulong fps;
+	ulong time;
 	float frametime;
 } cl;
 

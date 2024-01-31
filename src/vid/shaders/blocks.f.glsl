@@ -10,4 +10,7 @@ uniform sampler2D TEXTURE;
 void main()
 {
     COLOR = texture(TEXTURE, UV_COORD) * vec4(COLORMOD, 1.0);
+    if(COLOR.a < 0.01) {
+        discard;
+    }
 }

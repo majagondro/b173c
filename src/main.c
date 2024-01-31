@@ -39,8 +39,8 @@ const char *va(const char *fmt, ...)
 
 float calc_frametime(void)
 {
-	static u_long now = 0;
-	static u_long then = 0;
+	static ulong now = 0;
+	static ulong then = 0;
 
 	then = now;
 	now = SDL_GetPerformanceCounter();

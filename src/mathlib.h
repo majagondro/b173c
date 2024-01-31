@@ -9,8 +9,12 @@
 
 #define DEG2RAD(d) ((d) * (3.1415f / 180.0f))
 
+#define SQRT_2 1.4142f
+#define SQRT_3 1.7321f
+
+#define vec3_init(v) {v[0], v[1], v[2]}
 #define vec3_copy(dest, a) dest[0] = a[0], dest[1] = a[1], dest[2] = a[2]
-#define vec3_add(dest, a, b) dest[0] = a[0] + b[0], dest[1] = a[1] + b[1], dest[2] = a[2] + b[2]
+#define vec3_add(dest, a, b) (dest)[0] = (a)[0] + (b)[0], (dest)[1] = (a)[1] + (b)[1], (dest)[2] = (a)[2] + (b)[2]
 #define vec3_sub(dest, a, b) dest[0] = a[0] - b[0], dest[1] = a[1] - b[1], dest[2] = a[2] - b[2]
 #define vec3_invert(dest, a) dest[0] = -a[0], dest[1] = -a[1], dest[2] = -a[2]
 #define vec3_mul_scalar(dest, a, b) dest[0] = a[0] * b, dest[1] = a[1] * b, dest[2] = a[2] * b

@@ -16,13 +16,13 @@ struct keyname {
 };
 
 struct {
-	u_byte forward : 1;
-	u_byte back : 1;
-	u_byte left : 1;
-	u_byte right : 1;
-	u_byte attack : 1;
-	u_byte jump : 1;
-	u_byte sneak : 1;
+	ubyte forward : 1;
+	ubyte back : 1;
+	ubyte left : 1;
+	ubyte right : 1;
+	ubyte attack : 1;
+	ubyte jump : 1;
+	ubyte sneak : 1;
 } inkeys;
 
 cvar sensitivity = {"sensitivity", "2.5"};
@@ -340,12 +340,20 @@ static void handle_keys(void)
 void in_update(void)
 {
 	SDL_Event e;
-	int i;
+	int key;
 
-	for (i = 0; i < KEY_NUM; i++) {
-		input_keys[i].just_pressed = false;
-		input_keys[i].just_released = false;
-		input_keys[i].echo = false;
+	for (key = 0; key < KEY_NUM; key++) {
+		if(key == KEY_MOUSEWHEELUP || key == KEY_MOUSEWHEELDOWN) {
+			if(input_keys[key].just_pressed || input_keys[key].pressed) {
+				input_keys[key].just_released = true;
+				input_keys[key].just_pressed = false;
+				input_keys[key].pressed = false;
+				continue;
+			}
+		}
+		input_keys[key].just_pressed = false;
+		input_keys[key].just_released = false;
+		input_keys[key].echo = false;
 	}
 
 	while (SDL_PollEvent(&e)) {
@@ -370,33 +378,33 @@ void in_update(void)
 			case SDL_MOUSEBUTTONDOWN: {
 				switch(e.button.button) {
 					case SDL_BUTTON_LEFT:
-						i = KEY_MOUSE1;
+						key = KEY_MOUSE1;
 						break;
 					case SDL_BUTTON_RIGHT:
-						i = KEY_MOUSE2;
+						key = KEY_MOUSE2;
 						break;
 					case SDL_BUTTON_MIDDLE:
-						i = KEY_MOUSE3;
+						key = KEY_MOUSE3;
 						break;
 				}
-				input_keys[i].pressed = true;
-				input_keys[i].just_pressed = true;
+				input_keys[key].pressed = true;
+				input_keys[key].just_pressed = true;
 			} break;
 
 			case SDL_MOUSEBUTTONUP: {
 				switch(e.button.button) {
 					case SDL_BUTTON_LEFT:
-						i = KEY_MOUSE1;
+						key = KEY_MOUSE1;
 						break;
 					case SDL_BUTTON_RIGHT:
-						i = KEY_MOUSE2;
+						key = KEY_MOUSE2;
 						break;
 					case SDL_BUTTON_MIDDLE:
-						i = KEY_MOUSE3;
+						key = KEY_MOUSE3;
 						break;
 				}
-				input_keys[i].pressed = false;
-				input_keys[i].just_released = true;
+				input_keys[key].pressed = false;
+				input_keys[key].just_released = true;
 			} break;
 
 			case SDL_MOUSEMOTION: {
@@ -404,6 +412,9 @@ void in_update(void)
 			} break;
 
 			case SDL_MOUSEWHEEL: {
+				key = e.wheel.y > 0 ? KEY_MOUSEWHEELUP : KEY_MOUSEWHEELDOWN;
+				input_keys[key].pressed = true; // fixme
+				input_keys[key].just_pressed = true;
 				handle_mouse(0, 0, e.wheel.y);
 			} break;
 

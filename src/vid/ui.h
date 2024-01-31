@@ -13,10 +13,10 @@ void ui_shutdown(void);
 void ui_draw(void);   // called before r_display_frame
 void ui_commit(void); // called in r_display_frame
 
-bool ui_drawchar(u_byte c, int x, int y, int color);
+bool ui_drawchar(ubyte c, int x, int y, int color);
 void ui_drawtext(const char *text, int x, int y);
 void ui_printf(int x, int y, const char *fmt, ...);
-int ui_charwidth(u_byte c);
+int ui_charwidth(ubyte c);
 int ui_strwidth(const char *text);
 
 // console.c

@@ -121,7 +121,8 @@ void net_process(void)
 	/* read and handle incoming packets */
 	if(cl.state > cl_disconnected) {
 		if(setjmp(read_abort)) {
-			// not enough data to read entire packet
+			// longjmp to here means that recv failed
+			// usually not enough data to read an entire packet
 			net_write_packets();
 			return;
 		}
@@ -144,7 +145,7 @@ void net_process(void)
 
 static bool net_read_packet(void)
 {
-	u_byte packet_id;
+	ubyte packet_id;
 	int i;
 
 	/* consume the old bytes */
@@ -404,9 +405,9 @@ static bool net_read_packet(void)
 				cz = net_read_int();
 			short sz = net_read_short();
 
-			short *b1 = mem_alloc(sz * sizeof(short));
-			byte *b2 = mem_alloc(sz);
-			byte *b3 = mem_alloc(sz);
+			short *b1 = alloca(sz * sizeof(short));
+			byte *b2 = alloca(sz);
+			byte *b3 = alloca(sz);
 
 			for(i = 0; i < sz; i++)
 				b1[i] = net_read_short();
@@ -414,10 +415,6 @@ static bool net_read_packet(void)
 			net_read_buf(b3, sz);
 
 			net_handle_0x34(cx, cz, sz, b1, b2, b3);
-
-			mem_free(b1);
-			mem_free(b2);
-			mem_free(b3);
 
 			break;
 		}
@@ -447,13 +444,11 @@ static bool net_read_packet(void)
 			float r = net_read_float();
 			int n = net_read_int();
 
-			b = mem_alloc(n * sizeof(*b));
+			b = alloca(n * sizeof(*b));
 			for(i = 0; i < n; i++)
 				net_read_buf(&b[i], sizeof(b[i]));
 
 			net_handle_0x3C(x, y, z, r, n, b);
-
-			mem_free(b);
 			break;
 		}
 		case PKT_SOUND_EFFECT: {
@@ -521,7 +516,7 @@ static bool net_read_packet(void)
 			struct ni_wi_payload *p;
 			byte gui = net_read_byte();
 			short cnt = net_read_short();
-			p = mem_alloc(cnt * sizeof(*p));
+			p = alloca(cnt * sizeof(*p));
 			for(i = 0; i < cnt; i++) {
 				p[i].item_id = net_read_short();
 				if(p[i].item_id != -1) {
@@ -530,7 +525,6 @@ static bool net_read_packet(void)
 				}
 			}
 			net_handle_0x68(gui, cnt, p);
-			mem_free(p);
 			break;
 		}
 		case PKT_UPDATE_PROGRESS_BAR: {
@@ -565,10 +559,9 @@ static bool net_read_packet(void)
 			s[0] = net_read_short();
 			s[1] = net_read_short();
 			n = net_read_byte();
-			b = mem_alloc(n);
+			b = alloca(n);
 			net_read_buf(b, n);
 			net_handle_0x83(s[0], s[1], n, b);
-			mem_free(b);
 			break;
 		}
 		case PKT_INCREMENT_STATISTIC: {
@@ -617,19 +610,18 @@ void net_read_buf(void *dest, size_t n)
 
 	n_read = recv(sockfd, read_buffer, total_read+n, MSG_PEEK);
 	if(n_read == 0) {
-		// EOF
+		// EOF - todo: disonnect here as well? read recv man page for more info as to why
 		read_ok = false;
 		longjmp(read_abort, 1);
 	} else if(n_read == -1) {
 		read_ok = false;
 		// EAGAIN is a common when using non-blocking sockets
 		// it just means no data is currently available
-		if(errno != EAGAIN) {
-			longjmp(read_abort, 1);
-		} else {
-			// what do :-(((((
-		}
+		if(errno != EAGAIN)
+			con_printf("net_read_buf: %s (error %d)\n", strerror(errno), errno);
+		longjmp(read_abort, 1);
 	} else if((size_t) n_read - total_read != n) {
+		// read some, but not everything
 		read_ok = false;
 		total_read = n_read;
 		longjmp(read_abort, 1);
@@ -751,7 +743,7 @@ void net_write_buf(const void *buf, size_t n)
 	}
 }
 
-void net_write_byte(u_byte v)
+void net_write_byte(ubyte v)
 {
 	net_write_buf(&v, 1);
 }
@@ -916,7 +908,7 @@ void disconnect_f(void)
 			setblocking(sockfd, false);
 		}
 
-		bzero(&cl.game, sizeof(cl.game));
+		memset(&cl.game, 0, sizeof(cl.game));
 
 		// net_update will disconnect next update
 		cl.state = cl_disconnected;

@@ -27,7 +27,7 @@ HANDLER(PKT_LOGIN_REQUEST, int ent_id, string16 unused, long seed, byte dimensio
 	cl.state = cl_connected;
 	con_printf(COLOR_DGREEN "connected!\n");
 	con_printf(COLOR_CYAN "seed: " COLOR_WHITE "%ld\n", seed);
-	con_hide();
+	// con_hide();
 	cl.game.our_id = ent_id;
 	vid_unlock_fps();
 	mem_free(unused);
@@ -222,55 +222,55 @@ HANDLER(PKT_ENTITY_METADATA, int ent_id, ...)
 HANDLER(PKT_PRE_CHUNK, int chunk_x, int chunk_z, bool load)
 {
 	if(load) {
-		world_prepare_chunk(chunk_x, chunk_z);
+		world_alloc_chunk(chunk_x, chunk_z);
 	} else {
-		world_delete_chunk(chunk_x, chunk_z);
+		world_free_chunk(chunk_x, chunk_z);
 	}
 }
 
-HANDLER(PKT_MAP_CHUNK, int x, short y, int z, byte size_x, byte size_y, byte size_z, int data_size, byte *data)
+HANDLER(PKT_MAP_CHUNK, int x, short y, int z, byte size_x, byte size_y, byte size_z, int data_size, ubyte *data)
 {
 	int sx, sy, sz;
 	sx = size_x + 1;
 	sy = size_y + 1;
 	sz = size_z + 1;
-	world_load_region_data(x, y, z, sx, sy, sz, data_size, (u_byte *) data);
-
+	world_load_compressed_chunk_data(x, y, z, sx, sy, sz, (size_t) data_size, data);
 }
 
 HANDLER(PKT_MULTI_BLOCK_CHANGE, int chunk_x, int chunk_z, short array_size, short *coord_array, byte *id_array, byte *metadata_array)
 {
-	struct chunk *chunk;
-	int i;
-	chunk = world_get_chunk(chunk_x, chunk_z);
-	if(!chunk)
+	if(!world_chunk_exists(chunk_x, chunk_z))
 		return;
-	for(i = 0; i < array_size; i++) {
-		byte id = id_array[i];
-		int x, y, z, c = coord_array[i], idx;
-		x = (c >> 12) & 4;
-		z = (c >> 8) & 4;
-		y = c & 255;
-		if(y > 127)
-			continue;
 
-		idx = IDX_FROM_COORDS(x, y, z);
-		chunk->data->blocks[idx] = id;
-		chunk->data->metadata[idx] = metadata_array[i];
+	for(int i = 0; i < array_size; i++) {
+		int x, y, z;
+		int c = coord_array[i];
+		block_id id = id_array[i];
+		ubyte metadata = metadata_array[i];
+
+		/* unpack */
+		x = ((c >> 12) & 15) + chunk_x * WORLD_CHUNK_SIZE;
+		z = ((c >> 8) & 15) + chunk_z * WORLD_CHUNK_SIZE;
+		y = c & 255;
+
+		world_set_block_id(x, y, z, id);
+		world_set_block_metadata(x, y, z, metadata);
 	}
 }
 
 HANDLER(PKT_BLOCK_CHANGE, int x, byte y, int z, byte block_id, byte metadata)
 {
-	world_set_block(x, y, z, block_id);
-	world_set_metadata(x, y, z, metadata);
+	world_set_block_id(x, y, z, block_id);
+	world_set_block_metadata(x, y, z, metadata);
 }
 
+// noteblock: data1 = instrument  data2 = pitch
+// piston:    data1 = state       data2 = direction
 HANDLER(PKT_BLOCK_ACTION, int x, short y, int z, byte data1, byte data2)
 {
 
 }
-// noteblock: data1 = instrument data2 = pitch      piston: data1 = state     data2 = direction
+
 HANDLER(PKT_EXPLOSION, double x, double y, double z, float radius, int num_affected_blocks, struct ni_off_coord *affected_blocks)
 {
 
@@ -334,7 +334,7 @@ HANDLER(PKT_UPDATE_SIGN, int x, short y, int z, string16 line1, string16 line2, 
 	mem_free(line4);
 }
 
-HANDLER(PKT_ITEM_DATA, short item_type, short item_id, u_byte data_size, byte *data)
+HANDLER(PKT_ITEM_DATA, short item_type, short item_id, ubyte data_size, byte *data)
 {
 
 }
@@ -346,13 +346,9 @@ HANDLER(PKT_INCREMENT_STATISTIC, int stat_id, byte amount)
 
 HANDLER(PKT_DISCONNECT, string16 reason)
 {
-	printf("'");
-	c16puts(reason);
-	printf("'\n");
 	con_printf("you got kicked: %s\n", c8(reason));
 	cmd_exec("disconnect", false);
 	cl.state = cl_disconnected;
-	vid_lock_fps();
 	mem_free(reason);
 }
 

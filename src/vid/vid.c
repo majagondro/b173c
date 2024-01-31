@@ -11,12 +11,12 @@
 SDL_Window *window_handle;
 SDL_GLContext glcontext;
 
-u_long frames_drawn = 0;
-u_long last_check_tick = 0; // for fps because its a little more stable and looks nicer :)
-u_long then = 0, now = 0; // for frametime
+ulong frames_drawn = 0;
+ulong last_check_tick = 0; // for fps because its a little more stable and looks nicer :)
+ulong then = 0, now = 0; // for frametime
 
-cvar vid_width = {"vid_width", "1280"};
-cvar vid_height = {"vid_height", "720"};
+cvar vid_width = {"vid_width", "854"};
+cvar vid_height = {"vid_height", "480"};
 
 struct gl_state gl;
 
@@ -101,6 +101,9 @@ void gl_debug_message(GLenum source, GLenum type, GLuint id, GLenum severity, GL
 	fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
 			(type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
 			type, severity, message);
+	if(type == GL_DEBUG_TYPE_ERROR) {
+		exit(1);
+	}
 }
 
 void vid_init(void)
@@ -149,6 +152,8 @@ void vid_init(void)
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
 
 	world_renderer_init();
 }
@@ -203,7 +208,7 @@ void vid_update(void)
 void vid_display_frame(void)
 {
 	int e;
-	float *clearcolor = world_get_sky_color();
+	float *clearcolor = world_calculate_sky_color();
 	glClearColor(clearcolor[0], clearcolor[1], clearcolor[2], 1.0f);
 	// glClearColor(0.1f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -212,22 +217,10 @@ void vid_display_frame(void)
 	glUseProgram(gl.shader3d);
 	world_render();
 
-	e = glGetError();
-	if(e) {
-		con_printf("gl_error: %d\n", e);
-		exit(1);
-	}
-
 	/* draw 2d stuff */
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glUseProgram(gl.shader2d);
 	ui_commit();
-
-	e = glGetError();
-	if(e) {
-		con_printf("gl_error: %d\n", e);
-		exit(1);
-	}
 
 	SDL_GL_SwapWindow(window_handle);
 

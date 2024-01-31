@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #define MESHBUILDER_INDEX_TYPE uint16_t
+#define MESHBUILDER_INDEX_TYPE_GL GL_UNSIGNED_SHORT
 
 void meshbuilder_start(size_t vert_size);
 

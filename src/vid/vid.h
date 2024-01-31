@@ -6,7 +6,7 @@
 
 struct gl_state {
 	int w, h;
-	u_int shader3d, shader2d;
+	uint shader3d, shader2d;
 };
 
 void vid_init(void);
@@ -19,11 +19,5 @@ void vid_lock_fps(void);
 void vid_unlock_fps(void);
 
 void vid_display_frame(void);
-
-
-void world_renderer_init(void);
-void world_renderer_shutdown(void);
-void world_render(void);
-void world_renderer_free_chunk_render_data(struct chunk *c);
 
 #endif

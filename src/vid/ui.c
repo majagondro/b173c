@@ -176,6 +176,15 @@ static char *statestr(void)
 void ui_commit(void)
 {
 	if(developer.integer) {
+		ulong t = world_get_time();
+		ulong d, h, m;
+
+		d = t / 24000;
+		// fixme hour and minute is wrong xd
+		h = (6 + (t % 24000) / 1000) % 24;
+		m = (60 * ((t % 24000) % 1000) / 1000) % 60;
+		ui_printf(8, ui_h - 48, "time: %.2lu:%.2lu, day %lu (tick %lu)\n", h, m, d, t);
+
 		ui_printf(8, ui_h - 40, "net: %s", statestr());
 
 		ui_printf(8, ui_h - 32, "%f %f %f / %f %f %f",

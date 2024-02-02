@@ -50,7 +50,7 @@ float calc_frametime(void)
 
 int main(void)
 {
-	float net_timeout = 0.0f;
+	float phys_timeout = 0.0f;
 
 	in_init();
 	con_init();
@@ -70,10 +70,13 @@ int main(void)
 
 		in_update();
 
-		net_timeout -= cl.frametime;
-		if(net_timeout <= 0.0f) {
+		phys_timeout -= cl.frametime;
+		if(phys_timeout <= 0.0f) {
 			net_process();
-			net_timeout = 0.05f;
+
+			world_set_time(world_get_time() + 1); // client prediction of time
+
+			phys_timeout = 0.05f; // 20 u/s
 		}
 
 		vid_update();

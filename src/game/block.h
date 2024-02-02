@@ -5,13 +5,36 @@
 #include "block_ids.h"
 
 typedef enum {
-	 BLOCK_FACE_Y_NEG = 0,
-	 BLOCK_FACE_Y_POS = 1,
-	 BLOCK_FACE_Z_NEG = 2,
-	 BLOCK_FACE_Z_POS = 3,
-	 BLOCK_FACE_X_NEG = 4,
-	 BLOCK_FACE_X_POS = 5
+	 BLOCK_FACE_Y_NEG,
+	 BLOCK_FACE_Y_POS,
+	 BLOCK_FACE_Z_NEG,
+	 BLOCK_FACE_Z_POS,
+	 BLOCK_FACE_X_NEG,
+	 BLOCK_FACE_X_POS
 } block_face;
+
+typedef enum {
+	RENDER_NONE = -1,
+	RENDER_CUBE,
+	RENDER_CROSS,
+	RENDER_TORCH,
+	RENDER_FIRE,
+	RENDER_FLUID,
+	RENDER_WIRE,
+	RENDER_CROPS,
+	RENDER_DOOR,
+	RENDER_LADDER,
+	RENDER_RAIL,
+	RENDER_STAIRS,
+	RENDER_FENCE,
+	RENDER_LEVER,
+	RENDER_CACTUS,
+	RENDER_BED,
+	RENDER_REPEATER,
+	RENDER_PISTON_BASE,
+	RENDER_PISTON_EXTENSION,
+	RENDER_CUBE_SPECIAL
+} block_render_type;
 
 typedef ubyte block_id;
 
@@ -26,6 +49,7 @@ typedef struct {
 	char *name;
 	ubyte texture_indices[6];
 	bool opaque;
+	block_render_type render_type;
 } block_properties;
 
 

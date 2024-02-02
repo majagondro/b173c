@@ -239,7 +239,7 @@ void remesh_chunk(world_chunk *chunk)
 					int z = (chunk->z << 4) + zoff;
 					block_data block = world_get_block(x, y, z);
 
-					if(block_is_semi_transparent(block))
+					if(block_is_semi_transparent(block) || block_get_properties(block.id).render_type != RENDER_CUBE)
 						continue;
 
 					if(!block_is_empty(block)) {
@@ -309,7 +309,7 @@ void remesh_chunk(world_chunk *chunk)
 
 		/* semi-transparent faces */
 
-		/*meshbuilder_start(sizeof(*glbuf->alpha_vertices));
+		meshbuilder_start(sizeof(*glbuf->alpha_vertices));
 
 		for(int xoff = 0; xoff < WORLD_CHUNK_SIZE; xoff++) {
 			for(int zoff = 0; zoff < WORLD_CHUNK_SIZE; zoff++) {
@@ -329,7 +329,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_Y_NEG],
-								BLOCK_FACE_Y_NEG)
+								BLOCK_FACE_Y_NEG), BLOCK_FACE_Y_NEG
 							);
 						}
 
@@ -337,7 +337,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_Y_POS],
-								BLOCK_FACE_Y_POS)
+								BLOCK_FACE_Y_POS), BLOCK_FACE_Y_POS
 							);
 						}
 
@@ -345,7 +345,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_X_POS],
-								BLOCK_FACE_X_POS)
+								BLOCK_FACE_X_POS), BLOCK_FACE_X_POS
 							);
 						}
 
@@ -353,7 +353,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_X_NEG],
-								BLOCK_FACE_X_NEG)
+								BLOCK_FACE_X_NEG), BLOCK_FACE_X_NEG
 							);
 						}
 
@@ -361,7 +361,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_Z_POS],
-								BLOCK_FACE_Z_POS)
+								BLOCK_FACE_Z_POS), BLOCK_FACE_Z_POS
 							);
 						}
 
@@ -369,7 +369,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_Z_NEG],
-								BLOCK_FACE_Z_NEG)
+								BLOCK_FACE_Z_NEG), BLOCK_FACE_Z_NEG
 							);
 						}
 					}
@@ -379,13 +379,12 @@ void remesh_chunk(world_chunk *chunk)
 
 		meshbuilder_finish(&glbuf->alpha_vertices, &glbuf->num_alpha_vertices, &glbuf->alpha_indices, &glbuf->num_alpha_indices);
 
-		glBindBuffer(GL_ARRAY_BUFFER, chunk->alpha_vbo);
-		glbuf->alpha_basevertex = bufidx * (MAX_GLBUF_SIZE / sizeof(struct world_vertex));
-		glBufferSubData(GL_ARRAY_BUFFER,       */
-//			/* offs */ bufidx * MAX_GLBUF_SIZE,
-//			/* size */ glbuf->num_alpha_vertices * sizeof(*glbuf->alpha_vertices),
-//			/* data */ glbuf->alpha_vertices);
-//		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ARRAY_BUFFER, glbuf->alpha_vbo);
+		glBufferData(GL_ARRAY_BUFFER,
+			/* size */ glbuf->num_alpha_vertices * sizeof(*glbuf->alpha_vertices),
+			/* data */ glbuf->alpha_vertices,
+			/* usag */ GL_DYNAMIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 }
 

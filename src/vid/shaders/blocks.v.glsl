@@ -1,6 +1,7 @@
 #version 430 core
 
-layout(location=0) in uint IN;
+layout(location=0) in vec3 IN_POS;
+layout(location=1) in uint IN_DATA;
 
 uniform vec3 CHUNK_POS;
 uniform mat4 VIEW;
@@ -35,18 +36,16 @@ vec2 get_uv_coord(int vertex_id, uint texture_index)
 
 void main()
 {
-    uint x, y, z, texture_index, face;
+    uint texture_index, face, light;
+    int extradata;
 
-    x = (IN >> 0) & 31u;
-    y = (IN >> 5) & 31u;
-    z = (IN >> 10) & 31u;
-    texture_index = (IN & uint(0x00ff0000)) >> 16;
-    face =          (IN & uint(0xff000000)) >> 24;
-
-    vec3 block_pos = vec3(x, y, z) + CHUNK_POS;
+    texture_index = (IN_DATA & uint(0x00ff)) >> 0;
+    face          = ((IN_DATA & uint(0xff00)) >> 8) & 7u;
+    light         = ((IN_DATA & uint(0xff00)) >> (8+3)) & uint(255>>3);
+    extradata     = (int(IN_DATA) & 0xffff0000) >> 16;
 
     COLORMOD = vec3(1);
-    if(texture_index == 0) {
+    if(texture_index == 0) { // temp: grass color todo: removeme
         COLORMOD = vec3(0.34375,0.4453,0.207)*1.9;
     }
 
@@ -60,7 +59,14 @@ void main()
         COLORMOD *= 0.6;
     }
 
-    UV_COORD = get_uv_coord(gl_VertexID, texture_index);
+    COLORMOD *= float(light) / 15.0f;
+
+    vec3 block_pos = IN_POS + CHUNK_POS;
+    vec2 uv = get_uv_coord(gl_VertexID, texture_index);
+    // float angl = radians(float(extradata));
+    // UV_COORD.x = uv.x * cos(angl) - uv.y * sin(angl);
+    // UV_COORD.y = uv.x * sin(angl) + uv.y * cos(angl);
+    UV_COORD = uv;
 
     gl_Position = PROJECTION * VIEW * (vec4(block_pos, 1.0));
 }

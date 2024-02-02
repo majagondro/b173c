@@ -4,8 +4,6 @@
 #include "vid/vid.h"
 #include "hashmap.h"
 
-#define GET4BIT(arr, idx) (((arr)[(idx) >> 1] >> ((idx & 1) ? 4 : 0)) & 15)
-
 const static block_data AIR_BLOCK_DATA = {.id = 0, .metadata = 0, .skylight = 15, .blocklight = 0};
 const static block_data EMPTY_BLOCK_DATA = {.id = 0, .metadata = 0, .skylight = 0, .blocklight = 0};
 const static block_data SOLID_BLOCK_DATA = {.id = 1, .metadata = 0, .skylight = 0, .blocklight = 0};
@@ -132,6 +130,14 @@ static int inflate_data(ubyte *in, ubyte *out, size_t size_in, size_t size_out)
 	return Z_OK;
 }
 
+static ubyte get_nibble(ubyte *data, int x, int y, int z)
+{
+	int idx8 = IDX_FROM_COORDS(x, y, z);
+	int idx4 = idx8 >> 1;
+	int odd = idx8 & 1;
+	return !odd ? data[idx4] & 15 : data[idx4] >> 4 & 15;
+}
+
 void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_y, int size_z, size_t data_size, ubyte *data)
 {
 	int x_start, y_start, z_start;
@@ -179,42 +185,39 @@ void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_
 		}
 	}
 
+#define GET4BIT(v, idx) (((v) >> (((idx) & 1) ? 4 : 0)) & 15)
 
 	/* metadata */
-	/*for(x = x_start; x < x_end; ++x) {
-		for(z = z_start; z < z_end; ++z) {
-			for(y = y_start; y < y_end; y += 2, data_ptr++) {
-				int i1 = IDX_FROM_COORDS(x, y, z);
-				int i2 = IDX_FROM_COORDS(x, y + 1, z);
-				chunk->data[i1].metadata = GET4BIT(data_ptr, i1);
-				chunk->data[i2].metadata = GET4BIT(data_ptr, i2);
+	for(x = x_start; x < x_end; x++) {
+		for(z = z_start; z < z_end; z++) {
+			for(y = y_start; y < y_end; y++) {
+				int idx = IDX_FROM_COORDS(x, y, z);
+				chunk->data[idx].metadata = get_nibble(data_ptr, x, y, z);
 			}
 		}
-	}*/
+	}
+	data_ptr += (x_end - x_start) * (z_end - z_start) * ((y_end - y_start) / 2);
 
 	/* block light */
-	/*for(x = x_start; x < x_end; ++x) {
-		for(z = z_start; z < z_end; ++z) {
-			for(y = y_start; y < y_end; y += 2, data_ptr++) {
-				int i1 = IDX_FROM_COORDS(x, y, z);
-				int i2 = IDX_FROM_COORDS(x, y + 1, z);
-				chunk->data[i1].blocklight = GET4BIT(data_ptr, i1);
-				chunk->data[i2].blocklight = GET4BIT(data_ptr, i2);
+	for(x = x_start; x < x_end; x++) {
+		for(z = z_start; z < z_end; z++) {
+			for(y = y_start; y < y_end; y++) {
+				int idx = IDX_FROM_COORDS(x, y, z);
+				chunk->data[idx].blocklight = get_nibble(data_ptr, x, y, z);
 			}
 		}
-	}*/
+	}
+	data_ptr += (x_end - x_start) * (z_end - z_start) * ((y_end - y_start) / 2);
 
 	/* sky light */
-	/*for(x = x_start; x < x_end; ++x) {
-		for(z = z_start; z < z_end; ++z) {
-			for(y = y_start; y < y_end; y += 2, data_ptr++) {
-				int i1 = IDX_FROM_COORDS(x, y, z);
-				int i2 = IDX_FROM_COORDS(x, y + 1, z);
-				chunk->data[i1].skylight = GET4BIT(data_ptr, i1);
-				chunk->data[i2].skylight = GET4BIT(data_ptr, i2);
+	for(x = x_start; x < x_end; x++) {
+		for(z = z_start; z < z_end; z++) {
+			for(y = y_start; y < y_end; y++) {
+				int idx = IDX_FROM_COORDS(x, y, z);
+				chunk->data[idx].skylight = get_nibble(data_ptr, x, y, z);
 			}
 		}
-	}*/
+	}
 }
 
 block_data world_get_block(int x, int y, int z)
@@ -239,13 +242,13 @@ block_data world_get_block(int x, int y, int z)
 		return cache.chunk->data[IDX_FROM_COORDS(x, y, z)];
 	return EMPTY_BLOCK_DATA;
 }
-/*
-ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z)
+
+static ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z)
 {
 	int i = IDX_FROM_COORDS(x, y, z);
-	int block_id = c->data->blocks[i];
+	block_data block = c->data[i];
 	int l, bl;
-	if(block_id == 44 || block_id == 60 || block_id == 53 || block_id == 67) {
+	if(block.id == BLOCK_SLAB_SINGLE || block.id == BLOCK_FARMLAND || block.id == BLOCK_STAIRS_WOOD || block.id == BLOCK_STAIRS_STONE) {
 		int py = world_get_block_lighting(x, y + 1, z);
 		int px = world_get_block_lighting(x + 1, y, z);
 		int nx = world_get_block_lighting(x - 1, y, z);
@@ -253,8 +256,8 @@ ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z)
 		int nz = world_get_block_lighting(x, y, z - 1);
 		return max(py, max(px, max(nx, max(pz, nz))));
 	}
-	l = GET4BIT(c->data->skylight, i);
-	bl = GET4BIT(c->data->blocklight, i);
+	l = block.skylight;
+	bl = block.blocklight;
 	return (bl > l ? bl : l) & 15;
 }
 
@@ -267,10 +270,10 @@ ubyte world_get_block_lighting(int x, int y, int z)
 		return 15;
 	cp = world_get_chunk(x >> 4, z >> 4);
 	if(!cp)
-		return 15;
+		return 0;
 	return chunk_get_block_lighting(cp, x & 15, y, z & 15);
 }
-*/
+
 
 void world_set_block(int x, int y, int z, block_data data)
 {

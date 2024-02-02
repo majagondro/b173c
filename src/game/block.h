@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "block_ids.h"
+#include "mathlib.h"
 
 typedef enum {
 	 BLOCK_FACE_Y_NEG,
@@ -53,10 +54,13 @@ typedef struct {
 } block_properties;
 
 
+#define block_is_solid(b) ((b).id != 0 && (b).id != 9 && (b).id != 10 && (b).id != 11 && (b).id != 27 && (b).id != 28 && (b).id != 31 && (b).id != 32 && (b).id != 37 && (b).id != 38 && (b).id != 39 && (b).id != 40 && (b).id != 50 && (b).id != 51 && (b).id != 55 && (b).id != 59 && (b).id != 65 && (b).id != 66 && (b).id != 69 && (b).id != 75 && (b).id != 76 && (b).id != 77 && (b).id != 78 && (b).id != 83 && (b).id != 90 && (b).id != 93 && (b).id != 94)
 #define block_is_empty(b) ((b).id == 0)
 #define block_is_transparent(b) (block_get_properties(b.id).opaque == 0)
 #define block_is_semi_transparent(b) ((b).id == BLOCK_WATER_STILL || (b).id == BLOCK_WATER_MOVING || (b).id == BLOCK_ICE)
 block_properties block_get_properties(block_id id);
 bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_face face);
+bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id self_id);
+float block_fluid_get_height(int x, int y, int z, block_id self_id);
 
 #endif

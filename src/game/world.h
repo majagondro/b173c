@@ -23,12 +23,13 @@ typedef struct {
 	struct world_chunk_glbuf {
 		bool visible;
 		struct world_vertex {
-			ubyte x : 5;
-			ubyte y : 5;
-			ubyte z : 5;
-			ubyte padding : 1 attr(unused);
+			float x;// ubyte x : 5;
+			float y;// ubyte y : 5;
+			float z;// ubyte z : 5;
+			// ubyte padding : 1 attr(unused);
 			ubyte texture_index;
 			ubyte data;
+			ushort extradata;
 		} attr(packed)
 		*vertices, *alpha_vertices;
 		ushort *indices, *alpha_indices;
@@ -57,6 +58,7 @@ block_data world_get_block(int x, int y, int z);
 void world_set_block(int x, int y, int z, block_data data);
 void world_set_block_id(int x, int y, int z, block_id id);
 void world_set_block_metadata(int x, int y, int z, byte new_metadata);
+ubyte world_get_block_lighting(int x, int y, int z);
 
 /* time, daylight cycle, etc. */
 void world_set_time(ulong time);
@@ -71,6 +73,6 @@ void world_renderer_shutdown(void);
 void world_render(void);
 void world_init_chunk_glbufs(world_chunk *c);
 void world_free_chunk_glbufs(world_chunk *c);
-struct world_vertex world_make_vertex(ubyte x, ubyte y, ubyte z, ubyte texture_index, ubyte data);
+struct world_vertex world_make_vertex(float x, float y, float z, ubyte texture_index, ubyte face, ubyte light);
 
 #endif

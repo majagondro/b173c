@@ -2,7 +2,9 @@
 #include "common.h"
 #include "world.h"
 
-enum { TRANSPARENT = 0, OPAQUE = 1 };
+enum {
+	TRANSPARENT = 0, OPAQUE = 1
+};
 
 #define TEXTURE_ALL(idx) {idx,idx,idx,idx,idx,idx}
 #define TEXTURE_TOP_BOT_SIDE(top, bot, side) {bot, top, side, side, side, side}
@@ -17,8 +19,8 @@ static block_properties blocks[256] = {
 	[BLOCK_WOOD_PLANKS] = {"planks", TEXTURE_ALL(4), OPAQUE, RENDER_CUBE},
 	[BLOCK_SAPLING] = {"sapling", TEXTURE_ALL(15), TRANSPARENT, RENDER_CROSS},
 	[BLOCK_BEDROCK] = {"bedrock", TEXTURE_ALL(17), OPAQUE, RENDER_CUBE},
-	[BLOCK_WATER_MOVING] = {"water_flowing", TEXTURE_ALL(255-32), TRANSPARENT, RENDER_FLUID},
-	[BLOCK_WATER_STILL] = {"water_still", TEXTURE_ALL(255-32), TRANSPARENT, RENDER_FLUID},
+	[BLOCK_WATER_MOVING] = {"water_flowing", TEXTURE_ALL(255 - 32), TRANSPARENT, RENDER_FLUID},
+	[BLOCK_WATER_STILL] = {"water_still", TEXTURE_ALL(255 - 32), TRANSPARENT, RENDER_FLUID},
 	[BLOCK_LAVA_MOVING] = {"lava_flowing", TEXTURE_ALL(255), TRANSPARENT, RENDER_FLUID},
 	[BLOCK_LAVA_STILL] = {"lava_still", TEXTURE_ALL(255), TRANSPARENT, RENDER_FLUID},
 	[BLOCK_SAND] = {"sand", TEXTURE_ALL(18), OPAQUE, RENDER_CUBE},
@@ -32,17 +34,17 @@ static block_properties blocks[256] = {
 	[BLOCK_GLASS] = {"glass", TEXTURE_ALL(49), TRANSPARENT, RENDER_CUBE},
 	[BLOCK_ORE_LAPIS] = {"lapis_ore", TEXTURE_ALL(160), OPAQUE, RENDER_CUBE},
 	[BLOCK_BLOCK_LAPIS] = {"lapis_block", TEXTURE_ALL(144), OPAQUE, RENDER_CUBE},
-	[BLOCK_DISPENSER] = {"dispenser", TEXTURE_TOPBOT_SIDE(45+17, 45), OPAQUE, RENDER_CUBE},
-	[BLOCK_SANDSTONE] = {"sandstone", TEXTURE_TOP_BOT_SIDE(192-16, 192+16, 192), OPAQUE, RENDER_CUBE},
+	[BLOCK_DISPENSER] = {"dispenser", TEXTURE_TOPBOT_SIDE(45 + 17, 45), OPAQUE, RENDER_CUBE},
+	[BLOCK_SANDSTONE] = {"sandstone", TEXTURE_TOP_BOT_SIDE(192 - 16, 192 + 16, 192), OPAQUE, RENDER_CUBE},
 	[BLOCK_NOTEBLOCK] = {"noteblock", TEXTURE_ALL(74), OPAQUE, RENDER_CUBE},
 	[BLOCK_BED] = {"bed", TEXTURE_ALL(134), TRANSPARENT, RENDER_BED},
 	[BLOCK_RAIL_POWERED] = {"rail_powered", TEXTURE_ALL(179), TRANSPARENT, RENDER_RAIL},
 	[BLOCK_RAIL_DETECTOR] = {"rail_detector", TEXTURE_ALL(195), TRANSPARENT, RENDER_RAIL},
-	[BLOCK_PISTON_BASE_STICKY] = {"piston_sticky", TEXTURE_TOP_BOT_SIDE(106, 106+3, 106+2), TRANSPARENT, RENDER_PISTON_BASE},
+	[BLOCK_PISTON_BASE_STICKY] = {"piston_sticky", TEXTURE_TOP_BOT_SIDE(106, 106 + 3, 106 + 2), TRANSPARENT, RENDER_PISTON_BASE},
 	[BLOCK_COBWEB] = {"cobweb", TEXTURE_ALL(11), TRANSPARENT, RENDER_CROSS},
 	[BLOCK_TALLGRASS] = {"tallgrass", TEXTURE_ALL(39), TRANSPARENT, RENDER_CROSS},
 	[BLOCK_DEADBUSH] = {"deadbush", TEXTURE_ALL(55), TRANSPARENT, RENDER_CROSS},
-	[BLOCK_PISTON_BASE] = {"piston", TEXTURE_TOP_BOT_SIDE(107, 107+2, 107+1), TRANSPARENT, RENDER_PISTON_BASE},
+	[BLOCK_PISTON_BASE] = {"piston", TEXTURE_TOP_BOT_SIDE(107, 107 + 2, 107 + 1), TRANSPARENT, RENDER_PISTON_BASE},
 	[BLOCK_PISTON_EXTENSION] = {"piston_head", TEXTURE_ALL(250), TRANSPARENT, RENDER_PISTON_EXTENSION},
 	[BLOCK_CLOTH] = {"wool", TEXTURE_ALL(64), OPAQUE, RENDER_CUBE},
 	[BLOCK_PISTON_MOVING] = {"piston_moving (idk)", TEXTURE_ALL(240), TRANSPARENT, RENDER_NONE},
@@ -55,7 +57,7 @@ static block_properties blocks[256] = {
 	[BLOCK_SLAB_DOUBLE] = {"slab_double", TEXTURE_ALL(6), OPAQUE, RENDER_CUBE},
 	[BLOCK_SLAB_SINGLE] = {"slab_single", TEXTURE_ALL(6), TRANSPARENT, RENDER_CUBE},
 	[BLOCK_BRICK] = {"bricks", TEXTURE_ALL(7), OPAQUE, RENDER_CUBE},
-	[BLOCK_TNT] = {"tnt", TEXTURE_TOP_BOT_SIDE(8+1, 8+2, 8), OPAQUE, RENDER_CUBE},
+	[BLOCK_TNT] = {"tnt", TEXTURE_TOP_BOT_SIDE(8 + 1, 8 + 2, 8), OPAQUE, RENDER_CUBE},
 	[BLOCK_BOOKSHELF] = {"bookshelf", TEXTURE_TOPBOT_SIDE(4, 35), OPAQUE, RENDER_CUBE},
 	[BLOCK_COBBLESTONE_MOSSY] = {"mossy_cobblestone", TEXTURE_ALL(36), OPAQUE, RENDER_CUBE},
 	[BLOCK_OBSIDIAN] = {"obsidian", TEXTURE_ALL(37), OPAQUE, RENDER_CUBE},
@@ -63,15 +65,15 @@ static block_properties blocks[256] = {
 	[BLOCK_FIRE] = {"fire", TEXTURE_ALL(31), TRANSPARENT, RENDER_FIRE},
 	[BLOCK_MOB_SPAWNER] = {"spawner", TEXTURE_ALL(65), TRANSPARENT, RENDER_CUBE},
 	[BLOCK_STAIRS_WOOD] = {"stair_wood", TEXTURE_ALL(4), TRANSPARENT, RENDER_STAIRS},
-	[BLOCK_CHEST] = {"chest", TEXTURE_TOPBOT_SIDE(26-1, 26), OPAQUE, RENDER_CUBE},
+	[BLOCK_CHEST] = {"chest", TEXTURE_TOPBOT_SIDE(26 - 1, 26), OPAQUE, RENDER_CUBE},
 	[BLOCK_REDSTONE_DUST] = {"redstone_wire", TEXTURE_ALL(164), TRANSPARENT, RENDER_WIRE},
 	[BLOCK_ORE_DIAMOND] = {"diamond_ore", TEXTURE_ALL(50), OPAQUE, RENDER_CUBE},
 	[BLOCK_BLOCK_DIAMOND] = {"diamond_block", TEXTURE_ALL(24), OPAQUE, RENDER_CUBE},
-	[BLOCK_WORKBENCH] = {"workbench", TEXTURE_TOP_BOT_SIDE(59-16, 4, 59), OPAQUE, RENDER_CUBE},
+	[BLOCK_WORKBENCH] = {"workbench", TEXTURE_TOP_BOT_SIDE(59 - 16, 4, 59), OPAQUE, RENDER_CUBE},
 	[BLOCK_CROP_WHEAT] = {"crops", TEXTURE_ALL(88), TRANSPARENT, RENDER_CROPS},
 	[BLOCK_FARMLAND] = {"farmland", TEXTURE_TOP_BOT_SIDE(87, 2, 2), TRANSPARENT, RENDER_CUBE},
-	[BLOCK_FURNACE_IDLE] = {"furnace", TEXTURE_TOPBOT_SIDE(45+17, 45-1), OPAQUE, RENDER_CUBE},
-	[BLOCK_FURNACE_ACTIVE] = {"furnace_lit", TEXTURE_TOPBOT_SIDE(45+17, 45+16), OPAQUE, RENDER_CUBE},
+	[BLOCK_FURNACE_IDLE] = {"furnace", TEXTURE_TOPBOT_SIDE(45 + 17, 45 - 1), OPAQUE, RENDER_CUBE},
+	[BLOCK_FURNACE_ACTIVE] = {"furnace_lit", TEXTURE_TOPBOT_SIDE(45 + 17, 45 + 16), OPAQUE, RENDER_CUBE},
 	[BLOCK_SIGN_POST] = {"sign_post", TEXTURE_ALL(4), TRANSPARENT},
 	[BLOCK_DOOR_WOOD] = {"door_wood", TEXTURE_ALL(97), TRANSPARENT, RENDER_DOOR},
 	[BLOCK_LADDER] = {"ladder", TEXTURE_ALL(83), TRANSPARENT, RENDER_LADDER},
@@ -90,18 +92,18 @@ static block_properties blocks[256] = {
 	[BLOCK_SNOW_LAYER] = {"snow_layer", TEXTURE_ALL(66), TRANSPARENT, RENDER_CUBE_SPECIAL},
 	[BLOCK_ICE] = {"ice", TEXTURE_ALL(67), TRANSPARENT, RENDER_CUBE},
 	[BLOCK_SNOW] = {"snow", TEXTURE_ALL(66), OPAQUE, RENDER_CUBE},
-	[BLOCK_CACTUS] = {"cactus", TEXTURE_TOP_BOT_SIDE(70-1, 70+1, 70), TRANSPARENT, RENDER_CACTUS},
+	[BLOCK_CACTUS] = {"cactus", TEXTURE_TOP_BOT_SIDE(70 - 1, 70 + 1, 70), TRANSPARENT, RENDER_CACTUS},
 	[BLOCK_CLAY] = {"clay", TEXTURE_ALL(72), OPAQUE, RENDER_CUBE},
 	[BLOCK_SUGAR_CANE] = {"reeds", TEXTURE_ALL(73), TRANSPARENT, RENDER_CROSS},
 	[BLOCK_JUKEBOX] = {"jukebox", TEXTURE_TOP_BOT_SIDE(75, 74, 74), OPAQUE, RENDER_CUBE},
 	[BLOCK_FENCE] = {"fence", TEXTURE_ALL(4), TRANSPARENT, RENDER_FENCE},
-	[BLOCK_PUMPKIN] = {"pumpkin", TEXTURE_TOPBOT_SIDE(102, 102+16), OPAQUE, RENDER_CUBE},
+	[BLOCK_PUMPKIN] = {"pumpkin", TEXTURE_TOPBOT_SIDE(102, 102 + 16), OPAQUE, RENDER_CUBE},
 	[BLOCK_NETTHERRACK] = {"netherrack", TEXTURE_ALL(103), OPAQUE, RENDER_CUBE},
 	[BLOCK_SOUL_SAND] = {"soulsand", TEXTURE_ALL(104), TRANSPARENT, RENDER_CUBE},
 	[BLOCK_GLOWSTONE] = {"glowstone", TEXTURE_ALL(105), OPAQUE, RENDER_CUBE},
 	[BLOCK_PORTAL] = {"portal", TEXTURE_ALL(240), TRANSPARENT, RENDER_CUBE_SPECIAL},
-	[BLOCK_PUMPKIN_LANTERN] = {"pumpkin_lit", TEXTURE_TOPBOT_SIDE(102, 102+17), OPAQUE, RENDER_CUBE},
-	[BLOCK_CAKE] = {"cake", TEXTURE_TOP_BOT_SIDE(121, 121+3, 121+1), TRANSPARENT, RENDER_CUBE_SPECIAL},
+	[BLOCK_PUMPKIN_LANTERN] = {"pumpkin_lit", TEXTURE_TOPBOT_SIDE(102, 102 + 17), OPAQUE, RENDER_CUBE},
+	[BLOCK_CAKE] = {"cake", TEXTURE_TOP_BOT_SIDE(121, 121 + 3, 121 + 1), TRANSPARENT, RENDER_CUBE_SPECIAL},
 	[BLOCK_REDSTONE_REPEATER_DISABLED] = {"redstone_repeater", TEXTURE_ALL(131), TRANSPARENT, RENDER_REPEATER},
 	[BLOCK_REDSTONE_REPEATER_ENABLED] = {"redstone_repeater_lit", TEXTURE_ALL(147), TRANSPARENT, RENDER_REPEATER},
 	[BLOCK_TRAPDOOR] = {"trapdoor", TEXTURE_ALL(84), TRANSPARENT, RENDER_CUBE_SPECIAL},
@@ -115,12 +117,12 @@ block_properties block_get_properties(block_id id)
 bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_face face)
 {
 	vec3 face_offsets[6] = {
-		[BLOCK_FACE_Y_NEG] = { 0, -1,  0},
-		[BLOCK_FACE_Y_POS] = { 0,  1,  0},
-		[BLOCK_FACE_Z_NEG] = { 0,  0, -1},
-		[BLOCK_FACE_Z_POS] = { 0,  0,  1},
-		[BLOCK_FACE_X_NEG] = {-1,  0,  0},
-		[BLOCK_FACE_X_POS] = { 1,  0,  0}
+		[BLOCK_FACE_Y_NEG] = {0, -1, 0},
+		[BLOCK_FACE_Y_POS] = {0, 1, 0},
+		[BLOCK_FACE_Z_NEG] = {0, 0, -1},
+		[BLOCK_FACE_Z_POS] = {0, 0, 1},
+		[BLOCK_FACE_X_NEG] = {-1, 0, 0},
+		[BLOCK_FACE_X_POS] = {1, 0, 0}
 	};
 
 	block_data other;
@@ -133,5 +135,111 @@ bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_f
 		return false;
 	}
 
-	return block_is_transparent(other);
+	if(block_get_properties(self.id).render_type == RENDER_FLUID) {
+		if(face == BLOCK_FACE_Y_POS) {
+			return true;
+		}
+	} else {
+		return block_is_transparent(other);
+	}
+}
+
+static float fluid_get_percent_air(ubyte metadata)
+{
+	if(metadata >= 8)
+		metadata = 0;
+	return (float) (metadata + 1) / 9.0f;
+}
+
+static bool is_same_fluid_material(block_id self, block_id other)
+{
+	if(other == self)
+		return true;
+	if(self == BLOCK_WATER_MOVING)
+		return other == BLOCK_WATER_STILL;
+	if(self == BLOCK_WATER_STILL)
+		return other == BLOCK_WATER_MOVING;
+	if(self == BLOCK_LAVA_MOVING)
+		return other == BLOCK_LAVA_STILL;
+	if(self == BLOCK_LAVA_STILL)
+		return other == BLOCK_LAVA_MOVING;
+	return false;
+}
+
+float block_fluid_get_height(int x, int y, int z, block_id self_id)
+{
+	int total = 0;
+	float total_air = 0.0f;
+
+	for(int side = 0; side < 4; side++) {
+		int xoff = x - (side & 1);
+		int zoff = z - (side >> 1 & 1);
+		block_data other;
+
+		if(world_get_block(xoff, y + 1, zoff).id == self_id) {
+			return 1.0f;
+		}
+
+		other = world_get_block(xoff, y, zoff);
+		if(other.id != self_id && !is_same_fluid_material(self_id, other.id)) {
+			if(!block_is_solid(other)) {
+				total_air++;
+				total++;
+			}
+		} else {
+			if(other.metadata >= 8 || other.metadata == 0) {
+				total_air += fluid_get_percent_air(other.metadata) * 10.0f;
+				total += 10;
+			}
+			total_air += fluid_get_percent_air(other.metadata);
+			total++;
+		}
+	}
+	return 1.0f - total_air / (float) total;
+}
+
+static int compute_flow_decay(int x, int y, int z, block_id self_id)
+{
+	if(!is_same_fluid_material(world_get_block(x, y, z).id, self_id)) {
+		return -1;
+	} else {
+		block_data data = world_get_block(x, y, z);
+		if(data.metadata >= 8)
+			data.metadata = 0;
+		return data.metadata;
+	}
+}
+
+bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id self_id)
+{
+	vec3 dir = {0};
+	int decay = compute_flow_decay(x, y, z, self_id);
+	float l;
+
+	for(int side = 0; side < 4; side++) {
+		int xoff = x - (2 * (side & 1) - 1);
+		int zoff = z - (2 * (side >> 1 & 1) - 1);
+		block_data other = world_get_block(xoff, y, zoff);
+		int decay2 = compute_flow_decay(xoff, y, zoff, other.id);
+		if(decay2 < 0) {
+			if(!block_is_solid(other)) {
+				decay2 = compute_flow_decay(xoff, y - 1, zoff, other.id);
+				if(decay2 >= 0) {
+					float diff = decay2 - (decay - 8);
+					vec3_add(dir, dir, ((vec3) {(xoff - x) * diff, 0, (zoff - z) * diff}));
+				}
+			}
+		} else {
+			float diff = decay2 - decay;
+			vec3_add(dir, dir, ((vec3) {(xoff - x) * diff, 0, (zoff - z) * diff}));
+		}
+	}
+
+	l = vec3_len(dir);
+	if(l > 0.0f) {
+		vec3_mul_scalar(dir, dir, 1.0f / vec3_len(dir));
+	}
+	vec3_copy(dest, dir);
+
+	return (dir[0] != 0 || dir[2] != 0);
 }

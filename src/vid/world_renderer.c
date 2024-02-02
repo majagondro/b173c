@@ -67,6 +67,7 @@ static bool is_visible_on_frustum(const vec3 point, float radius)
 }
 
 void world_renderer_update_chunk_visibility(world_chunk *chunk);
+
 static void update_view_matrix_and_frustum(void)
 {
 	float half_h = r_zfar.value * tanf(DEG2RAD(fov.value) * 0.5f);
@@ -154,9 +155,12 @@ void world_renderer_init(void)
 	glGenVertexArrays(1, &gl_world_vao);
 
 	glBindVertexArray(gl_world_vao);
-	glVertexAttribIFormat(0, 1, GL_UNSIGNED_INT, 0);
+	glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0);
+	glVertexAttribIFormat(1, 1, GL_UNSIGNED_INT, 12);
 	glVertexAttribBinding(0, 0);
+	glVertexAttribBinding(1, 0);
 	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
 
 	glBindVertexArray(0);
 
@@ -214,9 +218,51 @@ static void add_block_face(struct world_vertex v, block_face face)
 	meshbuilder_add_quad(&tl, &tr, &bl, &br);
 }
 
+void render_fluid(int x, int y, int z, block_data self)
+{
+	if(block_should_face_be_rendered(x, y, z, self, BLOCK_FACE_Y_POS)) {
+		float h_00, h_10, h_01, h_11;
+		block_properties props = block_get_properties(self.id);
+		struct world_vertex v1, v2, v3, v4;
+		ubyte light;
+		//vec3 flowdir; todo
+		//float flowangle;
+
+		//if(!block_get_fluid_flow_direction(flowdir, x, y, z, self.id)) {
+		//	flowangle = 0.0f;
+		//} else {
+		//	flowangle = RAD2DEG(atan2f(flowdir[2], flowdir[0]) - PI * 0.5f);
+		//	con_printf("%f %f %f -> %f\n", flowdir[0], flowdir[1], flowdir[2], flowangle);
+		//}
+
+
+		h_00 = block_fluid_get_height(x, y, z, self.id);
+		h_10 = block_fluid_get_height(x + 1, y, z, self.id);
+		h_01 = block_fluid_get_height(x, y, z + 1, self.id);
+		h_11 = block_fluid_get_height(x + 1, y, z + 1, self.id);
+
+		light = world_get_block_lighting(x, y, z);
+		v1 = world_make_vertex((x&15), (y&15) + h_00, (z&15), props.texture_indices[BLOCK_FACE_Y_POS], BLOCK_FACE_Y_POS, light);
+		v2 = world_make_vertex((x&15)+1, (y&15) + h_10, (z&15), props.texture_indices[BLOCK_FACE_Y_POS], BLOCK_FACE_Y_POS, light);
+		v3 = world_make_vertex((x&15), (y&15) + h_01, (z&15)+1, props.texture_indices[BLOCK_FACE_Y_POS], BLOCK_FACE_Y_POS, light);
+		v4 = world_make_vertex((x&15)+1, (y&15) + h_11, (z&15)+1, props.texture_indices[BLOCK_FACE_Y_POS], BLOCK_FACE_Y_POS, light);
+
+		//if(flowangle < 0)
+		//	flowangle += 360.0f;
+		//v1.extradata = (short) flowangle;
+		//v2.extradata = (short) flowangle;
+		//v3.extradata = (short) flowangle;
+		//v4.extradata = (short) flowangle;
+
+		meshbuilder_add_quad(&v1, &v2, &v3, &v4);
+	}
+}
+
 void remesh_chunk(world_chunk *chunk)
 {
-	static const vec3 axes[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+	static const vec3 axes[3] = {{1, 0, 0},
+								 {0, 1, 0},
+								 {0, 0, 1}};
 
 	world_renderer_update_chunk_visibility(chunk);
 
@@ -239,17 +285,18 @@ void remesh_chunk(world_chunk *chunk)
 					int z = (chunk->z << 4) + zoff;
 					block_data block = world_get_block(x, y, z);
 
-					if(block_is_semi_transparent(block) || block_get_properties(block.id).render_type != RENDER_CUBE)
+					if(block_is_semi_transparent(block) || block_get_properties(block.id).render_type != RENDER_CUBE) {
 						continue;
 
-					if(!block_is_empty(block)) {
+					} else if(!block_is_empty(block)) {
+						// greedy meshing here?
 						block_properties props = block_get_properties(block.id);
 
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_NEG)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_Y_NEG],
-								BLOCK_FACE_Y_NEG), BLOCK_FACE_Y_NEG
+								BLOCK_FACE_Y_NEG, world_get_block_lighting(x, y-1, z)), BLOCK_FACE_Y_NEG
 							);
 						}
 
@@ -257,7 +304,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_Y_POS],
-								BLOCK_FACE_Y_POS), BLOCK_FACE_Y_POS
+								BLOCK_FACE_Y_POS, world_get_block_lighting(x, y+1, z)), BLOCK_FACE_Y_POS
 							);
 						}
 
@@ -265,7 +312,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_X_POS],
-								BLOCK_FACE_X_POS), BLOCK_FACE_X_POS
+								BLOCK_FACE_X_POS, world_get_block_lighting(x+1, y, z)), BLOCK_FACE_X_POS
 							);
 						}
 
@@ -273,7 +320,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_X_NEG],
-								BLOCK_FACE_X_NEG), BLOCK_FACE_X_NEG
+								BLOCK_FACE_X_NEG, world_get_block_lighting(x-1, y, z)), BLOCK_FACE_X_NEG
 							);
 						}
 
@@ -281,7 +328,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_Z_POS],
-								BLOCK_FACE_Z_POS), BLOCK_FACE_Z_POS
+								BLOCK_FACE_Z_POS, world_get_block_lighting(x, y, z+1)), BLOCK_FACE_Z_POS
 							);
 						}
 
@@ -289,7 +336,7 @@ void remesh_chunk(world_chunk *chunk)
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
 								props.texture_indices[BLOCK_FACE_Z_NEG],
-								BLOCK_FACE_Z_NEG), BLOCK_FACE_Z_NEG
+								BLOCK_FACE_Z_NEG, world_get_block_lighting(x, y, z-1)), BLOCK_FACE_Z_NEG
 							);
 						}
 					}
@@ -319,58 +366,63 @@ void remesh_chunk(world_chunk *chunk)
 					int z = (chunk->z << 4) + zoff;
 					block_data block = world_get_block(x, y, z);
 
-					if(!block_is_semi_transparent(block))
-						continue;
-
-					if(!block_is_empty(block)) {
-						block_properties props = block_get_properties(block.id);
-
-						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_NEG)) {
-							add_block_face(world_make_vertex(
-								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_Y_NEG],
-								BLOCK_FACE_Y_NEG), BLOCK_FACE_Y_NEG
-							);
+					if(!block_is_semi_transparent(block) || block_get_properties(block.id).render_type != RENDER_CUBE) {
+						if(block_is_semi_transparent(block)) {
+							// it is water
+							render_fluid(x, y, z, block);
 						}
+					} else {
+						// greedy meshing here?
+						if(!block_is_empty(block)) {
+							block_properties props = block_get_properties(block.id);
 
-						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_POS)) {
-							add_block_face(world_make_vertex(
-								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_Y_POS],
-								BLOCK_FACE_Y_POS), BLOCK_FACE_Y_POS
-							);
-						}
+							if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_NEG)) {
+								add_block_face(world_make_vertex(
+									xoff, yoff, zoff,
+									props.texture_indices[BLOCK_FACE_Y_NEG],
+									BLOCK_FACE_Y_NEG, world_get_block_lighting(x, y-1, z)), BLOCK_FACE_Y_NEG
+								);
+							}
 
-						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_POS)) {
-							add_block_face(world_make_vertex(
-								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_X_POS],
-								BLOCK_FACE_X_POS), BLOCK_FACE_X_POS
-							);
-						}
+							if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_POS)) {
+								add_block_face(world_make_vertex(
+									xoff, yoff, zoff,
+									props.texture_indices[BLOCK_FACE_Y_POS],
+									BLOCK_FACE_Y_POS, world_get_block_lighting(x, y+1, z)), BLOCK_FACE_Y_POS
+								);
+							}
 
-						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_NEG)) {
-							add_block_face(world_make_vertex(
-								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_X_NEG],
-								BLOCK_FACE_X_NEG), BLOCK_FACE_X_NEG
-							);
-						}
+							if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_POS)) {
+								add_block_face(world_make_vertex(
+									xoff, yoff, zoff,
+									props.texture_indices[BLOCK_FACE_X_POS],
+									BLOCK_FACE_X_POS, world_get_block_lighting(x+1, y, z)), BLOCK_FACE_X_POS
+								);
+							}
 
-						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_POS)) {
-							add_block_face(world_make_vertex(
-								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_Z_POS],
-								BLOCK_FACE_Z_POS), BLOCK_FACE_Z_POS
-							);
-						}
+							if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_NEG)) {
+								add_block_face(world_make_vertex(
+									xoff, yoff, zoff,
+									props.texture_indices[BLOCK_FACE_X_NEG],
+									BLOCK_FACE_X_NEG, world_get_block_lighting(x-1, y, z)), BLOCK_FACE_X_NEG
+								);
+							}
 
-						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_NEG)) {
-							add_block_face(world_make_vertex(
-								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_Z_NEG],
-								BLOCK_FACE_Z_NEG), BLOCK_FACE_Z_NEG
-							);
+							if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_POS)) {
+								add_block_face(world_make_vertex(
+									xoff, yoff, zoff,
+									props.texture_indices[BLOCK_FACE_Z_POS],
+									BLOCK_FACE_Z_POS, world_get_block_lighting(x, y, z+1)), BLOCK_FACE_Z_POS
+								);
+							}
+
+							if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_NEG)) {
+								add_block_face(world_make_vertex(
+									xoff, yoff, zoff,
+									props.texture_indices[BLOCK_FACE_Z_NEG],
+									BLOCK_FACE_Z_NEG, world_get_block_lighting(x, y, z-1)), BLOCK_FACE_Z_NEG
+								);
+							}
 						}
 					}
 				}
@@ -401,7 +453,7 @@ void world_renderer_update_chunk_visibility(world_chunk *chunk)
 		struct world_chunk_glbuf *glbuf = &chunk->glbufs[bufidx];
 		int y_center = bufidx * WORLD_CHUNK_SIZE + WORLD_CHUNK_SIZE / 2;
 
-		glbuf->visible = is_visible_on_frustum((float[]){x_center, y_center, z_center}, cube_diagonal_half);
+		glbuf->visible = is_visible_on_frustum((float[]) {x_center, y_center, z_center}, cube_diagonal_half);
 
 		/* if at least 1 glbuf is visible, mark the chunk as visible too */
 		if(glbuf->visible) {
@@ -484,7 +536,7 @@ void world_render(void)
 	}
 
 	/* done */
- 	glBindVertexArray(0);
+	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -510,15 +562,15 @@ void world_free_chunk_glbufs(world_chunk *chunk)
 	}
 }
 
-struct world_vertex world_make_vertex(ubyte x, ubyte y, ubyte z, ubyte texture_index, ubyte data)
+struct world_vertex world_make_vertex(float x, float y, float z, ubyte texture_index, ubyte face, ubyte light)
 {
 	struct world_vertex v = {0};
 
-	v.x = x & 15;
-	v.y = y & 15;
-	v.z = z & 15;
+	v.x = x;
+	v.y = y;
+	v.z = z;
 	v.texture_index = texture_index;
-	v.data = data;
+	v.data = face | (light << 3);
 
 	return v;
 }

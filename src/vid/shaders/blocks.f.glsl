@@ -13,4 +13,5 @@ void main()
     if(COLOR.a < 0.01) {
         discard;
     }
+    COLOR.a += 0.2;
 }

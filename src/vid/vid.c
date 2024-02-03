@@ -145,7 +145,7 @@ void vid_init(void)
 
 	// load shaders
 	gl.shader3d = load_shader(blocks_v_glsl, blocks_f_glsl);
-	gl.shader2d = load_shader(shader_vertex2d, shader_fragment2d);
+	gl.shader2d = load_shader(font_v_glsl, font_f_glsl);
 
 	now = SDL_GetPerformanceCounter();
 

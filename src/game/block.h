@@ -15,7 +15,6 @@ typedef enum {
 } block_face;
 
 typedef enum {
-	RENDER_NONE = -1,
 	RENDER_CUBE,
 	RENDER_CROSS,
 	RENDER_TORCH,
@@ -34,7 +33,9 @@ typedef enum {
 	RENDER_REPEATER,
 	RENDER_PISTON_BASE,
 	RENDER_PISTON_EXTENSION,
-	RENDER_CUBE_SPECIAL
+	RENDER_CUBE_SPECIAL,
+	RENDER_NONE,
+	RENDER_TYPE_COUNT
 } block_render_type;
 
 typedef ubyte block_id;
@@ -59,6 +60,7 @@ typedef struct {
 #define block_is_transparent(b) (block_get_properties(b.id).opaque == 0)
 #define block_is_semi_transparent(b) ((b).id == BLOCK_WATER_STILL || (b).id == BLOCK_WATER_MOVING || (b).id == BLOCK_ICE)
 block_properties block_get_properties(block_id id);
+ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata);
 bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_face face);
 bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id self_id);
 float block_fluid_get_height(int x, int y, int z, block_id self_id);

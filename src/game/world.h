@@ -18,10 +18,11 @@ typedef struct {
 	block_data *data;
 
 	/* rendering related */
-	bool needs_remesh;
+	bool needs_remesh; // TODO: needs_remesh_simple (1x1x1 blocks), needs_remesh_complex (doors crops etc)
 	bool visible;
 	struct world_chunk_glbuf {
 		bool visible;
+		bool needs_remesh;
 		struct world_vertex {
 			float x;// ubyte x : 5;
 			float y;// ubyte y : 5;
@@ -50,8 +51,8 @@ void world_alloc_chunk(int chunk_x, int chunk_z);
 void world_free_chunk(int chunk_x, int chunk_z);
 bool world_chunk_exists(int chunk_x, int chunk_z);
 world_chunk *world_get_chunk(int chunk_x, int chunk_z);
-void world_mark_chunk_for_remesh(int chunk_x, int chunk_z);
-void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_y, int size_z, size_t data_size, ubyte *data);
+void world_mark_region_for_remesh(int x_start, int y_start, int z_start, int x_end, int y_end, int z_end);
+void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_y, int size_z, size_t compressed_size, ubyte *compressed);
 
 /* blocks */
 block_data world_get_block(int x, int y, int z);

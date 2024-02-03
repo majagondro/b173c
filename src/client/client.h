@@ -11,6 +11,7 @@ extern struct client_state {
 		float stance;
 		bool rotated, moved;
 		int our_id;
+		long seed;
 	} game;
 
 	enum { cl_disconnected, cl_connecting, cl_connected } state;

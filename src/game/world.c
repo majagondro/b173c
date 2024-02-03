@@ -1,7 +1,6 @@
 #include <zlib.h>
 #include "world.h"
 #include "client/console.h"
-#include "vid/vid.h"
 #include "hashmap.h"
 
 const static block_data AIR_BLOCK_DATA = {.id = 0, .metadata = 0, .skylight = 15, .blocklight = 0};
@@ -86,11 +85,26 @@ world_chunk *world_get_chunk(int chunk_x, int chunk_z)
 	return (world_chunk *) hashmap_get(world_chunk_map, &key);
 }
 
-void world_mark_chunk_for_remesh(int chunk_x, int chunk_z)
+void world_mark_region_for_remesh(int x_start, int y_start, int z_start, int x_end, int y_end, int z_end)
 {
-	world_chunk *chunk = world_get_chunk(chunk_x, chunk_z);
-	if(chunk != NULL) {
-		chunk->needs_remesh = true;
+	int cxs = x_start >> 4;
+	int cxe = x_end >> 4;
+	int cys = y_start >> 4;
+	int cye = y_end >> 4;
+	int czs = z_start >> 4;
+	int cze = z_end >> 4;
+	for(int cx = cxs - 1; cx <= cxe + 1; cx++) {
+		for(int cz = czs - 1; cz <= cze + 1; cz++) {
+			for(int cy = cys - 1; cy <= cye + 1; cy++) {
+				world_chunk *chunk = world_get_chunk(cx, cz);
+				if(!chunk)
+					continue;
+				if(cy >= 0 && cy < 8) {
+					chunk->glbufs[cy].needs_remesh = true;
+					chunk->needs_remesh = true;
+				}
+			}
+		}
 	}
 }
 
@@ -130,94 +144,122 @@ static int inflate_data(ubyte *in, ubyte *out, size_t size_in, size_t size_out)
 	return Z_OK;
 }
 
-static ubyte get_nibble(ubyte *data, int x, int y, int z)
+static ubyte get_nibble(const ubyte *data, int idx8)
 {
-	int idx8 = IDX_FROM_COORDS(x, y, z);
 	int idx4 = idx8 >> 1;
 	int odd = idx8 & 1;
 	return !odd ? data[idx4] & 15 : data[idx4] >> 4 & 15;
 }
 
-void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_y, int size_z, size_t data_size, ubyte *data)
+static int world_set_chunk_data(world_chunk *chunk, const ubyte *data, int x_start, int y_start, int z_start, int x_end, int y_end, int z_end, int data_pos)
 {
-	int x_start, y_start, z_start;
-	int x_end, y_end, z_end;
-	int chunk_x = x >> 4;
-	int chunk_z = z >> 4;
+	for(int x = x_start; x < x_end; x++) {
+		for(int z = z_start; z < z_end; z++) {
+			for(int y = y_start; y < y_end; y++, data_pos++) {
+				int index = IDX_FROM_COORDS(x, y, z);
+				chunk->data[index].id = data[data_pos];
+			}
+		}
+	}
+
+	for(int x = x_start; x < x_end; x++) {
+		for(int z = z_start; z < z_end; z++) {
+			bool next = false;
+			for(int y = y_start; y < y_end; y++) {
+				int index = IDX_FROM_COORDS(x, y, z);
+				ubyte value = data[data_pos];
+				chunk->data[index].metadata = !(y & 1) ? (value & 15) : ((value >> 4) & 15);
+				if(next)
+					data_pos++;
+				next = !next;
+			}
+		}
+	}
+
+	for(int x = x_start; x < x_end; x++) {
+		for(int z = z_start; z < z_end; z++) {
+			bool next = false;
+			for(int y = y_start; y < y_end; y++) {
+				int index = IDX_FROM_COORDS(x, y, z);
+				ubyte value = data[data_pos];
+				chunk->data[index].blocklight = !(y & 1) ? (value & 15) : ((value >> 4) & 15);
+				if(next)
+					data_pos++;
+				next = !next;
+			}
+		}
+	}
+
+	for(int x = x_start; x < x_end; x++) {
+		for(int z = z_start; z < z_end; z++) {
+			bool next = false;
+			for(int y = y_start; y < y_end; y++) {
+				int index = IDX_FROM_COORDS(x, y, z);
+				ubyte value = data[data_pos];
+				chunk->data[index].skylight = !(y & 1) ? (value & 15) : ((value >> 4) & 15);
+				if(next)
+					data_pos++;
+				next = !next;
+			}
+		}
+	}
+
+	return data_pos;
+}
+
+void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_y, int size_z, size_t compressed_size, ubyte *compressed)
+{
 	// 1 byte id, 0.5 byte metadata, 2x0.5 byte light data
-	ubyte decompressed[size_x * size_y * size_z * 5 / 2];
-	ubyte *data_ptr;
-	world_chunk *chunk;
-	int err;
+	ubyte data[size_x * size_y * size_z * 5 / 2];
+	int i;
+	int chunk_x_start = x >> 4;
+	int chunk_z_start = z >> 4;
+	int chunk_x_end = (x + size_x - 1) >> 4;
+	int chunk_z_end = (z + size_z - 1) >> 4;
+	int y_start, y_end;
 
-	world_alloc_chunk(chunk_x, chunk_z);
-	chunk = world_get_chunk(chunk_x, chunk_z);
-
-	if((err = inflate_data(data, decompressed, data_size, sizeof(decompressed))) != Z_OK) {
-		con_printf(COLOR_RED"error while decompressing chunk data:"COLOR_WHITE"%s\n", zError(err)); //should this print?
+	if((i = inflate_data(compressed, data, compressed_size, sizeof(data))) != Z_OK) {
+		con_printf(COLOR_RED"error while decompressing chunk data:"COLOR_WHITE"%s\n", zError(i)); // should this print?
 		return;
 	}
 
-	/* mark for remeshing */
-	world_mark_chunk_for_remesh(chunk_x, chunk_z);
-	world_mark_chunk_for_remesh(chunk_x + 1, chunk_z);
-	world_mark_chunk_for_remesh(chunk_x - 1, chunk_z);
-	world_mark_chunk_for_remesh(chunk_x, chunk_z + 1);
-	world_mark_chunk_for_remesh(chunk_x, chunk_z - 1);
+	y_start = y;
+	y_end = y + size_y;
 
-	/* local coordinates */
-	x_start = x & (WORLD_CHUNK_SIZE - 1);
-	y_start = y & (WORLD_CHUNK_HEIGHT - 1);
-	z_start = z & (WORLD_CHUNK_SIZE - 1);
-	x_end = x_start + size_x;
-	y_end = y_start + size_y;
-	z_end = z_start + size_z;
+	if(y_start < 0)
+		y_start = 0;
+	if(y_end > 128)
+		y_end = 128;
 
-	data_ptr = decompressed;
+	i = 0;
+	for(int cx = chunk_x_start; cx <= chunk_x_end; cx++) {
+		int x_start = x - cx * 16;
+		int x_end = x + size_x - cx * 16;
 
-	/* block ids */
-	for(x = x_start; x < x_end; x++) {
-		for(z = z_start; z < z_end; z++) {
-			for(y = y_start; y < y_end; y++, data_ptr++) {
-				int index = IDX_FROM_COORDS(x, y, z);
-				chunk->data[index].id = *data_ptr;
-			}
+		if(x_start < 0)
+			x_start = 0;
+		if(x_end > 16)
+			x_end = 16;
+
+		for(int cz = chunk_z_start; cz <= chunk_z_end; cz++) {
+			int z_start = z - cz * 16;
+			int z_end = z + size_z - cz * 16;
+
+			if(z_start < 0)
+				z_start = 0;
+			if(z_end > 16)
+				z_end = 16;
+
+			/* should have been allocated by a PreChunk packet, but we check anyway */
+			if(!world_chunk_exists(cx, cz))
+				world_alloc_chunk(cx, cz);
+
+			world_mark_region_for_remesh(cx * 16 + x_start, y_start, cz * 16 + z_start, cx * 16 + x_end, y_end, cz * 16 + z_end);
+			i = world_set_chunk_data(world_get_chunk(cx, cz), data, x_start, y_start, z_start, x_end, y_end, z_end, i);
 		}
 	}
 
-#define GET4BIT(v, idx) (((v) >> (((idx) & 1) ? 4 : 0)) & 15)
 
-	/* metadata */
-	for(x = x_start; x < x_end; x++) {
-		for(z = z_start; z < z_end; z++) {
-			for(y = y_start; y < y_end; y++) {
-				int idx = IDX_FROM_COORDS(x, y, z);
-				chunk->data[idx].metadata = get_nibble(data_ptr, x, y, z);
-			}
-		}
-	}
-	data_ptr += (x_end - x_start) * (z_end - z_start) * ((y_end - y_start) / 2);
-
-	/* block light */
-	for(x = x_start; x < x_end; x++) {
-		for(z = z_start; z < z_end; z++) {
-			for(y = y_start; y < y_end; y++) {
-				int idx = IDX_FROM_COORDS(x, y, z);
-				chunk->data[idx].blocklight = get_nibble(data_ptr, x, y, z);
-			}
-		}
-	}
-	data_ptr += (x_end - x_start) * (z_end - z_start) * ((y_end - y_start) / 2);
-
-	/* sky light */
-	for(x = x_start; x < x_end; x++) {
-		for(z = z_start; z < z_end; z++) {
-			for(y = y_start; y < y_end; y++) {
-				int idx = IDX_FROM_COORDS(x, y, z);
-				chunk->data[idx].skylight = get_nibble(data_ptr, x, y, z);
-			}
-		}
-	}
 }
 
 block_data world_get_block(int x, int y, int z)
@@ -247,7 +289,7 @@ static ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z)
 {
 	int i = IDX_FROM_COORDS(x, y, z);
 	block_data block = c->data[i];
-	int l, bl;
+	int sl, bl;
 	if(block.id == BLOCK_SLAB_SINGLE || block.id == BLOCK_FARMLAND || block.id == BLOCK_STAIRS_WOOD || block.id == BLOCK_STAIRS_STONE) {
 		int py = world_get_block_lighting(x, y + 1, z);
 		int px = world_get_block_lighting(x + 1, y, z);
@@ -256,9 +298,9 @@ static ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z)
 		int nz = world_get_block_lighting(x, y, z - 1);
 		return max(py, max(px, max(nx, max(pz, nz))));
 	}
-	l = block.skylight;
+	sl = block.skylight;
 	bl = block.blocklight;
-	return (bl > l ? bl : l) & 15;
+	return (bl > sl ? bl : sl) & 15;
 }
 
 ubyte world_get_block_lighting(int x, int y, int z)
@@ -286,7 +328,7 @@ void world_set_block(int x, int y, int z, block_data data)
 	if(!chunk)
 		return;
 
-	world_mark_chunk_for_remesh(x >> 4, z >> 4);
+	world_mark_region_for_remesh(x-1, y-1, z-1, x+1, y+1, z+1);
 
 	chunk->data[IDX_FROM_COORDS(x, y, z)] = data;
 }

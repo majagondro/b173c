@@ -55,7 +55,7 @@ static block_properties blocks[256] = {
 	[BLOCK_BLOCK_GOLD] = {"gold_block", TEXTURE_ALL(23), OPAQUE, RENDER_CUBE},
 	[BLOCK_BLOCK_IRON] = {"iron_block", TEXTURE_ALL(22), OPAQUE, RENDER_CUBE},
 	[BLOCK_SLAB_DOUBLE] = {"slab_double", TEXTURE_ALL(6), OPAQUE, RENDER_CUBE},
-	[BLOCK_SLAB_SINGLE] = {"slab_single", TEXTURE_ALL(6), TRANSPARENT, RENDER_CUBE},
+	[BLOCK_SLAB_SINGLE] = {"slab_single", TEXTURE_ALL(6), TRANSPARENT, RENDER_CUBE_SPECIAL},
 	[BLOCK_BRICK] = {"bricks", TEXTURE_ALL(7), OPAQUE, RENDER_CUBE},
 	[BLOCK_TNT] = {"tnt", TEXTURE_TOP_BOT_SIDE(8 + 1, 8 + 2, 8), OPAQUE, RENDER_CUBE},
 	[BLOCK_BOOKSHELF] = {"bookshelf", TEXTURE_TOPBOT_SIDE(4, 35), OPAQUE, RENDER_CUBE},
@@ -112,6 +112,24 @@ static block_properties blocks[256] = {
 block_properties block_get_properties(block_id id)
 {
 	return blocks[id & 255];
+}
+
+ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata)
+{
+	block_properties props = block_get_properties(id);
+
+	switch(id) {
+		case BLOCK_FARMLAND:
+			if(face == BLOCK_FACE_Y_POS)
+				return props.texture_indices[BLOCK_FACE_Y_POS] + (metadata != 0 ? -1 : 0);
+			break;
+		case BLOCK_CROP_WHEAT:
+			return props.texture_indices[0] + metadata;
+			break;
+	}
+
+
+	return props.texture_indices[face];
 }
 
 bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_face face)

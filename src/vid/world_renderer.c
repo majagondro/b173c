@@ -8,6 +8,8 @@
 #include "hashmap.h"
 #include "meshbuilder.h"
 
+// todo: mesher thread
+
 #include "ext/terrain.c"
 
 #define VIEW_HEIGHT 1.62f
@@ -258,6 +260,111 @@ void render_fluid(int x, int y, int z, block_data self)
 	}
 }
 
+void render_null(int x, int y, int z, block_data self)
+{
+
+}
+
+void render_cross(int x, int y, int z, block_data self)
+{
+	struct world_vertex tl, tr, bl, br;
+	ubyte light = world_get_block_lighting(x, y, z);
+	ubyte texture = block_get_texture_index(self.id, 0, self.metadata);
+
+	x &= 15;
+	y &= 15;
+	z &= 15;
+
+	tl = world_make_vertex(x+1, y+1, z, texture, 1, light);
+	tr = world_make_vertex(x, y+1, z+1, texture, 1, light);
+	bl = world_make_vertex(x+1, y, z, texture, 1, light);
+	br = world_make_vertex(x, y, z+1, texture, 1, light);
+	meshbuilder_add_quad(&tl, &tr, &bl, &br);
+	meshbuilder_add_quad(&tr, &tl, &br, &bl);
+
+	tl = world_make_vertex(x, y+1, z, texture, 1, light);
+	tr = world_make_vertex(x+1, y+1, z+1, texture, 1, light);
+	bl = world_make_vertex(x, y, z, texture, 1, light);
+	br = world_make_vertex(x+1, y, z+1, texture, 1, light);
+	meshbuilder_add_quad(&tl, &tr, &bl, &br);
+	meshbuilder_add_quad(&tr, &tl, &br, &bl);
+}
+
+void render_crops(int x, int y, int z, block_data self)
+{
+	struct world_vertex tl, tr, bl, br;
+	ubyte light = world_get_block_lighting(x, y, z);
+	ubyte texture = block_get_texture_index(self.id, 0, self.metadata);
+	float x0, x1, z0, z1;
+
+	x &= 15;
+	y &= 15;
+	z &= 15;
+
+	x0 = x + 0.25f;
+	x1 = x + 0.75f;
+	z0 = z;
+	z1 = z + 1.0f;
+
+	tl = world_make_vertex(x0, y+1, z0, texture, 1, light);
+	tr = world_make_vertex(x0, y+1, z1, texture, 1, light);
+	bl = world_make_vertex(x0, y, z0, texture, 1, light);
+	br = world_make_vertex(x0, y, z1, texture, 1, light);
+	meshbuilder_add_quad(&tl, &tr, &bl, &br);
+	meshbuilder_add_quad(&tr, &tl, &br, &bl);
+
+	tl = world_make_vertex(x1, y+1, z0, texture, 1, light);
+	tr = world_make_vertex(x1, y+1, z1, texture, 1, light);
+	bl = world_make_vertex(x1, y, z0, texture, 1, light);
+	br = world_make_vertex(x1, y, z1, texture, 1, light);
+	meshbuilder_add_quad(&tl, &tr, &bl, &br);
+	meshbuilder_add_quad(&tr, &tl, &br, &bl);
+
+	x0 = x;
+	x1 = x + 1.0f;
+	z0 = z + 0.25f;
+	z1 = z + 0.75f;
+
+
+	tl = world_make_vertex(x0, y+1, z0, texture, 1, light);
+	tr = world_make_vertex(x1, y+1, z0, texture, 1, light);
+	bl = world_make_vertex(x0, y, z0, texture, 1, light);
+	br = world_make_vertex(x1, y, z0, texture, 1, light);
+	meshbuilder_add_quad(&tl, &tr, &bl, &br);
+	meshbuilder_add_quad(&tr, &tl, &br, &bl);
+
+	tl = world_make_vertex(x0, y+1, z1, texture, 1, light);
+	tr = world_make_vertex(x1, y+1, z1, texture, 1, light);
+	bl = world_make_vertex(x0, y, z1, texture, 1, light);
+	br = world_make_vertex(x1, y, z1, texture, 1, light);
+	meshbuilder_add_quad(&tl, &tr, &bl, &br);
+	meshbuilder_add_quad(&tr, &tl, &br, &bl);
+}
+
+
+void (*render_funcs[RENDER_TYPE_COUNT])(int, int, int, block_data) = {
+	[RENDER_CUBE] = render_null, // handled elsewhere
+	[RENDER_CROSS] = render_cross,
+	[RENDER_TORCH] = render_null,
+	[RENDER_FIRE] = render_null,
+	[RENDER_FLUID] = render_null,
+	[RENDER_WIRE] = render_null,
+	[RENDER_CROPS] = render_crops,
+	[RENDER_DOOR] = render_null,
+	[RENDER_LADDER] = render_null,
+	[RENDER_RAIL] = render_null,
+	[RENDER_STAIRS] = render_null,
+	[RENDER_FENCE] = render_null,
+	[RENDER_LEVER] = render_null,
+	[RENDER_CACTUS] = render_null,
+	[RENDER_BED] = render_null,
+	[RENDER_REPEATER] = render_null,
+	[RENDER_PISTON_BASE] = render_null,
+	[RENDER_PISTON_EXTENSION] = render_null,
+	[RENDER_CUBE_SPECIAL] = render_null,
+	[RENDER_NONE] = render_null
+};
+
 void remesh_chunk(world_chunk *chunk)
 {
 	static const vec3 axes[3] = {{1, 0, 0},
@@ -268,6 +375,11 @@ void remesh_chunk(world_chunk *chunk)
 
 	for(int bufidx = 7; bufidx >= 0; bufidx--) {
 		struct world_chunk_glbuf *glbuf = &chunk->glbufs[bufidx];
+
+		if(!glbuf->needs_remesh)
+			continue;
+
+		glbuf->needs_remesh = false;
 
 		/* free old data */
 		mem_free(glbuf->vertices);
@@ -285,9 +397,10 @@ void remesh_chunk(world_chunk *chunk)
 					int z = (chunk->z << 4) + zoff;
 					block_data block = world_get_block(x, y, z);
 
-					if(block_is_semi_transparent(block) || block_get_properties(block.id).render_type != RENDER_CUBE) {
+					if(block_is_semi_transparent(block)) {
 						continue;
-
+					} else if(block_get_properties(block.id).render_type != RENDER_CUBE) {
+						render_funcs[block_get_properties(block.id).render_type](x, y, z, block);
 					} else if(!block_is_empty(block)) {
 						// greedy meshing here?
 						block_properties props = block_get_properties(block.id);
@@ -295,7 +408,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_NEG)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_Y_NEG],
+								block_get_texture_index(block.id, BLOCK_FACE_Y_NEG, block.metadata),
 								BLOCK_FACE_Y_NEG, world_get_block_lighting(x, y-1, z)), BLOCK_FACE_Y_NEG
 							);
 						}
@@ -303,7 +416,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_POS)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_Y_POS],
+								block_get_texture_index(block.id, BLOCK_FACE_Y_POS, block.metadata),
 								BLOCK_FACE_Y_POS, world_get_block_lighting(x, y+1, z)), BLOCK_FACE_Y_POS
 							);
 						}
@@ -311,7 +424,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_POS)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_X_POS],
+								block_get_texture_index(block.id, BLOCK_FACE_X_POS, block.metadata),
 								BLOCK_FACE_X_POS, world_get_block_lighting(x+1, y, z)), BLOCK_FACE_X_POS
 							);
 						}
@@ -319,7 +432,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_NEG)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_X_NEG],
+								block_get_texture_index(block.id, BLOCK_FACE_X_NEG, block.metadata),
 								BLOCK_FACE_X_NEG, world_get_block_lighting(x-1, y, z)), BLOCK_FACE_X_NEG
 							);
 						}
@@ -327,7 +440,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_POS)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_Z_POS],
+								block_get_texture_index(block.id, BLOCK_FACE_Z_POS, block.metadata),
 								BLOCK_FACE_Z_POS, world_get_block_lighting(x, y, z+1)), BLOCK_FACE_Z_POS
 							);
 						}
@@ -335,7 +448,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_NEG)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								props.texture_indices[BLOCK_FACE_Z_NEG],
+								block_get_texture_index(block.id, BLOCK_FACE_Z_NEG, block.metadata),
 								BLOCK_FACE_Z_NEG, world_get_block_lighting(x, y, z-1)), BLOCK_FACE_Z_NEG
 							);
 						}
@@ -355,8 +468,10 @@ void remesh_chunk(world_chunk *chunk)
 
 
 		/* semi-transparent faces */
+		// todo: implement
+		// todo: greedy meshing on still water
 
-		meshbuilder_start(sizeof(*glbuf->alpha_vertices));
+		/*meshbuilder_start(sizeof(*glbuf->alpha_vertices));
 
 		for(int xoff = 0; xoff < WORLD_CHUNK_SIZE; xoff++) {
 			for(int zoff = 0; zoff < WORLD_CHUNK_SIZE; zoff++) {
@@ -432,11 +547,11 @@ void remesh_chunk(world_chunk *chunk)
 		meshbuilder_finish(&glbuf->alpha_vertices, &glbuf->num_alpha_vertices, &glbuf->alpha_indices, &glbuf->num_alpha_indices);
 
 		glBindBuffer(GL_ARRAY_BUFFER, glbuf->alpha_vbo);
-		glBufferData(GL_ARRAY_BUFFER,
-			/* size */ glbuf->num_alpha_vertices * sizeof(*glbuf->alpha_vertices),
-			/* data */ glbuf->alpha_vertices,
-			/* usag */ GL_DYNAMIC_DRAW);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBufferData(GL_ARRAY_BUFFER,*/
+//			/* size */ glbuf->num_alpha_vertices * sizeof(*glbuf->alpha_vertices),
+//			/* data */ glbuf->alpha_vertices,
+//			/* usag */ GL_DYNAMIC_DRAW);
+//		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 }
 

@@ -76,7 +76,7 @@ static void calculate_char_widths(void)
 		bool start_set = false;
 
 		if(c == ' ') {
-			charwidths[c] = CON_CHAR_SIZE;
+			charwidths[c] = 6;
 			continue;
 		}
 
@@ -176,25 +176,12 @@ static char *statestr(void)
 void ui_commit(void)
 {
 	if(developer.integer) {
-		ulong t = world_get_time();
-		ulong d, h, m;
-
-		d = t / 24000;
-		// fixme hour and minute is wrong xd
-		h = (6 + (t % 24000) / 1000) % 24;
-		m = (60 * ((t % 24000) % 1000) / 1000) % 60;
-		ui_printf(8, ui_h - 48, "time: %.2lu:%.2lu, day %lu (tick %lu)\n", h, m, d, t);
-
-		ui_printf(8, ui_h - 40, "net: %s", statestr());
-
-		ui_printf(8, ui_h - 32, "%f %f %f / %f %f %f",
-				  cl.game.pos[0], cl.game.pos[1], cl.game.pos[2],
-				  cl.game.rot[0], cl.game.rot[1], cl.game.rot[2]);
-
-		ui_printf(8, ui_h - 16, "%lu/%.0f fps", cl.fps, 1 / cl.frametime);
-
-		ui_printf(40, ui_h - 24, "/%d chars used", MAX_CON_CHARS);
-		ui_printf(8, ui_h - 24, "%4d", fontcharcount + 4);
+		ui_printf(1, 1, "b173c 0.0.0 (%lu fps)", cl.fps);
+		ui_printf(1, 49, "x: %.14f (%d)", cl.game.pos[0], (int)cl.game.pos[0] >> 4);
+		ui_printf(1, 57, "y: %.14f", cl.game.pos[1]);
+		ui_printf(1, 65, "z: %.14f (%d)", cl.game.pos[2], (int)cl.game.pos[2] >> 4);
+		ui_printf(1, 89, "Seed: %ld", cl.game.seed);
+		ui_printf(1, 97, "Time: %lu (day %lu)", world_get_time(),  world_get_time() / 24000);
 	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, fontdatavbo);

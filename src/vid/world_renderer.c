@@ -7,10 +7,9 @@
 #include "client/console.h"
 #include "hashmap.h"
 #include "meshbuilder.h"
+#include "assets.h"
 
 // todo: mesher thread
-
-#include "ext/terrain.c"
 
 #define VIEW_HEIGHT 1.62f
 
@@ -139,6 +138,8 @@ static void recalculate_projection_matrix(void)
 
 void world_renderer_init(void)
 {
+	asset_image *terrain_asset;
+
 	cvar_register(&fov);
 	cvar_register(&r_zfar);
 	cvar_register(&r_znear);
@@ -167,6 +168,8 @@ void world_renderer_init(void)
 	glBindVertexArray(0);
 
 	/* load terrain texture */
+	terrain_asset = asset_get_image(ASSET_TEXTURE_TERRAIN);
+
 	glGenTextures(1, &gl_world_texture);
 	glBindTexture(GL_TEXTURE_2D, gl_world_texture);
 
@@ -174,7 +177,7 @@ void world_renderer_init(void)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, terrain_png.width, terrain_png.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, terrain_png.pixel_data);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, terrain_asset->width, terrain_asset->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, terrain_asset->data);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 }

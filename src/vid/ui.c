@@ -6,7 +6,7 @@
 #include "client/console.h"
 #include "vid.h"
 #include "client/client.h"
-
+#include "assets.h"
 
 #define MAX_CON_CHARS 8192
 #define CON_CHAR_SIZE 8
@@ -35,12 +35,12 @@ vec2 glyph_vertices[] = {
 	{2.0f, -2.0f}, {1.0f, 1.0f},
 };
 
-#include "ext/pixelbrains.c"
 int charwidths[256] = {0};
 vec4 fontdata[MAX_CON_CHARS] = {0};
 int fontcharcount = 0;
-uint fonttex;
+uint gl_ui_font_texture;
 uint fontvao, fontvbo = 0, fontdatavbo;
+asset_image *asset_font_image = NULL;
 
 extern struct gl_state gl;
 
@@ -88,8 +88,8 @@ static void calculate_char_widths(void)
 		for(x2 = x; x2 < x + CON_CHAR_SIZE; x2++) {
 			bool empty = true;
 			for(y2 = y; y2 < y + CON_CHAR_SIZE; y2++) {
-				alpha_idx = (y2 * q_conchars.width + x2) * q_conchars.bytes_per_pixel + 3;
-				if(q_conchars.pixel_data[alpha_idx] > 0) {
+				alpha_idx = (y2 * asset_font_image->width + x2) * asset_font_image->channels + 3;
+				if(asset_font_image->data[alpha_idx] > 0) {
 					empty = false;
 					break;
 				}
@@ -116,14 +116,16 @@ void ui_init(void)
 {
 	cvar_register(&ui_scale);
 
+	asset_font_image = asset_get_image(ASSET_TEXTURE_FONT_DEFAULT);
+
 	// setup font image
-	glGenTextures(1, &fonttex);
-	glBindTexture(GL_TEXTURE_2D, fonttex);
+	glGenTextures(1, &gl_ui_font_texture);
+	glBindTexture(GL_TEXTURE_2D, gl_ui_font_texture);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 128, 128, 0, GL_RGBA, GL_UNSIGNED_BYTE, q_conchars.pixel_data);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, asset_font_image->width, asset_font_image->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, asset_font_image->data);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// setup font buffers
@@ -189,7 +191,7 @@ void ui_commit(void)
 	glBufferData(GL_ARRAY_BUFFER, fontcharcount * sizeof(vec4), fontdata, GL_DYNAMIC_DRAW);
 
 	glBindVertexArray(fontvao);
-	glBindTexture(GL_TEXTURE_2D, fonttex);
+	glBindTexture(GL_TEXTURE_2D, gl_ui_font_texture);
 	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, fontcharcount);
 
 	fontcharcount = 0;

@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "mathlib.h"
+#include "game/world.h"
 
 extern struct client_state {
 	struct {
@@ -10,8 +11,10 @@ extern struct client_state {
 		vec3 pos;
 		float stance;
 		bool rotated, moved;
+		bool attack[2];
 		int our_id;
 		long seed;
+		struct trace_result look_trace;
 	} game;
 
 	enum { cl_disconnected, cl_connecting, cl_connected } state;

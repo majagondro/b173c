@@ -48,17 +48,23 @@ void cam_angles(vec3 fwd, vec3 side, vec3 up, float yaw, float pitch)
 	cy = cosf(DEG2RAD(yaw));
 	sy = sinf(DEG2RAD(yaw));
 
-	side[0] = -cy;
-	side[1] = 0;
-	side[2] = sy;
+	if(side != NULL) {
+		side[0] = -cy;
+		side[1] = 0;
+		side[2] = sy;
+	}
 
-	up[0] = sy * sp;
-	up[1] = cp;
-	up[2] = cy * sp;
+	if(up != NULL) {
+		up[0] = sy * sp;
+		up[1] = cp;
+		up[2] = cy * sp;
+	}
 
-	fwd[0] = sy * cp;
-	fwd[1] = -sp;
-	fwd[2] = cp * cy;
+	if(fwd != NULL) {
+		fwd[0] = sy * cp;
+		fwd[1] = -sp;
+		fwd[2] = cp * cy;
+	}
 }
 
 void mat_view(mat4 dest, const vec3 pos, vec3 ang)

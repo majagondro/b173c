@@ -17,6 +17,7 @@ static mat4 view_mat = {0};
 static mat4 proj_mat = {0};
 static uint gl_world_vao;
 static uint gl_world_texture; // fixme
+static uint gl_block_selection_vbo;
 static uint loc_chunkpos, loc_proj, loc_view, loc_nightlightmod;
 
 struct {
@@ -67,6 +68,31 @@ static bool is_visible_on_frustum(const vec3 point, float radius)
 
 void world_renderer_update_chunk_visibility(world_chunk *chunk);
 
+struct world_vertex *update_block_selection_box(float x, float y, float z)
+{
+	static struct world_vertex b[16];
+	const float grow = 0.002f;
+
+	b[0] = world_make_vertex(x - grow, y - grow, z - grow, 0, 0, 0);
+	b[1] = world_make_vertex(x + 1 + grow, y - grow, z - grow, 0, 0, 0);
+	b[2] = world_make_vertex(x + 1 + grow, y - grow, z + 1 + grow, 0, 0, 0);
+	b[3] = world_make_vertex(x - grow, y - grow, z + 1 + grow, 0, 0, 0);
+	b[4] = b[0];
+	b[5] = world_make_vertex(x - grow, y + 1 + grow, z - grow, 0, 0, 0);
+	b[6] = world_make_vertex(x + 1 + grow, y + 1 + grow, z - grow, 0, 0, 0);
+	b[7] = b[1];
+	b[8] = b[6];
+	b[9] = world_make_vertex(x + 1 + grow, y + 1 + grow, z + 1 + grow, 0, 0, 0);
+	b[10] = b[2];
+	b[11] = b[9];
+	b[12] = world_make_vertex(x - grow, y + 1 + grow, z + 1 + grow, 0, 0, 0);
+	b[13] = b[3];
+	b[14] = b[12];
+	b[15] = b[5];
+
+	return b;
+}
+
 static void update_view_matrix_and_frustum(void)
 {
 	float half_h = r_zfar.value * tanf(DEG2RAD(fov.value) * 0.5f);
@@ -114,6 +140,20 @@ static void update_view_matrix_and_frustum(void)
 
 	/* update view matrix */
 	mat_view(view_mat, cl.game.pos, cl.game.rot);
+
+	/* update look trace */
+	if(cl.state == cl_connected) {
+		cl.game.pos[0] -= 0.5f;
+		cl.game.pos[1] -= 0.5f;
+		cl.game.pos[2] -= 0.5f;
+		cl.game.look_trace = world_trace_ray(cl.game.pos, forward, 16.0f);
+		cl.game.pos[0] += 0.5f;
+		cl.game.pos[1] += 0.5f;
+		cl.game.pos[2] += 0.5f;
+		glBindBuffer(GL_ARRAY_BUFFER, gl_block_selection_vbo);
+		glBufferData(GL_ARRAY_BUFFER, 16 * sizeof(struct world_vertex), update_block_selection_box(cl.game.look_trace.x, cl.game.look_trace.y, cl.game.look_trace.z), GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
 
 	cl.game.pos[1] -= VIEW_HEIGHT;
 
@@ -180,6 +220,8 @@ void world_renderer_init(void)
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, terrain_asset->width, terrain_asset->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, terrain_asset->data);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glGenBuffers(1, &gl_block_selection_vbo);
 }
 
 void world_renderer_shutdown(void)
@@ -678,6 +720,15 @@ void world_render(void)
 				glDrawArrays(GL_TRIANGLES, 0, chunk->glbufs[j].num_alpha_vertices);
 			}
 		}
+	}
+
+	/* draw block selection box */
+	if(!cl.game.look_trace.reached_end) {
+		vec3 cp = {-1,-1,-1};
+		glLineWidth(2.0f);
+		glUniform3fv(loc_chunkpos, 1, cp);
+		glBindVertexBuffer(0, gl_block_selection_vbo, 0, sizeof(struct world_vertex));
+		glDrawArrays(GL_LINE_STRIP, 0, 16);
 	}
 
 	/* done */

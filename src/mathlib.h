@@ -15,7 +15,9 @@
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
-#define vec3_init(v) {v[0], v[1], v[2]}
+#define roundf2i(f) ((int)roundf(f))
+
+#define vec3_from(v) {v[0], v[1], v[2]}
 #define vec3_add(dest, a, b) (dest)[0] = (a)[0] + (b)[0], (dest)[1] = (a)[1] + (b)[1], (dest)[2] = (a)[2] + (b)[2]
 #define vec3_copy(dest, a) (dest)[0] = (a)[0], (dest)[1] = (a)[1], (dest)[2] = (a)[2]
 #define vec3_sub(dest, a, b) (dest)[0] = (a)[0] - (b)[0], (dest)[1] = (a)[1] - (b)[1], (dest)[2] = (a)[2] - (b)[2]

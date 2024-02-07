@@ -452,3 +452,65 @@ float world_calculate_sky_light_modifier(void)
 	}
 	return lmod / 15.0f;
 }
+
+struct trace_result world_trace_ray(const vec3 _origin, const vec3 _dir, float maxlen)
+{
+	struct trace_result res = {0};
+	float dist = 0.0f;
+	vec3 p = vec3_from(_origin); // pos
+	int step[3];
+	block_face ofsface[3];
+	vec3 delta; // the distance the ray has to travel to go from 1 x/y/z-edge to the next x/y/z-edge
+	vec3 edgedist; // the distance the ray has to travel from its start position to the first x/y/z-edge
+
+	p[0] += 0.5f;
+	p[1] += 0.5f;
+	p[2] += 0.5f;
+
+	for(int axis = 0; axis < 3; axis++) {
+		delta[axis] = _dir[axis] == 0.0f ? 9999.0f : fabsf(1.0f / _dir[axis]);
+
+		if(_dir[axis] < 0.0f) {
+			step[axis] = -1;
+			ofsface[axis] = 1;
+			edgedist[axis] = (p[axis] - floorf(p[axis])) * delta[axis];
+		} else {
+			step[axis] = 1;
+			ofsface[axis] = 0;
+			edgedist[axis] = (floorf(p[axis]) + 1.0 - p[axis]) * delta[axis];
+		}
+	}
+
+	res.x = floorf(p[0]);
+	res.y = floorf(p[1]);
+	res.z = floorf(p[2]);
+
+	res.reached_end = true; // by default
+
+	while(dist < maxlen) {
+		if(edgedist[0] < edgedist[1] && edgedist[0] < edgedist[2]) {
+			edgedist[0] += delta[0];
+			res.x += step[0];
+			res.hit_face = BLOCK_FACE_X_NEG + ofsface[0];
+		} else if(edgedist[1] < edgedist[2]) {
+			edgedist[1] += delta[1];
+			res.y += step[1];
+			res.hit_face = BLOCK_FACE_Y_NEG + ofsface[1];
+		} else {
+			edgedist[2] += delta[2];
+			res.z += step[2];
+			res.hit_face = BLOCK_FACE_Z_NEG + ofsface[2];
+		}
+
+		res.block = world_get_block(res.x, res.y, res.z);
+		if(block_is_collidable(res.block)) {
+			res.reached_end = false;
+			break;
+		}
+
+		dist += 1.0f;
+	}
+
+	return res;
+}
+

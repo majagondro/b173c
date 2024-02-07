@@ -69,6 +69,14 @@ float *world_calculate_sky_color(void); // fixme: 'color' type
 float world_calculate_sun_angle(void);
 float world_calculate_sky_light_modifier(void);
 
+/* ray tracing */
+struct trace_result {
+	int x, y, z;
+	block_data block;
+	block_face hit_face;
+	bool reached_end;
+} world_trace_ray(const vec3 origin, const vec3 dir, float max_length);
+
 /* rendering */
 void world_renderer_init(void);
 void world_renderer_shutdown(void);

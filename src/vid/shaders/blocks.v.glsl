@@ -62,7 +62,11 @@ void main()
 
     COLORMOD *= float(light) / 15.0f * NIGHTTIME_LIGHT_MODIFIER;
 
-    vec3 block_pos = IN_POS + CHUNK_POS;
+    vec3 block_pos = IN_POS;
+    if(CHUNK_POS != vec3(-1)) { // hack for block selection box
+        block_pos += CHUNK_POS;
+    }
+
     vec2 uv = get_uv_coord(gl_VertexID, texture_index);
     // float angl = radians(float(extradata));
     // UV_COORD.x = uv.x * cos(angl) - uv.y * sin(angl);

@@ -21,6 +21,7 @@ struct {
 	ubyte left : 1;
 	ubyte right : 1;
 	ubyte attack : 1;
+	ubyte attack2 : 1;
 	ubyte jump : 1;
 	ubyte sneak : 1;
 } inkeys;
@@ -41,6 +42,8 @@ void sneakdown_f(void) { inkeys.sneak = 1; }
 void sneakup_f(void) { inkeys.sneak = 0; }
 void attackdown_f(void) { inkeys.attack = 1; }
 void attackup_f(void) { inkeys.attack = 0; }
+void attack2down_f(void) { inkeys.attack2 = 1; }
+void attack2up_f(void) { inkeys.attack2 = 0; }
 
 struct keyname keynames[] = {
 	{"TAB",        KEY_TAB},
@@ -225,6 +228,8 @@ void in_init(void)
 	cmd_register("-right", rightup_f);
 	cmd_register("+attack", attackdown_f);
 	cmd_register("-attack", attackup_f);
+	cmd_register("+attack2", attack2down_f);
+	cmd_register("-attack2", attack2up_f);
 	cmd_register("+jump", jumpdown_f);
 	cmd_register("-jump", jumpup_f);
 	cmd_register("+sneak", sneakdown_f);
@@ -296,7 +301,6 @@ static void handle_keys(void)
 		}
 	}
 
-
 	if(cl.state == cl_connected && !con_opened) {
 		//fixmee rmme
 		float spd = 20.0f;
@@ -332,6 +336,13 @@ static void handle_keys(void)
 			cl.game.pos[1] -= cl.frametime * spd;
 			cl.game.stance -= cl.frametime * spd;
 			cl.game.moved = true;
+		}
+
+
+		if(inkeys.attack2) {
+			cl.game.attack[1] = true;
+		} else {
+			cl.game.attack[1] = false;
 		}
 	}
 

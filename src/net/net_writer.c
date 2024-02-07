@@ -1,6 +1,8 @@
 #include "net_internal.h"
 #include "client/client.h"
 #include "client/console.h"
+#include "game/block.h"
+#include "game/world.h"
 
 void net_write_packets(void)
 {
@@ -34,6 +36,14 @@ void net_write_packets(void)
 		cl.game.rotated = false;
 	} else {
 		net_write_0x0A(false);
+	}
+
+	if(cl.game.attack[1]) {
+		if(!cl.game.look_trace.reached_end) {
+			net_write_0x0F(cl.game.look_trace.x, cl.game.look_trace.y, cl.game.look_trace.z, cl.game.look_trace.hit_face, BLOCK_DIRT, 1, 0);
+		} else {
+			net_write_0x0F(-1, -1, -1, -1, 0, 0, 0);
+		}
 	}
 }
 
@@ -110,14 +120,16 @@ WRITER(PKT_PLAYER_MINE, byte action, int x, byte y, int z, byte face)
 	net_write_byte(face);
 }
 
-WRITER(PKT_PLAYER_PLACE, int x, byte y, int z, byte face, short block_or_item_id, byte item_count, short item_metadata)
+WRITER(PKT_PLAYER_PLACE, int x, byte y, int z, byte face, short item_id, byte item_count, short item_metadata)
 	net_write_int(x);
 	net_write_byte(y);
 	net_write_int(z);
 	net_write_byte(face);
-	net_write_short(block_or_item_id);
-	net_write_byte(item_count);
-	net_write_short(item_metadata);
+	net_write_short(item_id);
+	if(item_id >= 0) {
+		net_write_byte(item_count);
+		net_write_short(item_metadata);
+	}
 }
 
 WRITER(PKT_ANIMATION, int ent_id, byte animation)

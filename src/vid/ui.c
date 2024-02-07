@@ -186,6 +186,9 @@ void ui_commit(void)
 		ui_printf(1, 97, "Time: %lu (day %lu)", world_get_time(),  world_get_time() / 24000);
 	}
 
+	// crosshair
+	ui_printf(ui_w / 2 - 3, ui_h / 2 - 3, "\x9");
+
 	glBindBuffer(GL_ARRAY_BUFFER, fontdatavbo);
 	// todo: update only parts of the buffer that were changed
 	glBufferData(GL_ARRAY_BUFFER, fontcharcount * sizeof(vec4), fontdata, GL_DYNAMIC_DRAW);

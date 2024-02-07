@@ -93,9 +93,9 @@ void world_mark_region_for_remesh(int x_start, int y_start, int z_start, int x_e
 	int cye = y_end >> 4;
 	int czs = z_start >> 4;
 	int cze = z_end >> 4;
-	for(int cx = cxs - 1; cx <= cxe + 1; cx++) {
-		for(int cz = czs - 1; cz <= cze + 1; cz++) {
-			for(int cy = cys - 1; cy <= cye + 1; cy++) {
+	for(int cx = cxs; cx <= cxe; cx++) {
+		for(int cz = czs; cz <= cze; cz++) {
+			for(int cy = cys; cy <= cye; cy++) {
 				world_chunk *chunk = world_get_chunk(cx, cz);
 				if(!chunk)
 					continue;
@@ -254,7 +254,7 @@ void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_
 			if(!world_chunk_exists(cx, cz))
 				world_alloc_chunk(cx, cz);
 
-			world_mark_region_for_remesh(cx * 16 + x_start, y_start, cz * 16 + z_start, cx * 16 + x_end, y_end, cz * 16 + z_end);
+			world_mark_region_for_remesh(cx * 16 + x_start - 1, y_start - 1, cz * 16 + z_start - 1, cx * 16 + x_end + 1, y_end + 1, cz * 16 + z_end + 1);
 			i = world_set_chunk_data(world_get_chunk(cx, cz), data, x_start, y_start, z_start, x_end, y_end, z_end, i);
 		}
 	}

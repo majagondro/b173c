@@ -90,16 +90,8 @@ void unalias_f(void)
 	alias_remove(cmd_argv(1));
 }
 
-#include "game/world.h"
 void echo_f(void)
 {
-	void *it;
-	size_t i = 0;
-	while(hashmap_iter(world_chunk_map, &i, &it)) {
-		world_chunk *c = it;
-		c->needs_remesh = true;
-	}
-
 	con_printf("%s\n", cmd_args(1, cmd_argc()));
 }
 

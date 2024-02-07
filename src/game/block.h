@@ -14,6 +14,9 @@ typedef enum {
 	 BLOCK_FACE_X_POS
 } block_face;
 
+#define IS_SIDE_FACE(f) ((f) != BLOCK_FACE_Y_NEG && (f) != BLOCK_FACE_Y_POS)
+#define IS_TOPBOT_FACE(f) ((f) == BLOCK_FACE_Y_NEG || (f) == BLOCK_FACE_Y_POS)
+
 typedef enum {
 	RENDER_CUBE,
 	RENDER_CROSS,
@@ -60,7 +63,7 @@ typedef struct {
 #define block_is_transparent(b) (block_get_properties(b.id).opaque == 0)
 #define block_is_semi_transparent(b) ((b).id == BLOCK_WATER_STILL || (b).id == BLOCK_WATER_MOVING || (b).id == BLOCK_ICE)
 block_properties block_get_properties(block_id id);
-ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata);
+ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int x, int y, int z);
 bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_face face);
 bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id self_id);
 float block_fluid_get_height(int x, int y, int z, block_id self_id);

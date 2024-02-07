@@ -26,17 +26,14 @@ struct {
 	} top, bottom, right, left, far, near;
 } frustum = {0};
 
-struct block {
-	float x, y, z;
-	// float data1, data2;
-} __attribute__((packed));
-
 static void recalculate_projection_matrix(void);
+void onchange_r_fancyleaves(void); // in block.c
 
 cvar fov = {"fov", "90", recalculate_projection_matrix};
 cvar r_zfar = {"r_zfar", "256", recalculate_projection_matrix};
 cvar r_znear = {"r_znear", "0.1", recalculate_projection_matrix};
 cvar r_max_remeshes = {"r_max_remeshes", "2"};
+cvar r_fancyleaves = {"r_fancyleaves", "1", onchange_r_fancyleaves};
 cvar gl_polygon_mode = {"gl_polygon_mode", "GL_FILL"};
 
 extern cvar vid_width, vid_height;
@@ -144,6 +141,7 @@ void world_renderer_init(void)
 	cvar_register(&r_zfar);
 	cvar_register(&r_znear);
 	cvar_register(&r_max_remeshes);
+	cvar_register(&r_fancyleaves);
 	cvar_register(&gl_polygon_mode);
 
 	recalculate_projection_matrix();
@@ -272,7 +270,7 @@ void render_cross(int x, int y, int z, block_data self)
 {
 	struct world_vertex tl, tr, bl, br;
 	ubyte light = world_get_block_lighting(x, y, z);
-	ubyte texture = block_get_texture_index(self.id, 0, self.metadata);
+	ubyte texture = block_get_texture_index(self.id, 0, self.metadata, x, y, z);
 
 	x &= 15;
 	y &= 15;
@@ -297,7 +295,7 @@ void render_crops(int x, int y, int z, block_data self)
 {
 	struct world_vertex tl, tr, bl, br;
 	ubyte light = world_get_block_lighting(x, y, z);
-	ubyte texture = block_get_texture_index(self.id, 0, self.metadata);
+	ubyte texture = block_get_texture_index(self.id, 0, self.metadata, x, y, z);
 	float x0, x1, z0, z1;
 
 	x &= 15;
@@ -411,7 +409,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_NEG)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								block_get_texture_index(block.id, BLOCK_FACE_Y_NEG, block.metadata),
+								block_get_texture_index(block.id, BLOCK_FACE_Y_NEG, block.metadata, x, y, z),
 								BLOCK_FACE_Y_NEG, world_get_block_lighting(x, y-1, z)), BLOCK_FACE_Y_NEG
 							);
 						}
@@ -419,7 +417,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_POS)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								block_get_texture_index(block.id, BLOCK_FACE_Y_POS, block.metadata),
+								block_get_texture_index(block.id, BLOCK_FACE_Y_POS, block.metadata, x, y, z),
 								BLOCK_FACE_Y_POS, world_get_block_lighting(x, y+1, z)), BLOCK_FACE_Y_POS
 							);
 						}
@@ -427,7 +425,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_POS)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								block_get_texture_index(block.id, BLOCK_FACE_X_POS, block.metadata),
+								block_get_texture_index(block.id, BLOCK_FACE_X_POS, block.metadata, x, y, z),
 								BLOCK_FACE_X_POS, world_get_block_lighting(x+1, y, z)), BLOCK_FACE_X_POS
 							);
 						}
@@ -435,7 +433,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_X_NEG)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								block_get_texture_index(block.id, BLOCK_FACE_X_NEG, block.metadata),
+								block_get_texture_index(block.id, BLOCK_FACE_X_NEG, block.metadata, x, y, z),
 								BLOCK_FACE_X_NEG, world_get_block_lighting(x-1, y, z)), BLOCK_FACE_X_NEG
 							);
 						}
@@ -443,7 +441,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_POS)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								block_get_texture_index(block.id, BLOCK_FACE_Z_POS, block.metadata),
+								block_get_texture_index(block.id, BLOCK_FACE_Z_POS, block.metadata, x, y, z),
 								BLOCK_FACE_Z_POS, world_get_block_lighting(x, y, z+1)), BLOCK_FACE_Z_POS
 							);
 						}
@@ -451,7 +449,7 @@ void remesh_chunk(world_chunk *chunk)
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Z_NEG)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,
-								block_get_texture_index(block.id, BLOCK_FACE_Z_NEG, block.metadata),
+								block_get_texture_index(block.id, BLOCK_FACE_Z_NEG, block.metadata, x, y, z),
 								BLOCK_FACE_Z_NEG, world_get_block_lighting(x, y, z-1)), BLOCK_FACE_Z_NEG
 							);
 						}

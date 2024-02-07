@@ -1,6 +1,7 @@
 #include "block.h"
 #include "common.h"
 #include "world.h"
+#include "client/console.h"
 
 enum {
 	TRANSPARENT = 0, OPAQUE = 1
@@ -71,9 +72,9 @@ static block_properties blocks[256] = {
 	[BLOCK_BLOCK_DIAMOND] = {"diamond_block", TEXTURE_ALL(24), OPAQUE, RENDER_CUBE},
 	[BLOCK_WORKBENCH] = {"workbench", TEXTURE_TOP_BOT_SIDE(59 - 16, 4, 59), OPAQUE, RENDER_CUBE},
 	[BLOCK_CROP_WHEAT] = {"crops", TEXTURE_ALL(88), TRANSPARENT, RENDER_CROPS},
-	[BLOCK_FARMLAND] = {"farmland", TEXTURE_TOP_BOT_SIDE(87, 2, 2), TRANSPARENT, RENDER_CUBE},
-	[BLOCK_FURNACE_IDLE] = {"furnace", TEXTURE_TOPBOT_SIDE(45 + 17, 45 - 1), OPAQUE, RENDER_CUBE},
-	[BLOCK_FURNACE_ACTIVE] = {"furnace_lit", TEXTURE_TOPBOT_SIDE(45 + 17, 45 + 16), OPAQUE, RENDER_CUBE},
+	[BLOCK_FARMLAND] = {"farmland", TEXTURE_TOP_BOT_SIDE(87, 2, 2), TRANSPARENT, RENDER_CUBE_SPECIAL},
+	[BLOCK_FURNACE_IDLE] = {"furnace", TEXTURE_TOPBOT_SIDE(45 + 17, 45), OPAQUE, RENDER_CUBE},
+	[BLOCK_FURNACE_ACTIVE] = {"furnace_lit", TEXTURE_TOPBOT_SIDE(45 + 17, 45), OPAQUE, RENDER_CUBE},
 	[BLOCK_SIGN_POST] = {"sign_post", TEXTURE_ALL(4), TRANSPARENT},
 	[BLOCK_DOOR_WOOD] = {"door_wood", TEXTURE_ALL(97), TRANSPARENT, RENDER_DOOR},
 	[BLOCK_LADDER] = {"ladder", TEXTURE_ALL(83), TRANSPARENT, RENDER_LADDER},
@@ -97,12 +98,12 @@ static block_properties blocks[256] = {
 	[BLOCK_SUGAR_CANE] = {"reeds", TEXTURE_ALL(73), TRANSPARENT, RENDER_CROSS},
 	[BLOCK_JUKEBOX] = {"jukebox", TEXTURE_TOP_BOT_SIDE(75, 74, 74), OPAQUE, RENDER_CUBE},
 	[BLOCK_FENCE] = {"fence", TEXTURE_ALL(4), TRANSPARENT, RENDER_FENCE},
-	[BLOCK_PUMPKIN] = {"pumpkin", TEXTURE_TOPBOT_SIDE(102, 102 + 16), OPAQUE, RENDER_CUBE},
+	[BLOCK_PUMPKIN] = {"pumpkin", TEXTURE_TOPBOT_SIDE(102, 102 + 17), OPAQUE, RENDER_CUBE},
 	[BLOCK_NETTHERRACK] = {"netherrack", TEXTURE_ALL(103), OPAQUE, RENDER_CUBE},
 	[BLOCK_SOUL_SAND] = {"soulsand", TEXTURE_ALL(104), TRANSPARENT, RENDER_CUBE},
 	[BLOCK_GLOWSTONE] = {"glowstone", TEXTURE_ALL(105), OPAQUE, RENDER_CUBE},
 	[BLOCK_PORTAL] = {"portal", TEXTURE_ALL(240), TRANSPARENT, RENDER_CUBE_SPECIAL},
-	[BLOCK_PUMPKIN_LANTERN] = {"pumpkin_lit", TEXTURE_TOPBOT_SIDE(102, 102 + 17), OPAQUE, RENDER_CUBE},
+	[BLOCK_PUMPKIN_LANTERN] = {"pumpkin_lit", TEXTURE_TOPBOT_SIDE(102, 102 + 18), OPAQUE, RENDER_CUBE},
 	[BLOCK_CAKE] = {"cake", TEXTURE_TOP_BOT_SIDE(121, 121 + 3, 121 + 1), TRANSPARENT, RENDER_CUBE_SPECIAL},
 	[BLOCK_REDSTONE_REPEATER_DISABLED] = {"redstone_repeater", TEXTURE_ALL(131), TRANSPARENT, RENDER_REPEATER},
 	[BLOCK_REDSTONE_REPEATER_ENABLED] = {"redstone_repeater_lit", TEXTURE_ALL(147), TRANSPARENT, RENDER_REPEATER},
@@ -114,20 +115,102 @@ block_properties block_get_properties(block_id id)
 	return blocks[id & 255];
 }
 
-ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata)
+ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int x, int y, int z)
 {
 	block_properties props = block_get_properties(id);
+	extern cvar r_fancyleaves;
+	int off = 0;
 
 	switch(id) {
-		case BLOCK_FARMLAND:
-			if(face == BLOCK_FACE_Y_POS)
-				return props.texture_indices[BLOCK_FACE_Y_POS] + (metadata != 0 ? -1 : 0);
+		/* non-directional blocks */
+		case BLOCK_SAPLING:
+			return props.texture_indices[face] + 16 * (metadata + 2);
+		case BLOCK_WOOD_LOG:
+			if(IS_SIDE_FACE(face))
+				return props.texture_indices[face] + (metadata == 0 ? 0 : (16 * 6 + (metadata - 1)));
+			break;
+		case BLOCK_LEAVES:
+			return props.texture_indices[face] +
+				(!r_fancyleaves.integer) + // +1 is for opaque leaves
+		    	(metadata == 1 ? (16 * 5) : 0); // oak/birch leaves use the same texture - move only if spruce
+		case BLOCK_TALLGRASS:
+			if(metadata == 0)
+				off = 16;
+			else if(metadata == 2)
+				off = 16 + 1;
+			return props.texture_indices[face] + off;
+		case BLOCK_CLOTH:
+			if(metadata == 0)
+				return props.texture_indices[face];
+			metadata = ~(metadata & 15);
+			return (7 * 16 + 1) + ((metadata & 8) >> 3) + 16 * (metadata & 7); // :P
+		case BLOCK_SLAB_SINGLE:
+		case BLOCK_SLAB_DOUBLE:
+			if(metadata == 0) {
+				// smooth stone
+				if(IS_TOPBOT_FACE(face))
+					return 6;
+				return 5;
+			} else if(metadata == 1) {
+				// sandstone
+				switch(face) {
+					case BLOCK_FACE_Y_POS:
+						return 13 * 16;
+					case BLOCK_FACE_Y_NEG:
+						return 15 * 16;
+					default:
+						return 14 * 16;
+				}
+			} else if(metadata == 2) {
+				// planks
+				return 4;
+			} else if(metadata == 3) {
+				// cobblestone
+				return 16;
+			}
+			break;
+		case BLOCK_WORKBENCH:
+			if(IS_SIDE_FACE(face) && (face == BLOCK_FACE_Z_NEG || face == BLOCK_FACE_X_NEG))
+				return props.texture_indices[face] + 1;
 			break;
 		case BLOCK_CROP_WHEAT:
-			return props.texture_indices[0] + metadata;
+			return props.texture_indices[face] + metadata;
+		case BLOCK_FARMLAND:
+			if(face == BLOCK_FACE_Y_POS)
+				return props.texture_indices[BLOCK_FACE_Y_POS] - (int)(metadata != 0);
+			break;
+		/* directional blocks */
+		case BLOCK_BED: // todo
+			break;
+		case BLOCK_PISTON_BASE: // todo am lazy
+		case BLOCK_PISTON_BASE_STICKY:
+			break;
+		case BLOCK_CHEST: // todo this is stupid :/
+			break;
+		case BLOCK_DISPENSER:
+		case BLOCK_FURNACE_ACTIVE:
+		case BLOCK_FURNACE_IDLE:
+			off = (id == BLOCK_DISPENSER ? 1 : (id == BLOCK_FURNACE_IDLE ? -1 : 16));
+			if(IS_SIDE_FACE(face) && metadata == face)
+				return props.texture_indices[face] + off;
+			break;
+		case BLOCK_PUMPKIN_LANTERN:
+			off = 1;
+		case BLOCK_PUMPKIN:
+			if(IS_SIDE_FACE(face)) {
+				// BRUH??????????
+				if(
+					(metadata == 0 && face == BLOCK_FACE_Z_POS) ||
+					(metadata == 1 && face == BLOCK_FACE_X_NEG) ||
+					(metadata == 2 && face == BLOCK_FACE_Z_NEG) ||
+					(metadata == 3 && face == BLOCK_FACE_X_POS)
+				) {
+					return props.texture_indices[face] + 16 + 1 + off;
+				}
+			}
+
 			break;
 	}
-
 
 	return props.texture_indices[face];
 }
@@ -260,4 +343,13 @@ bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id sel
 	vec3_copy(dest, dir);
 
 	return (dir[0] != 0 || dir[2] != 0);
+}
+
+void onchange_r_fancyleaves(void)
+{
+	extern cvar r_fancyleaves;
+	blocks[BLOCK_LEAVES].opaque = !r_fancyleaves.integer;
+	if(world_get_time() != 0) { // HACK pls fixmee!!! - this checks if the world is init
+		world_mark_all_for_remesh();
+	}
 }

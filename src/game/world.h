@@ -52,6 +52,7 @@ void world_free_chunk(int chunk_x, int chunk_z);
 bool world_chunk_exists(int chunk_x, int chunk_z);
 world_chunk *world_get_chunk(int chunk_x, int chunk_z);
 void world_mark_region_for_remesh(int x_start, int y_start, int z_start, int x_end, int y_end, int z_end);
+void world_mark_all_for_remesh(void);
 void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_y, int size_z, size_t compressed_size, ubyte *compressed);
 
 /* blocks */

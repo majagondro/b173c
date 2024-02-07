@@ -108,6 +108,19 @@ void world_mark_region_for_remesh(int x_start, int y_start, int z_start, int x_e
 	}
 }
 
+void world_mark_all_for_remesh(void)
+{
+	void *it;
+	size_t i = 0;
+	while(hashmap_iter(world_chunk_map, &i, &it)) {
+		world_chunk *chunk = it;
+		chunk->needs_remesh = true;
+		for(int j = 0; j < 8; j++) {
+			chunk->glbufs[j].needs_remesh = true;
+		}
+	}
+}
+
 static int inflate_data(ubyte *in, ubyte *out, size_t size_in, size_t size_out)
 {
 	int ret;
@@ -296,7 +309,23 @@ static ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z)
 		int nx = world_get_block_lighting(x - 1, y, z);
 		int pz = world_get_block_lighting(x, y, z + 1);
 		int nz = world_get_block_lighting(x, y, z - 1);
-		return max(py, max(px, max(nx, max(pz, nz))));
+		if(px > py) {
+			py = px;
+		}
+
+		if(nx > py) {
+			py = nx;
+		}
+
+		if(pz > py) {
+			py = pz;
+		}
+
+		if(nz > py) {
+			py = nz;
+		}
+
+		return py;
 	}
 	sl = block.skylight;
 	bl = block.blocklight;

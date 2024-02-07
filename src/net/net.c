@@ -49,6 +49,7 @@ static void setblocking(int fd, bool blocking)
 void disconnect_f(void);
 void connect_f(void);
 void say_f(void);
+void respawn_f(void);
 
 void net_init(void)
 {
@@ -71,6 +72,7 @@ void net_init(void)
 		cmd_register("connect", connect_f);
 		cmd_register("disconnect", disconnect_f);
 		cmd_register("say", say_f);
+		cmd_register("respawn", respawn_f);
 		cmds_reg = true;
 	}
 
@@ -930,9 +932,11 @@ void say_f(void)
 		return;
 	}
 
-	if(!strcmp(cmd_argv(1), "respawn")) {
-		net_write_0x09(0);
-	} else {
-		net_write_0x03(c16(cmd_args(1, cmd_argc())));
-	}
+
+	net_write_0x03(c16(cmd_args(1, cmd_argc())));
+}
+
+void respawn_f(void)
+{
+	net_write_0x09(0);
 }

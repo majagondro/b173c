@@ -74,7 +74,9 @@ HANDLER(PKT_USE_ENTITY, int user_id, int target_id, bool attack)
 
 HANDLER(PKT_UPDATE_HEALTH, short health)
 {
-
+	if(health <= 0) {
+		con_printf("u died idiot\n");
+	}
 }
 
 HANDLER(PKT_RESPAWN, byte dimension)

@@ -304,6 +304,7 @@ static ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z)
 	block_data block = c->data[i];
 	int sl, bl;
 	if(block.id == BLOCK_SLAB_SINGLE || block.id == BLOCK_FARMLAND || block.id == BLOCK_STAIRS_WOOD || block.id == BLOCK_STAIRS_STONE) {
+		// fixme?
 		int py = world_get_block_lighting(x, y + 1, z);
 		int px = world_get_block_lighting(x + 1, y, z);
 		int nx = world_get_block_lighting(x - 1, y, z);

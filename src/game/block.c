@@ -98,12 +98,12 @@ static block_properties blocks[256] = {
 	[BLOCK_SUGAR_CANE] = {"reeds", TEXTURE_ALL(73), TRANSPARENT, RENDER_CROSS},
 	[BLOCK_JUKEBOX] = {"jukebox", TEXTURE_TOP_BOT_SIDE(75, 74, 74), OPAQUE, RENDER_CUBE},
 	[BLOCK_FENCE] = {"fence", TEXTURE_ALL(4), TRANSPARENT, RENDER_FENCE},
-	[BLOCK_PUMPKIN] = {"pumpkin", TEXTURE_TOPBOT_SIDE(102, 102 + 17), OPAQUE, RENDER_CUBE},
+	[BLOCK_PUMPKIN] = {"pumpkin", TEXTURE_TOPBOT_SIDE(102, 102 + 16), OPAQUE, RENDER_CUBE},
 	[BLOCK_NETTHERRACK] = {"netherrack", TEXTURE_ALL(103), OPAQUE, RENDER_CUBE},
 	[BLOCK_SOUL_SAND] = {"soulsand", TEXTURE_ALL(104), TRANSPARENT, RENDER_CUBE},
 	[BLOCK_GLOWSTONE] = {"glowstone", TEXTURE_ALL(105), OPAQUE, RENDER_CUBE},
 	[BLOCK_PORTAL] = {"portal", TEXTURE_ALL(240), TRANSPARENT, RENDER_CUBE_SPECIAL},
-	[BLOCK_PUMPKIN_LANTERN] = {"pumpkin_lit", TEXTURE_TOPBOT_SIDE(102, 102 + 18), OPAQUE, RENDER_CUBE},
+	[BLOCK_PUMPKIN_LANTERN] = {"pumpkin_lit", TEXTURE_TOPBOT_SIDE(102, 102 + 16), OPAQUE, RENDER_CUBE},
 	[BLOCK_CAKE] = {"cake", TEXTURE_TOP_BOT_SIDE(121, 121 + 3, 121 + 1), TRANSPARENT, RENDER_CUBE_SPECIAL},
 	[BLOCK_REDSTONE_REPEATER_DISABLED] = {"redstone_repeater", TEXTURE_ALL(131), TRANSPARENT, RENDER_REPEATER},
 	[BLOCK_REDSTONE_REPEATER_ENABLED] = {"redstone_repeater_lit", TEXTURE_ALL(147), TRANSPARENT, RENDER_REPEATER},
@@ -205,7 +205,7 @@ ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int 
 					(metadata == 2 && face == BLOCK_FACE_Z_NEG) ||
 					(metadata == 3 && face == BLOCK_FACE_X_POS)
 				) {
-					return props.texture_indices[face] + 16 + 1 + off;
+					return props.texture_indices[face] + 1 + off;
 				}
 			}
 
@@ -217,6 +217,7 @@ ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int 
 
 bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_face face)
 {
+	extern cvar r_smartleaves;
 	vec3 face_offsets[6] = {
 		[BLOCK_FACE_Y_NEG] = {0, -1, 0},
 		[BLOCK_FACE_Y_POS] = {0, 1, 0},
@@ -232,9 +233,12 @@ bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_f
 
 	other = world_get_block(pos2[0], pos2[1], pos2[2]);
 
-	if(block_is_semi_transparent(self) && block_is_semi_transparent(other)) {
+	if(block_is_semi_transparent(self) && block_is_semi_transparent(other))
 		return false;
-	}
+
+	if(self.id != BLOCK_LEAVES || r_smartleaves.integer)
+		if(other.id == self.id)
+			return false;
 
 	if(block_get_properties(self.id).render_type == RENDER_FLUID) {
 		if(face == BLOCK_FACE_Y_POS) {
@@ -345,7 +349,7 @@ bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id sel
 	return (dir[0] != 0 || dir[2] != 0);
 }
 
-void onchange_r_fancyleaves(void)
+void onchange_block_render_modes(void)
 {
 	extern cvar r_fancyleaves;
 	blocks[BLOCK_LEAVES].opaque = !r_fancyleaves.integer;

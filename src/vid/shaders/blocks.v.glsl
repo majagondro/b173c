@@ -6,6 +6,7 @@ layout(location=1) in uint IN_DATA;
 uniform vec3 CHUNK_POS;
 uniform mat4 VIEW;
 uniform mat4 PROJECTION;
+uniform float NIGHTTIME_LIGHT_MODIFIER;
 
 out vec2 UV_COORD;
 out vec3 COLORMOD;
@@ -49,17 +50,17 @@ void main()
         COLORMOD = vec3(0.34375,0.4453,0.207)*1.9;
     }
 
-    if(face == 0) {
-        COLORMOD *= 0.3;
-    } else if(face == 1) {
+    if(face == 0) { // -Y
+        COLORMOD *= 0.5;
+    } else if(face == 1) { // +Y
         COLORMOD *= 1.0;
-    } else if(face == 2 || face == 3) {
+    } else if(face == 2 || face == 3) { // +-Z
         COLORMOD *= 0.8;
-    } else if(face == 4 || face == 5) {
+    } else if(face == 4 || face == 5) { // +-X
         COLORMOD *= 0.6;
     }
 
-    COLORMOD *= float(light) / 15.0f;
+    COLORMOD *= float(light) / 15.0f * NIGHTTIME_LIGHT_MODIFIER;
 
     vec3 block_pos = IN_POS + CHUNK_POS;
     vec2 uv = get_uv_coord(gl_VertexID, texture_index);

@@ -27,13 +27,14 @@ struct {
 } frustum = {0};
 
 static void recalculate_projection_matrix(void);
-void onchange_r_fancyleaves(void); // in block.c
+void onchange_block_render_modes(void); // in block.c
 
 cvar fov = {"fov", "90", recalculate_projection_matrix};
 cvar r_zfar = {"r_zfar", "256", recalculate_projection_matrix};
 cvar r_znear = {"r_znear", "0.1", recalculate_projection_matrix};
 cvar r_max_remeshes = {"r_max_remeshes", "2"};
-cvar r_fancyleaves = {"r_fancyleaves", "1", onchange_r_fancyleaves};
+cvar r_fancyleaves = {"r_fancyleaves", "1", onchange_block_render_modes};
+cvar r_smartleaves = {"r_smartleaves", "0", onchange_block_render_modes};
 cvar gl_polygon_mode = {"gl_polygon_mode", "GL_FILL"};
 
 extern cvar vid_width, vid_height;
@@ -142,6 +143,7 @@ void world_renderer_init(void)
 	cvar_register(&r_znear);
 	cvar_register(&r_max_remeshes);
 	cvar_register(&r_fancyleaves);
+	cvar_register(&r_smartleaves);
 	cvar_register(&gl_polygon_mode);
 
 	recalculate_projection_matrix();
@@ -291,57 +293,84 @@ void render_cross(int x, int y, int z, block_data self)
 	meshbuilder_add_quad(&tr, &tl, &br, &bl);
 }
 
-void render_crops(int x, int y, int z, block_data self)
+static void render_with_side_translation(int x, int y, int z, ubyte light, ubyte texture, float translation)
 {
 	struct world_vertex tl, tr, bl, br;
-	ubyte light = world_get_block_lighting(x, y, z);
-	ubyte texture = block_get_texture_index(self.id, 0, self.metadata, x, y, z);
 	float x0, x1, z0, z1;
 
 	x &= 15;
 	y &= 15;
 	z &= 15;
 
-	x0 = x + 0.25f;
-	x1 = x + 0.75f;
+	x0 = x + translation;
+	x1 = x + 1.0f - translation;
 	z0 = z;
 	z1 = z + 1.0f;
 
-	tl = world_make_vertex(x0, y+1, z0, texture, 1, light);
-	tr = world_make_vertex(x0, y+1, z1, texture, 1, light);
-	bl = world_make_vertex(x0, y, z0, texture, 1, light);
-	br = world_make_vertex(x0, y, z1, texture, 1, light);
+	tl = world_make_vertex(x0, y+1, z0, texture, BLOCK_FACE_X_NEG, light);
+	tr = world_make_vertex(x0, y+1, z1, texture, BLOCK_FACE_X_NEG, light);
+	bl = world_make_vertex(x0, y, z0, texture, BLOCK_FACE_X_NEG, light);
+	br = world_make_vertex(x0, y, z1, texture, BLOCK_FACE_X_NEG, light);
 	meshbuilder_add_quad(&tl, &tr, &bl, &br);
 	meshbuilder_add_quad(&tr, &tl, &br, &bl);
 
-	tl = world_make_vertex(x1, y+1, z0, texture, 1, light);
-	tr = world_make_vertex(x1, y+1, z1, texture, 1, light);
-	bl = world_make_vertex(x1, y, z0, texture, 1, light);
-	br = world_make_vertex(x1, y, z1, texture, 1, light);
+	tl = world_make_vertex(x1, y+1, z0, texture, BLOCK_FACE_X_POS, light);
+	tr = world_make_vertex(x1, y+1, z1, texture, BLOCK_FACE_X_POS, light);
+	bl = world_make_vertex(x1, y, z0, texture, BLOCK_FACE_X_POS, light);
+	br = world_make_vertex(x1, y, z1, texture, BLOCK_FACE_X_POS, light);
 	meshbuilder_add_quad(&tl, &tr, &bl, &br);
 	meshbuilder_add_quad(&tr, &tl, &br, &bl);
 
 	x0 = x;
 	x1 = x + 1.0f;
-	z0 = z + 0.25f;
-	z1 = z + 0.75f;
+	z0 = z + translation;
+	z1 = z + 1.0f - translation;
 
-
-	tl = world_make_vertex(x0, y+1, z0, texture, 1, light);
-	tr = world_make_vertex(x1, y+1, z0, texture, 1, light);
-	bl = world_make_vertex(x0, y, z0, texture, 1, light);
-	br = world_make_vertex(x1, y, z0, texture, 1, light);
+	tl = world_make_vertex(x0, y+1, z0, texture, BLOCK_FACE_Z_NEG, light);
+	tr = world_make_vertex(x1, y+1, z0, texture, BLOCK_FACE_Z_NEG, light);
+	bl = world_make_vertex(x0, y, z0, texture, BLOCK_FACE_Z_NEG, light);
+	br = world_make_vertex(x1, y, z0, texture, BLOCK_FACE_Z_NEG, light);
 	meshbuilder_add_quad(&tl, &tr, &bl, &br);
 	meshbuilder_add_quad(&tr, &tl, &br, &bl);
 
-	tl = world_make_vertex(x0, y+1, z1, texture, 1, light);
-	tr = world_make_vertex(x1, y+1, z1, texture, 1, light);
-	bl = world_make_vertex(x0, y, z1, texture, 1, light);
-	br = world_make_vertex(x1, y, z1, texture, 1, light);
+	tl = world_make_vertex(x0, y+1, z1, texture, BLOCK_FACE_Z_POS, light);
+	tr = world_make_vertex(x1, y+1, z1, texture, BLOCK_FACE_Z_POS, light);
+	bl = world_make_vertex(x0, y, z1, texture, BLOCK_FACE_Z_POS, light);
+	br = world_make_vertex(x1, y, z1, texture, BLOCK_FACE_Z_POS, light);
 	meshbuilder_add_quad(&tl, &tr, &bl, &br);
 	meshbuilder_add_quad(&tr, &tl, &br, &bl);
 }
 
+void render_crops(int x, int y, int z, block_data self)
+{
+	ubyte light = world_get_block_lighting(x, y, z);
+	ubyte texture = block_get_texture_index(self.id, 0, self.metadata, x, y, z);
+	render_with_side_translation(x, y, z, light, texture, 0.25f);
+}
+
+void render_cactus(int x, int y, int z, block_data self)
+{
+	ubyte light = world_get_block_lighting(x, y, z);
+	ubyte texture = block_get_texture_index(self.id, BLOCK_FACE_X_POS, self.metadata, x, y, z);
+
+	if(block_should_face_be_rendered(x, y, z, self, BLOCK_FACE_Y_NEG)) {
+		add_block_face(world_make_vertex(
+			x&15, y&15, z&15,
+			block_get_texture_index(self.id, BLOCK_FACE_Y_NEG, self.metadata, x, y, z),
+			BLOCK_FACE_Y_NEG, world_get_block_lighting(x, y-1, z)), BLOCK_FACE_Y_NEG
+		);
+	}
+
+	if(block_should_face_be_rendered(x, y, z, self, BLOCK_FACE_Y_POS)) {
+		add_block_face(world_make_vertex(
+			x&15, y&15, z&15,
+			block_get_texture_index(self.id, BLOCK_FACE_Y_POS, self.metadata, x, y, z),
+			BLOCK_FACE_Y_POS, world_get_block_lighting(x, y+1, z)), BLOCK_FACE_Y_POS
+		);
+	}
+
+	render_with_side_translation(x, y, z, light, texture, 1.0f / 16.0f);
+}
 
 void (*render_funcs[RENDER_TYPE_COUNT])(int, int, int, block_data) = {
 	[RENDER_CUBE] = render_null, // handled elsewhere
@@ -357,7 +386,7 @@ void (*render_funcs[RENDER_TYPE_COUNT])(int, int, int, block_data) = {
 	[RENDER_STAIRS] = render_null,
 	[RENDER_FENCE] = render_null,
 	[RENDER_LEVER] = render_null,
-	[RENDER_CACTUS] = render_null,
+	[RENDER_CACTUS] = render_cactus,
 	[RENDER_BED] = render_null,
 	[RENDER_REPEATER] = render_null,
 	[RENDER_PISTON_BASE] = render_null,

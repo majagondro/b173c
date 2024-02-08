@@ -45,6 +45,7 @@ extern struct hashmap *world_chunk_map;
 
 void world_init(void);
 void world_shutdown(void); // todo: rename me to cleanup or something?
+#define world_is_init() (cl.state == cl_connected)
 
 /* chunks */
 void world_alloc_chunk(int chunk_x, int chunk_z);

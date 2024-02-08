@@ -42,6 +42,7 @@ void world_init(void)
 void world_shutdown(void)
 {
 	hashmap_free(world_chunk_map);
+	world_set_time(0);
 }
 
 void world_alloc_chunk(int chunk_x, int chunk_z)
@@ -264,8 +265,6 @@ void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_
 			i = world_set_chunk_data(world_get_chunk(cx, cz), data, x_start, y_start, z_start, x_end, y_end, z_end, i);
 		}
 	}
-
-
 }
 
 block_data world_get_block(int x, int y, int z)

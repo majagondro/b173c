@@ -2,6 +2,7 @@
 #include "common.h"
 #include "world.h"
 #include "client/console.h"
+#include "client/client.h"
 
 enum {
 	TRANSPARENT = 0, OPAQUE = 1
@@ -353,7 +354,7 @@ void onchange_block_render_modes(void)
 {
 	extern cvar r_fancyleaves;
 	blocks[BLOCK_LEAVES].opaque = !r_fancyleaves.integer;
-	if(world_get_time() != 0) { // HACK pls fixmee!!! - this checks if the world is init
+	if(world_is_init()) {
 		world_mark_all_for_remesh();
 	}
 }

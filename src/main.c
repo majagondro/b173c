@@ -76,7 +76,9 @@ int main(void)
 		if(phys_timeout <= 0.0f) {
 			net_process();
 
-			world_set_time(world_get_time() + 1); // client prediction of time
+			if(world_is_init()) {
+				world_set_time(world_get_time() + 1); // client prediction of time
+			}
 
 			phys_timeout = 0.05f; // 20 u/s
 		}
@@ -84,6 +86,10 @@ int main(void)
 		vid_update();
 		ui_draw();
 		vid_display_frame();
+
+		if(!cl.active) { // todo: sys_inactivesleep cvar
+			SDL_Delay(25);
+		}
 	}
 
 	net_shutdown();

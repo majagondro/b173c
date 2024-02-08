@@ -27,23 +27,15 @@ void net_write_packets(void)
 	if(cl.game.moved && cl.game.rotated) {
 		cl.game.moved = false;
 		cl.game.rotated = false;
-		net_write_0x0D(cl.game.pos[0], cl.game.pos[1], cl.game.pos[1] + 0.2f, cl.game.pos[2], -cl.game.rot[1], cl.game.rot[0], false);
+		net_write_0x0D(cl.game.pos.x, cl.game.pos.y, cl.game.pos.y + 0.2f, cl.game.pos.z, -cl.game.rot.yaw, cl.game.rot.pitch, false);
 	} else if(cl.game.moved) {
-		net_write_0x0B(cl.game.pos[0], cl.game.pos[1], cl.game.pos[1] + 0.2f, cl.game.pos[2], false);
+		net_write_0x0B(cl.game.pos.x, cl.game.pos.y, cl.game.pos.y + 0.2f, cl.game.pos.z, false);
 		cl.game.moved = false;
 	} else if(cl.game.rotated) {
-		net_write_0x0C(-cl.game.rot[1], cl.game.rot[0], false);
+		net_write_0x0C(-cl.game.rot.yaw, cl.game.rot.pitch, false);
 		cl.game.rotated = false;
 	} else {
 		net_write_0x0A(false);
-	}
-
-	if(cl.game.attack[1]) {
-		if(!cl.game.look_trace.reached_end) {
-			net_write_0x0F(cl.game.look_trace.x, cl.game.look_trace.y, cl.game.look_trace.z, cl.game.look_trace.hit_face, BLOCK_DIRT, 1, 0);
-		} else {
-			net_write_0x0F(-1, -1, -1, -1, 0, 0, 0);
-		}
 	}
 }
 

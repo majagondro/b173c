@@ -11,7 +11,6 @@ extern struct client_state {
 		vec3 pos;
 		float stance;
 		bool rotated, moved;
-		bool attack[2];
 		int our_id;
 		long seed;
 		struct trace_result look_trace;

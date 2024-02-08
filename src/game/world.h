@@ -65,7 +65,7 @@ ubyte world_get_block_lighting(int x, int y, int z);
 /* time, daylight cycle, etc. */
 void world_set_time(ulong time);
 ulong world_get_time(void);
-float *world_calculate_sky_color(void); // fixme: 'color' type
+vec4 world_calculate_sky_color(void); // fixme: 'color' type
 float world_calculate_sun_angle(void);
 float world_calculate_sky_light_modifier(void);
 
@@ -75,7 +75,7 @@ struct trace_result {
 	block_data block;
 	block_face hit_face;
 	bool reached_end;
-} world_trace_ray(const vec3 origin, const vec3 dir, float max_length);
+} world_trace_ray(vec3 origin, vec3 dir, float max_length);
 
 /* rendering */
 void world_renderer_init(void);

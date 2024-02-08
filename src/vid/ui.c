@@ -52,8 +52,8 @@ void ui_update_size(int x, int y)
 	ui_h = (int)((float)(y) / ui_scale.value);
 
 	for(i = 0; i < 8; i += 2) {
-		glyph_vertices[i][0] = glyph_vertices_original[i][0] * CON_CHAR_SIZE / (float)(ui_w);
-		glyph_vertices[i][1] = glyph_vertices_original[i][1] * CON_CHAR_SIZE / (float)(ui_h);
+		glyph_vertices[i].x = glyph_vertices_original[i].x * CON_CHAR_SIZE / (float)(ui_w);
+		glyph_vertices[i].y = glyph_vertices_original[i].y * CON_CHAR_SIZE / (float)(ui_h);
 	}
 
 	if(fontvbo) {
@@ -179,9 +179,9 @@ void ui_commit(void)
 {
 	if(developer.integer) {
 		ui_printf(1, 1, "b173c 0.0.0 (%lu fps)", cl.fps);
-		ui_printf(1, 49, "x: %.14f (%d)", cl.game.pos[0], (int)cl.game.pos[0] >> 4);
-		ui_printf(1, 57, "y: %.14f", cl.game.pos[1]);
-		ui_printf(1, 65, "z: %.14f (%d)", cl.game.pos[2], (int)cl.game.pos[2] >> 4);
+		ui_printf(1, 49, "x: %.14f (%d)", cl.game.pos.x, (int)cl.game.pos.x >> 4);
+		ui_printf(1, 57, "y: %.14f", cl.game.pos.y);
+		ui_printf(1, 65, "z: %.14f (%d)", cl.game.pos.z, (int)cl.game.pos.z >> 4);
 		ui_printf(1, 89, "Seed: %ld", cl.game.seed);
 		ui_printf(1, 97, "Time: %lu (day %lu)", world_get_time(),  world_get_time() / 24000);
 	}
@@ -235,10 +235,10 @@ bool ui_drawchar(ubyte c, int x, int y, int color)
 	if(y <= -LINE_HEIGHT_PX || y >= ui_h)
 		return false;
 
-	fontdata[fontcharcount][0] = ((float)x) / ((float)ui_w);
-	fontdata[fontcharcount][1] = ((float)y) / ((float)ui_h);
-	fontdata[fontcharcount][2] = (float)b;
-	fontdata[fontcharcount][3] = (float)color;
+	fontdata[fontcharcount].x = ((float)x) / ((float)ui_w);
+	fontdata[fontcharcount].y = ((float)y) / ((float)ui_h);
+	fontdata[fontcharcount].z = (float)b;
+	fontdata[fontcharcount].w = (float)color;
 
 	fontcharcount++;
 

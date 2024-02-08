@@ -62,9 +62,7 @@ HANDLER(PKT_ENTITY_EQUIPMENT, int ent_id, short slot, short item_id, short metad
 
 HANDLER(PKT_SPAWN_POSITION, int x, int y, int z)
 {
-	cl.game.pos[0] = (float) x;
-	cl.game.pos[1] = (float) y;
-	cl.game.pos[2] = (float) z;
+	cl.game.pos = vec3_from(x, y, z);
 }
 
 HANDLER(PKT_USE_ENTITY, int user_id, int target_id, bool attack)
@@ -87,15 +85,13 @@ HANDLER(PKT_RESPAWN, byte dimension)
 // 0x0A, 0x0B, 0x0C are not sent by the server
 HANDLER(PKT_PLAYER_MOVE_AND_LOOK, double x, double stance, double y, double z, float yaw, float pitch, bool on_ground)
 {
-	cl.game.pos[0] = x;
-	cl.game.pos[1] = y;
-	cl.game.pos[2] = z;
+	cl.game.pos = vec3_from(x, y, z);
 	cl.game.stance = stance;
-	cl.game.rot[1] = yaw;
-	cl.game.rot[0] = pitch;
+	cl.game.rot.yaw = yaw;
+	cl.game.rot.pitch = pitch;
 
 	// send back
-	net_write_0x0D(cl.game.pos[0], cl.game.pos[1], cl.game.stance, cl.game.pos[2], cl.game.rot[1], cl.game.rot[0], false);
+	net_write_0x0D(cl.game.pos.x, cl.game.pos.y, cl.game.stance, cl.game.pos.z, cl.game.rot.yaw, cl.game.rot.pitch, false);
 }
 
 // 0x0E, 0x0F, 0x10, are not sent by the server
@@ -117,11 +113,9 @@ HANDLER(PKT_ENTITY_ACTION, int ent_id, byte action)
 HANDLER(PKT_NAMED_ENTITY_SPAWN, int ent_id, string16 name, int x, int y, int z, byte yaw, byte pitch, short held_item)
 {
 	if(ent_id == cl.game.our_id) {
-		cl.game.pos[0] = (float)(x / 32);
-		cl.game.pos[1] = (float)(y / 32);
-		cl.game.pos[2] = (float)(z / 32);
-		cl.game.rot[1] = (float)(yaw * 360) / 256.0f;
-		cl.game.rot[0] = (float)(pitch * 360) / 256.0f;
+		cl.game.pos = vec3_div(vec3_from(x, y, z), 32.0f);
+		cl.game.rot.yaw = (float)(yaw * 360) / 256.0f;
+		cl.game.rot.pitch = (float)(pitch * 360) / 256.0f;
 	}
 
 	mem_free(name);
@@ -170,39 +164,33 @@ HANDLER(PKT_ENTITY, int ent_id)
 HANDLER(PKT_ENTITY_RELATIVE_MOVE, int ent_id, byte rel_x, byte rel_y, byte rel_z)
 {
 	if(ent_id == cl.game.our_id) {
-		cl.game.pos[0] += (float)(rel_x) / 32.0f;
-		cl.game.pos[1] += (float)(rel_y) / 32.0f;
-		cl.game.pos[2] += (float)(rel_z) / 32.0f;
+		cl.game.pos = vec3_add(cl.game.pos, vec3_div(vec3_from(rel_x, rel_y, rel_z), 32.0f));
 	}
 }
 
 HANDLER(PKT_ENTITY_LOOK, int ent_id, byte yaw, byte pitch)
 {
 	if(ent_id == cl.game.our_id) {
-		cl.game.rot[1] = (float)(yaw * 360) / 256.0f;
-		cl.game.rot[0] = (float)(pitch * 360) / 256.0f;
+		cl.game.rot.yaw = (float)(yaw * 360) / 256.0f;
+		cl.game.rot.pitch = (float)(pitch * 360) / 256.0f;
 	}
 }
 
 HANDLER(PKT_ENTITY_LOOK_AND_RELATIVE_MOVE, int ent_id, byte rel_x, byte rel_y, byte rel_z, byte yaw, byte pitch)
 {
 	if(ent_id == cl.game.our_id) {
-		cl.game.pos[0] += (float)(rel_x) / 32.0f;
-		cl.game.pos[1] += (float)(rel_y) / 32.0f;
-		cl.game.pos[2] += (float)(rel_z) / 32.0f;
-		cl.game.rot[1] = (float)(yaw * 360) / 256.0f;
-		cl.game.rot[0] = (float)(pitch * 360) / 256.0f;
+		cl.game.pos = vec3_add(cl.game.pos, vec3_div(vec3_from(rel_x, rel_y, rel_z), 32.0f));
+		cl.game.rot.yaw = (float)(yaw * 360) / 256.0f;
+		cl.game.rot.pitch = (float)(pitch * 360) / 256.0f;
 	}
 }
 
 HANDLER(PKT_ENTITY_TELEPORT, int ent_id, int x, int y, int z, byte yaw, byte pitch)
 {
 	if(ent_id == cl.game.our_id) {
-		cl.game.pos[0] = (float)(x) / 32.0f;
-		cl.game.pos[1] = (float)(y) / 32.0f;
-		cl.game.pos[2] = (float)(z) / 32.0f;
-		cl.game.rot[1] = (float)(yaw * 360) / 256.0f;
-		cl.game.rot[0] = (float)(pitch * 360) / 256.0f;
+		cl.game.pos = vec3_div(vec3_from(x, y, z), 32.0f);
+		cl.game.rot.yaw = (float)(yaw * 360) / 256.0f;
+		cl.game.rot.pitch = (float)(pitch * 360) / 256.0f;
 	}
 }
 

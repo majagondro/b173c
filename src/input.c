@@ -4,6 +4,7 @@
 #include "client/console.h"
 #include "client/client.h"
 #include "vid/ui.h"
+#include "net/net_internal.h"
 
 extern SDL_Window *window_handle;
 struct key_status input_keys[512] = {0};
@@ -15,35 +16,26 @@ struct keyname {
 	int keynum;
 };
 
-struct {
-	ubyte forward : 1;
-	ubyte back : 1;
-	ubyte left : 1;
-	ubyte right : 1;
-	ubyte attack : 1;
-	ubyte attack2 : 1;
-	ubyte jump : 1;
-	ubyte sneak : 1;
-} inkeys;
+struct gamekeys gamekeys = {0};
 
 cvar sensitivity = {"sensitivity", "2.5"};
 
-void forwarddown_f(void) { inkeys.forward = 1; }
-void forwardup_f(void) { inkeys.forward = 0; }
-void backdown_f(void) { inkeys.back = 1; }
-void backup_f(void) { inkeys.back = 0; }
-void leftdown_f(void) { inkeys.left = 1; }
-void leftup_f(void) { inkeys.left = 0; }
-void rightdown_f(void) { inkeys.right = 1; }
-void rightup_f(void) { inkeys.right = 0; }
-void jumpdown_f(void) { inkeys.jump = 1; }
-void jumpup_f(void) { inkeys.jump = 0; }
-void sneakdown_f(void) { inkeys.sneak = 1; }
-void sneakup_f(void) { inkeys.sneak = 0; }
-void attackdown_f(void) { inkeys.attack = 1; }
-void attackup_f(void) { inkeys.attack = 0; }
-void attack2down_f(void) { inkeys.attack2 = 1; }
-void attack2up_f(void) { inkeys.attack2 = 0; }
+void forwarddown_f(void) { gamekeys.forward = 1; }
+void forwardup_f(void) { gamekeys.forward = 0; }
+void backdown_f(void) { gamekeys.back = 1; }
+void backup_f(void) { gamekeys.back = 0; }
+void leftdown_f(void) { gamekeys.left = 1; }
+void leftup_f(void) { gamekeys.left = 0; }
+void rightdown_f(void) { gamekeys.right = 1; }
+void rightup_f(void) { gamekeys.right = 0; }
+void jumpdown_f(void) { gamekeys.jump = 1; }
+void jumpup_f(void) { gamekeys.jump = 0; }
+void sneakdown_f(void) { gamekeys.sneak = 1; }
+void sneakup_f(void) { gamekeys.sneak = 0; }
+void attackdown_f(void) { gamekeys.attack = 1; }
+void attackup_f(void) { gamekeys.attack = 0; }
+void attack2down_f(void) { gamekeys.attack2 = 1; }
+void attack2up_f(void) { gamekeys.attack2 = 0; }
 
 struct keyname keynames[] = {
 	{"TAB",        KEY_TAB},
@@ -254,15 +246,15 @@ static void handle_mouse(int x, int y, int scroll)
 		return;
 	}
 
-	cl.game.rot[0] += ((float)(y)) * 0.022f * sensitivity.value;
-	cl.game.rot[1] -= ((float)(x)) * 0.022f * sensitivity.value;
+	cl.game.rot.pitch += ((float)(y)) * 0.022f * sensitivity.value;
+	cl.game.rot.yaw -= ((float)(x)) * 0.022f * sensitivity.value;
 
 	// limit camera angles
-	cl.game.rot[1] = fmodf(cl.game.rot[1], 360.0f);
-	if(cl.game.rot[0] > 90.0f)
-		cl.game.rot[0] = 90.0f;
-	if(cl.game.rot[0] < -90.0f)
-		cl.game.rot[0] = -90.0f;
+	cl.game.rot.yaw = fmodf(cl.game.rot.yaw, 360.0f);
+	if(cl.game.rot.pitch > 90.0f)
+		cl.game.rot.pitch = 90.0f;
+	if(cl.game.rot.pitch < -90.0f)
+		cl.game.rot.pitch = -90.0f;
 
 	cl.game.rotated = true;
 }
@@ -305,44 +297,35 @@ static void handle_keys(void)
 		//fixmee rmme
 		float spd = 20.0f;
 		vec3 fwd, side, up;
-		cam_angles(fwd, side, up, cl.game.rot[1], 0.0f);
-		fwd[1] = 0.0f;
+		cam_angles(&fwd, &side, &up, cl.game.rot.yaw, 0.0f);
 
-		if(inkeys.forward) {
-			cl.game.pos[0] += fwd[0] * cl.frametime * spd;
-			cl.game.pos[2] += fwd[2] * cl.frametime * spd;
+		fwd.y = 0.0f;
+		side.y = 0.0f;
+
+		if(gamekeys.forward) {
+			cl.game.pos = vec3_add(cl.game.pos, vec3_mul(fwd, cl.frametime * spd));
 			cl.game.moved = true;
-		} else if(inkeys.back) {
-			cl.game.pos[0] -= fwd[0] * cl.frametime * spd;
-			cl.game.pos[2] -= fwd[2] * cl.frametime * spd;
+		} else if(gamekeys.back) {
+			cl.game.pos = vec3_sub(cl.game.pos, vec3_mul(fwd, cl.frametime * spd));
 			cl.game.moved = true;
 		}
 
-		if(inkeys.left) {
-			cl.game.pos[0] -= side[0] * cl.frametime * spd;
-			cl.game.pos[2] -= side[2] * cl.frametime * spd;
+		if(gamekeys.left) {
+			cl.game.pos = vec3_sub(cl.game.pos, vec3_mul(side, cl.frametime * spd));
 			cl.game.moved = true;
-		} else if(inkeys.right) {
-			cl.game.pos[0] += side[0] * cl.frametime * spd;
-			cl.game.pos[2] += side[2] * cl.frametime * spd;
+		} else if(gamekeys.right) {
+			cl.game.pos = vec3_add(cl.game.pos, vec3_mul(side, cl.frametime * spd));
 			cl.game.moved = true;
 		}
 
-		if(inkeys.jump) {
-			cl.game.pos[1] += cl.frametime * spd;
+		if(gamekeys.jump) {
+			cl.game.pos.y += cl.frametime * spd;
 			cl.game.stance += cl.frametime * spd;
 			cl.game.moved = true;
-		} else if(inkeys.sneak) {
-			cl.game.pos[1] -= cl.frametime * spd;
+		} else if(gamekeys.sneak) {
+			cl.game.pos.y -= cl.frametime * spd;
 			cl.game.stance -= cl.frametime * spd;
 			cl.game.moved = true;
-		}
-
-
-		if(inkeys.attack2) {
-			cl.game.attack[1] = true;
-		} else {
-			cl.game.attack[1] = false;
 		}
 	}
 
@@ -422,9 +405,9 @@ void in_update(void)
 				handle_mouse(e.motion.xrel, e.motion.yrel, 0);
 			} break;
 
-			case SDL_MOUSEWHEEL: {
+			case SDL_MOUSEWHEEL: { // fixme
 				key = e.wheel.y > 0 ? KEY_MOUSEWHEELUP : KEY_MOUSEWHEELDOWN;
-				input_keys[key].pressed = true; // fixme
+				input_keys[key].pressed = true;
 				input_keys[key].just_pressed = true;
 				handle_mouse(0, 0, e.wheel.y);
 			} break;

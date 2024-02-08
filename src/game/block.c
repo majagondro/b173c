@@ -219,19 +219,19 @@ bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_f
 {
 	extern cvar r_smartleaves;
 	vec3 face_offsets[6] = {
-		[BLOCK_FACE_Y_NEG] = {0, -1, 0},
-		[BLOCK_FACE_Y_POS] = {0, 1, 0},
-		[BLOCK_FACE_Z_NEG] = {0, 0, -1},
-		[BLOCK_FACE_Z_POS] = {0, 0, 1},
-		[BLOCK_FACE_X_NEG] = {-1, 0, 0},
-		[BLOCK_FACE_X_POS] = {1, 0, 0}
+		[BLOCK_FACE_Y_NEG] = vec3_from(0, -1, 0),
+		[BLOCK_FACE_Y_POS] = vec3_from(0, 1, 0),
+		[BLOCK_FACE_Z_NEG] = vec3_from(0, 0, -1),
+		[BLOCK_FACE_Z_POS] = vec3_from(0, 0, 1),
+		[BLOCK_FACE_X_NEG] = vec3_from(-1, 0, 0),
+		[BLOCK_FACE_X_POS] = vec3_from(1, 0, 0),
 	};
 
 	block_data other;
-	vec3 pos2 = {x, y, z};
-	vec3_add(pos2, pos2, face_offsets[face]);
+	vec3 pos2 = vec3_from(x, y, z);
+	pos2 = vec3_add(pos2, face_offsets[face]);
 
-	other = world_get_block(pos2[0], pos2[1], pos2[2]);
+	other = world_get_block(pos2.x, pos2.y, pos2.z);
 
 	if(block_is_semi_transparent(self) && block_is_semi_transparent(other))
 		return false;
@@ -317,7 +317,7 @@ static int compute_flow_decay(int x, int y, int z, block_id self_id)
 
 bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id self_id)
 {
-	vec3 dir = {0};
+	/*vec3 dir = {0};
 	int decay = compute_flow_decay(x, y, z, self_id);
 	float l;
 
@@ -342,11 +342,11 @@ bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id sel
 
 	l = vec3_len(dir);
 	if(l > 0.0f) {
-		vec3_mul_scalar(dir, dir, 1.0f / vec3_len(dir));
+		vec3_mul(dir, dir, 1.0f / vec3_len(dir));
 	}
 	vec3_copy(dest, dir);
 
-	return (dir[0] != 0 || dir[2] != 0);
+	return (dir[0] != 0 || dir[2] != 0);*/
 }
 
 void onchange_block_render_modes(void)

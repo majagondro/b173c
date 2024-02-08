@@ -2,6 +2,22 @@
 #include "common.h"
 #include <math.h>
 
+vec3 vec3_normalize(vec3 v)
+{
+	return vec3_div(v, vec3_len(v));
+}
+
+vec3 vec3_cross(vec3 a, vec3 b)
+{
+	vec3 s;
+
+	s.x = a.y * b.z - a.z * b.y;
+	s.y = a.z * b.x - a.x * b.z;
+	s.z = a.x * b.y - a.y * b.x;
+
+	return vec3_normalize(s);
+}
+
 void mat_multiply(mat4 dest, const mat4 a, const mat4 b) {
 	dest[0][0] = a[0][0] * b[0][0] + a[0][1] * b[1][0] + a[0][2] * b[2][0] + a[0][3] * b[3][0];
 	dest[0][1] = a[0][0] * b[0][1] + a[0][1] * b[1][1] + a[0][2] * b[2][1] + a[0][3] * b[3][1];
@@ -40,7 +56,7 @@ void mat_translate(mat4 dest, float x, float y, float z)
 	dest[2][3] = z;
 }
 
-void cam_angles(vec3 fwd, vec3 side, vec3 up, float yaw, float pitch)
+void cam_angles(vec3 *fwd, vec3 *side, vec3 *up, float yaw, float pitch)
 {
 	float cp, sp, cy, sy;
 	cp = cosf(DEG2RAD(pitch));
@@ -49,36 +65,35 @@ void cam_angles(vec3 fwd, vec3 side, vec3 up, float yaw, float pitch)
 	sy = sinf(DEG2RAD(yaw));
 
 	if(side != NULL) {
-		side[0] = -cy;
-		side[1] = 0;
-		side[2] = sy;
+		side->x = -cy;
+		side->y = 0;
+		side->z = sy;
 	}
 
 	if(up != NULL) {
-		up[0] = sy * sp;
-		up[1] = cp;
-		up[2] = cy * sp;
+		up->x = sy * sp;
+		up->y = cp;
+		up->z = cy * sp;
 	}
 
 	if(fwd != NULL) {
-		fwd[0] = sy * cp;
-		fwd[1] = -sp;
-		fwd[2] = cp * cy;
+		fwd->x = sy * cp;
+		fwd->y = -sp;
+		fwd->z = cp * cy;
 	}
 }
 
-void mat_view(mat4 dest, const vec3 pos, vec3 ang)
+void mat_view(mat4 dest, vec3 pos, vec3 ang)
 {
 	vec3 x, y, z;
 
-	cam_angles(z, x, y, ang[1], ang[0]);
-	vec3_invert(z, z);
-	//vec3_invert(x, x);
+	cam_angles(&z, &x, &y, ang.yaw, ang.pitch);
+	z = vec3_invert(z);
 
 	for(int i = 0; i < 3; i++) {
-		dest[i][0] = x[i];
-		dest[i][1] = y[i];
-		dest[i][2] = z[i];
+		dest[i][0] = x.array[i];
+		dest[i][1] = y.array[i];
+		dest[i][2] = z.array[i];
 		dest[i][3] = 0.0f;
 	}
 
@@ -113,20 +128,4 @@ void mat_projection(mat4 dest, float fov, float aspect, float znear, float zfar)
 	ymax = znear * tanf(DEG2RAD(fov) * 0.5f);
 	xmax = ymax * aspect;
 	mat_frustrum(dest, -xmax, xmax, -ymax, ymax, znear, zfar);
-}
-
-void vec3_normalize(vec3 dest, const vec3 a)
-{
-	float len = sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
-	dest[0] = a[0] / len;
-	dest[1] = a[1] / len;
-	dest[2] = a[2] / len;
-}
-
-void vec3_cross(vec3 dest, const vec3 a, const vec3 b)
-{
-	dest[0] = a[1] * b[2] - a[2] * b[1];
-	dest[1] = a[2] * b[0] - a[0] * b[2];
-	dest[2] = a[0] * b[1] - a[1] * b[0];
-	vec3_normalize(dest, dest);
 }

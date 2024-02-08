@@ -18,7 +18,7 @@ void *_mem_alloc_impl(size_t sz, const char *file, int line)
 	if(!ptr) {
 		con_printf("%s:%d (%lu): it appears that you've run out of memory. i will help"
 			   " out by killing myself, meanwhile you go and clean up"
-			   " your computer, buy more ram or, if the number in parenthesis"
+			   " your computer, buy more ram, or, if the number in parenthesis"
 			   " is very big, report this error to the developer.\n", file, line, sz);
 		exit(1);
 	}

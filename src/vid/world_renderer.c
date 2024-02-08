@@ -42,32 +42,6 @@ extern cvar vid_width, vid_height;
 
 extern struct gl_state gl;
 
-static float get_dist_to_plane(const struct plane *p, const vec3 point)
-{
-	return vec3_dot(p->normal, point) - p->dist;
-}
-
-static struct plane make_plane(vec3 point, vec3 normal)
-{
-	struct plane p;
-	vec3_copy(p.normal, normal);
-	p.dist = vec3_dot(normal, point);
-	return p;
-}
-
-static bool is_visible_on_frustum(const vec3 point, float radius)
-{
-	return
-		get_dist_to_plane(&frustum.right, point) > -radius &&
-		get_dist_to_plane(&frustum.left, point) > -radius &&
-		get_dist_to_plane(&frustum.bottom, point) > -radius &&
-		get_dist_to_plane(&frustum.top, point) > -radius &&
-		get_dist_to_plane(&frustum.far, point) > -radius &&
-		get_dist_to_plane(&frustum.near, point) > -radius;
-}
-
-void world_renderer_update_chunk_visibility(world_chunk *chunk);
-
 struct world_vertex *update_block_selection_box(float x, float y, float z)
 {
 	static struct world_vertex b[16];
@@ -93,69 +67,70 @@ struct world_vertex *update_block_selection_box(float x, float y, float z)
 	return b;
 }
 
+static float get_dist_to_plane(const struct plane *p, vec3 point)
+{
+	return vec3_dot(p->normal, point) - p->dist;
+}
+
+static struct plane make_plane(vec3 point, vec3 normal)
+{
+	struct plane p;
+	p.normal = normal;
+	p.dist = vec3_dot(normal, point);
+	return p;
+}
+
+static bool is_visible_on_frustum(vec3 point, float radius)
+{
+	return
+		get_dist_to_plane(&frustum.right, point) > -radius &&
+		get_dist_to_plane(&frustum.left, point) > -radius &&
+		get_dist_to_plane(&frustum.bottom, point) > -radius &&
+		get_dist_to_plane(&frustum.top, point) > -radius &&
+		get_dist_to_plane(&frustum.far, point) > -radius &&
+		get_dist_to_plane(&frustum.near, point) > -radius;
+}
+
+void world_renderer_update_chunk_visibility(world_chunk *chunk);
+
 static void update_view_matrix_and_frustum(void)
 {
 	float half_h = r_zfar.value * tanf(DEG2RAD(fov.value) * 0.5f);
 	float half_w = half_h * (vid_width.value / vid_height.value);
 	vec3 right, up, forward;
 	vec3 fwdFar, fwdNear;
-	vec3 normal;
 	vec3 tmp;
 
-	cl.game.pos[1] += VIEW_HEIGHT;
+	cl.game.pos.y += VIEW_HEIGHT;
 
-	/* find camera vectors */
-	cam_angles(forward, right, up, cl.game.rot[1], cl.game.rot[0]);
-	vec3_mul_scalar(fwdFar, forward, r_zfar.value);
-	vec3_mul_scalar(fwdNear, forward, r_znear.value);
+	cam_angles(&forward, &right, &up, cl.game.rot.yaw, cl.game.rot.pitch);
+	fwdFar = vec3_mul(forward, r_zfar.value);
+	fwdNear = vec3_mul(forward, r_znear.value);
 
 	/* update frustum */
-	vec3_add(tmp, cl.game.pos, fwdFar);
-	vec3_invert(normal, forward);
-	frustum.far = make_plane(tmp, normal);
+	frustum.far = make_plane(vec3_add(cl.game.pos, fwdFar), vec3_invert(forward));
+	frustum.near = make_plane(vec3_add(cl.game.pos, fwdNear), forward);
 
-	vec3_add(tmp, cl.game.pos, fwdNear);
-	vec3_copy(normal, forward);
-	frustum.near = make_plane(tmp, normal);
+	tmp = vec3_mul(right, half_w);
+	frustum.left = make_plane(cl.game.pos, vec3_cross(vec3_sub(fwdFar, tmp), up));
+	frustum.right = make_plane(cl.game.pos, vec3_cross(up, vec3_add(fwdFar, tmp)));
 
-	vec3_mul_scalar(tmp, right, half_w);
-	vec3_sub(tmp, fwdFar, tmp);
-	vec3_cross(normal, tmp, up);
-	frustum.left = make_plane(cl.game.pos, normal);
-
-	vec3_mul_scalar(tmp, right, half_w);
-	vec3_add(tmp, fwdFar, tmp);
-	vec3_cross(normal, up, tmp);
-	frustum.right = make_plane(cl.game.pos, normal);
-
-	vec3_mul_scalar(tmp, up, half_h);
-	vec3_sub(tmp, fwdFar, tmp);
-	vec3_cross(normal, right, tmp);
-	frustum.top = make_plane(cl.game.pos, normal);
-
-	vec3_mul_scalar(tmp, up, half_h);
-	vec3_add(tmp, fwdFar, tmp);
-	vec3_cross(normal, tmp, right);
-	frustum.bottom = make_plane(cl.game.pos, normal);
+	tmp = vec3_mul(up, half_h);
+	frustum.top = make_plane(cl.game.pos, vec3_cross(right, vec3_sub(fwdFar, tmp)));
+	frustum.bottom = make_plane(cl.game.pos, vec3_cross(vec3_add(fwdFar, tmp), right));
 
 	/* update view matrix */
 	mat_view(view_mat, cl.game.pos, cl.game.rot);
 
 	/* update look trace */
 	if(cl.state == cl_connected) {
-		cl.game.pos[0] -= 0.5f;
-		cl.game.pos[1] -= 0.5f;
-		cl.game.pos[2] -= 0.5f;
 		cl.game.look_trace = world_trace_ray(cl.game.pos, forward, 16.0f);
-		cl.game.pos[0] += 0.5f;
-		cl.game.pos[1] += 0.5f;
-		cl.game.pos[2] += 0.5f;
 		glBindBuffer(GL_ARRAY_BUFFER, gl_block_selection_vbo);
 		glBufferData(GL_ARRAY_BUFFER, 16 * sizeof(struct world_vertex), update_block_selection_box(cl.game.look_trace.x, cl.game.look_trace.y, cl.game.look_trace.z), GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
-	cl.game.pos[1] -= VIEW_HEIGHT;
+	cl.game.pos.y -= VIEW_HEIGHT;
 
 	/* update visibility of chunks */
 	if(world_chunk_map != NULL && hashmap_count(world_chunk_map) > 0) {
@@ -230,13 +205,13 @@ void world_renderer_shutdown(void)
 
 static void add_block_face(struct world_vertex v, block_face face)
 {
-	const vec3 offsets[6][4] = {
-		[BLOCK_FACE_Y_NEG] = {{0, 0, 0}, {0, 0, 1}, {1, 0, 0}, {1, 0, 1}},
-		[BLOCK_FACE_Y_POS] = {{0, 1, 0}, {1, 1, 0}, {0, 1, 1}, {1, 1, 1}},
-		[BLOCK_FACE_Z_NEG] = {{1, 1, 0}, {0, 1, 0}, {1, 0, 0}, {0, 0, 0}},
-		[BLOCK_FACE_Z_POS] = {{0, 1, 1}, {1, 1, 1}, {0, 0, 1}, {1, 0, 1}},
-		[BLOCK_FACE_X_NEG] = {{0, 1, 0}, {0, 1, 1}, {0, 0, 0}, {0, 0, 1}},
-		[BLOCK_FACE_X_POS] = {{1, 1, 1}, {1, 1, 0}, {1, 0, 1}, {1, 0, 0}}
+	static const vec3 offsets[6][4] = {
+		[BLOCK_FACE_Y_NEG] = {vec3_from(0, 0, 0), vec3_from(0, 0, 1), vec3_from(1, 0, 0), vec3_from(1, 0, 1)},
+		[BLOCK_FACE_Y_POS] = {vec3_from(0, 1, 0), vec3_from(1, 1, 0), vec3_from(0, 1, 1), vec3_from(1, 1, 1)},
+		[BLOCK_FACE_Z_NEG] = {vec3_from(1, 1, 0), vec3_from(0, 1, 0), vec3_from(1, 0, 0), vec3_from(0, 0, 0)},
+		[BLOCK_FACE_Z_POS] = {vec3_from(0, 1, 1), vec3_from(1, 1, 1), vec3_from(0, 0, 1), vec3_from(1, 0, 1)},
+		[BLOCK_FACE_X_NEG] = {vec3_from(0, 1, 0), vec3_from(0, 1, 1), vec3_from(0, 0, 0), vec3_from(0, 0, 1)},
+		[BLOCK_FACE_X_POS] = {vec3_from(1, 1, 1), vec3_from(1, 1, 0), vec3_from(1, 0, 1), vec3_from(1, 0, 0)}
 	};
 
 	struct world_vertex tl, tr, bl, br;
@@ -246,21 +221,21 @@ static void add_block_face(struct world_vertex v, block_face face)
 	bl = v;
 	br = v;
 
-	tl.x += offsets[face][0][0];
-	tl.y += offsets[face][0][1];
-	tl.z += offsets[face][0][2];
+	tl.x += offsets[face][0].x;
+	tl.y += offsets[face][0].y;
+	tl.z += offsets[face][0].z;
 
-	tr.x += offsets[face][1][0];
-	tr.y += offsets[face][1][1];
-	tr.z += offsets[face][1][2];
+	tr.x += offsets[face][1].x;
+	tr.y += offsets[face][1].y;
+	tr.z += offsets[face][1].z;
 
-	bl.x += offsets[face][2][0];
-	bl.y += offsets[face][2][1];
-	bl.z += offsets[face][2][2];
+	bl.x += offsets[face][2].x;
+	bl.y += offsets[face][2].y;
+	bl.z += offsets[face][2].z;
 
-	br.x += offsets[face][3][0];
-	br.y += offsets[face][3][1];
-	br.z += offsets[face][3][2];
+	br.x += offsets[face][3].x;
+	br.y += offsets[face][3].y;
+	br.z += offsets[face][3].z;
 
 	meshbuilder_add_quad(&tl, &tr, &bl, &br);
 }
@@ -439,9 +414,11 @@ void (*render_funcs[RENDER_TYPE_COUNT])(int, int, int, block_data) = {
 
 void remesh_chunk(world_chunk *chunk)
 {
-	static const vec3 axes[3] = {{1, 0, 0},
-								 {0, 1, 0},
-								 {0, 0, 1}};
+	static const vec3 axes[3] = {
+		vec3_from(1, 0, 0),
+		vec3_from(0, 1, 0),
+		vec3_from(0, 0, 1)
+	};
 
 	world_renderer_update_chunk_visibility(chunk);
 
@@ -640,7 +617,7 @@ void world_renderer_update_chunk_visibility(world_chunk *chunk)
 		struct world_chunk_glbuf *glbuf = &chunk->glbufs[bufidx];
 		int y_center = bufidx * WORLD_CHUNK_SIZE + WORLD_CHUNK_SIZE / 2;
 
-		glbuf->visible = is_visible_on_frustum((float[]) {x_center, y_center, z_center}, cube_diagonal_half);
+		glbuf->visible = is_visible_on_frustum(vec3_from(x_center, y_center, z_center), cube_diagonal_half);
 
 		/* if at least 1 glbuf is visible, mark the chunk as visible too */
 		if(glbuf->visible) {
@@ -691,8 +668,9 @@ void world_render(void)
 		if(chunk->visible) {
 			/* go from top to bottom so that the gpu can discard pixels of cave meshes which won't be seen */
 			for(int j = 7; j >= 0; j--) {
-				vec3 chunk_pos = {chunk->x << 4, j << 4, chunk->z << 4};
-				glUniform3fv(loc_chunkpos, 1, chunk_pos);
+				float chunkpos[3];
+				vec3 chunk_pos = vec3_from(chunk->x << 4, j << 4, chunk->z << 4);
+				glUniform3fv(loc_chunkpos, 1, chunk_pos.array);
 
 				if(!chunk->glbufs[j].visible || chunk->glbufs[j].num_vertices <= 0)
 					continue;
@@ -710,8 +688,8 @@ void world_render(void)
 		if(chunk->visible) {
 			/* go from top to bottom so that the gpu can discard pixels of cave meshes which won't be seen */
 			for(int j = 7; j >= 0; j--) {
-				vec3 chunk_pos = {chunk->x << 4, j << 4, chunk->z << 4};
-				glUniform3fv(loc_chunkpos, 1, chunk_pos);
+				vec3 chunk_pos = vec3_from(chunk->x << 4, j << 4, chunk->z << 4);
+				glUniform3fv(loc_chunkpos, 1, chunk_pos.array);
 
 				if(!chunk->glbufs[j].visible || chunk->glbufs[j].num_alpha_vertices <= 0)
 					continue;
@@ -724,9 +702,9 @@ void world_render(void)
 
 	/* draw block selection box */
 	if(!cl.game.look_trace.reached_end) {
-		vec3 cp = {-1,-1,-1};
+		vec3 cp = vec3_from1(-1.0f);
 		glLineWidth(2.0f);
-		glUniform3fv(loc_chunkpos, 1, cp);
+		glUniform3fv(loc_chunkpos, 1, cp.array);
 		glBindVertexBuffer(0, gl_block_selection_vbo, 0, sizeof(struct world_vertex));
 		glDrawArrays(GL_LINE_STRIP, 0, 16);
 	}

@@ -17,27 +17,48 @@
 
 #define roundf2i(f) ((int)roundf(f))
 
-#define vec3_from(v) {v[0], v[1], v[2]}
-#define vec3_add(dest, a, b) (dest)[0] = (a)[0] + (b)[0], (dest)[1] = (a)[1] + (b)[1], (dest)[2] = (a)[2] + (b)[2]
-#define vec3_copy(dest, a) (dest)[0] = (a)[0], (dest)[1] = (a)[1], (dest)[2] = (a)[2]
-#define vec3_sub(dest, a, b) (dest)[0] = (a)[0] - (b)[0], (dest)[1] = (a)[1] - (b)[1], (dest)[2] = (a)[2] - (b)[2]
-#define vec3_invert(dest, a) (dest)[0] = -(a)[0], (dest)[1] = -(a)[1], (dest)[2] = -(a)[2]
-#define vec3_mul_scalar(dest, a, b) (dest)[0] = (a)[0] * (b), (dest)[1] = (a)[1] * (b), (dest)[2] = (a)[2] * (b)
-#define vec3_dot(a, b) ((a)[0]*(b)[0]+(a)[1]*(b)[1]+(a)[2]*(b)[2])
-#define vec3_len(a) sqrtf((a)[0]*(a)[0]+(a)[1]*(a)[1]+(a)[2]*(a)[2])
+typedef union {
+	float ptr[2];
+	struct { float x, y; };
+	struct { float u, v; };
+} vec2;
 
-typedef float vec4[4];
-typedef float vec3[3];
-typedef float vec2[2];
+typedef union {
+	float array[3];
+	struct { float x, y, z; };
+	struct { float r, g, b; };
+	struct { float pitch, yaw, roll; };
+} vec3;
+
+typedef union {
+	float ptr[4];
+	struct { float x, y, z, w; };
+	struct { float r, g, b, a; };
+} vec4;
+
 typedef float mat4[4][4];
+
+#define vec3_from(xv, yv, zv) ((vec3){.x=(xv), .y=(yv), .z=(zv)})
+#define vec3_from1(x)      vec3_from((x), (x), (x))
+
+#define vec3_add(a, b) vec3_from((a).x + (b).x, (a).y + (b).y, (a).z + (b).z)
+#define vec3_sub(a, b) vec3_from((a).x - (b).x, (a).y - (b).y, (a).z - (b).z)
+#define vec3_mul(v, s) vec3_from((v).x * (s)  , (v).y * (s)  , (v).z * (s)  )
+#define vec3_div(v, s) vec3_mul(v, 1.0f / s)
+#define vec3_invert(v) vec3_sub(vec3_from1(0), (v))
+#define vec3_dot(a, b)   ((a).x * (b).x + (a).y * (b).y + (a).z * (b).z)
+#define vec3_len(a) sqrtf(vec3_dot((a), (a)))
+// these are not macros because clion could not handle them ;-)
+vec3 vec3_normalize(vec3 v);
+vec3 vec3_cross(vec3 a, vec3 b);
 
 void mat_multiply(mat4 dest, const mat4 a, const mat4 b);
 void mat_identity(mat4 dest);
 void mat_translate(mat4 dest, float x, float y, float z);
-void mat_view(mat4 dest, const vec3 pos, vec3 ang);
+void mat_view(mat4 dest, vec3 pos, vec3 ang);
 void mat_frustrum(mat4 dest, float l, float r, float b, float t, float n, float f);
 void mat_projection(mat4 dest, float fov, float aspect, float znear, float zfar);
-void vec3_cross(vec3 dest, const vec3 a, const vec3 b);
-void cam_angles(vec3 fwd, vec3 side, vec3 up, float yaw, float pitch);
+
+void cam_angles(vec3 *fwd, vec3 *side, vec3 *up, float yaw, float pitch);
 
 #endif

@@ -157,13 +157,6 @@ static int inflate_data(ubyte *in, ubyte *out, size_t size_in, size_t size_out)
 	return Z_OK;
 }
 
-static ubyte get_nibble(const ubyte *data, int idx8)
-{
-	int idx4 = idx8 >> 1;
-	int odd = idx8 & 1;
-	return !odd ? data[idx4] & 15 : data[idx4] >> 4 & 15;
-}
-
 static int world_set_chunk_data(world_chunk *chunk, const ubyte *data, int x_start, int y_start, int z_start, int x_end, int y_end, int z_end, int data_pos)
 {
 	for(int x = x_start; x < x_end; x++) {
@@ -389,36 +382,36 @@ ulong world_get_time(void)
 
 
 #define is_between(t, a, b) t >= a && t <= b
-float *world_calculate_sky_color(void)
+vec4 world_calculate_sky_color(void)
 {
-	static vec3 color;
+	static vec4 color = {.a = 1};
 
 	int t = time % 24000;
 
 	if(is_between(t, 14000, 22000)) {
 		// night
-		color[0] = 0.01f;
-		color[1] = 0.01f;
-		color[2] = 0.03f;
+		color.r = 0.01f;
+		color.g = 0.01f;
+		color.b = 0.03f;
 	} else if(is_between(t, 11000, 14000)) {
 		// start of night
 		// interpolate between day (11000) and night (14000)
 		float f = (float) (t - 11000) / 3000.0f;
-		color[0] = f * 0.01f + (1.0f - f) * 0.55f;
-		color[1] = f * 0.01f + (1.0f - f) * 0.7f;
-		color[2] = f * 0.03f + (1.0f - f) * 1.0f;
+		color.r = f * 0.01f + (1.0f - f) * 0.55f;
+		color.g = f * 0.01f + (1.0f - f) * 0.7f;
+		color.b = f * 0.03f + (1.0f - f) * 1.0f;
 	} else if(is_between(t, 22000, 24000)) {
 		// start of day
 		// interpolate between night (22000) and day (24000)
 		float f = (float) (t - 22000) / 2000.0f;
-		color[0] = f * 0.55f + (1.0f - f) * 0.01f;
-		color[1] = f * 0.7f + (1.0f - f) * 0.01f;
-		color[2] = f * 1.0f + (1.0f - f) * 0.03f;
+		color.r = f * 0.55f + (1.0f - f) * 0.01f;
+		color.g = f * 0.7f + (1.0f - f) * 0.01f;
+		color.b = f * 1.0f + (1.0f - f) * 0.03f;
 	} else {
 		// day
-		color[0] = 0.55f;
-		color[1] = 0.7f;
-		color[2] = 1.0f;
+		color.r = 0.55f;
+		color.g = 0.7f;
+		color.b = 1.0f;
 	}
 
 	return color;
@@ -453,51 +446,46 @@ float world_calculate_sky_light_modifier(void)
 	return lmod / 15.0f;
 }
 
-struct trace_result world_trace_ray(const vec3 _origin, const vec3 _dir, float maxlen)
+struct trace_result world_trace_ray(vec3 origin, vec3 dir, float maxlen)
 {
 	struct trace_result res = {0};
 	float dist = 0.0f;
-	vec3 p = vec3_from(_origin); // pos
 	int step[3];
 	block_face ofsface[3];
-	vec3 delta; // the distance the ray has to travel to go from 1 x/y/z-edge to the next x/y/z-edge
-	vec3 edgedist; // the distance the ray has to travel from its start position to the first x/y/z-edge
-
-	p[0] += 0.5f;
-	p[1] += 0.5f;
-	p[2] += 0.5f;
+	vec3 delta;
+	vec3 edgedist;
 
 	for(int axis = 0; axis < 3; axis++) {
-		delta[axis] = _dir[axis] == 0.0f ? 9999.0f : fabsf(1.0f / _dir[axis]);
+		delta.array[axis] = dir.array[axis] == 0.0f ? 9999.0f : fabsf(1.0f / dir.array[axis]);
 
-		if(_dir[axis] < 0.0f) {
+		if(dir.array[axis] < 0.0f) {
 			step[axis] = -1;
 			ofsface[axis] = 1;
-			edgedist[axis] = (p[axis] - floorf(p[axis])) * delta[axis];
+			edgedist.array[axis] = (origin.array[axis] - floorf(origin.array[axis])) * delta.array[axis];
 		} else {
 			step[axis] = 1;
 			ofsface[axis] = 0;
-			edgedist[axis] = (floorf(p[axis]) + 1.0 - p[axis]) * delta[axis];
+			edgedist.array[axis] = (floorf(origin.array[axis]) + 1.0 - origin.array[axis]) * delta.array[axis];
 		}
 	}
 
-	res.x = floorf(p[0]);
-	res.y = floorf(p[1]);
-	res.z = floorf(p[2]);
+	res.x = floorf(origin.x);
+	res.y = floorf(origin.y);
+	res.z = floorf(origin.z);
 
 	res.reached_end = true; // by default
 
 	while(dist < maxlen) {
-		if(edgedist[0] < edgedist[1] && edgedist[0] < edgedist[2]) {
-			edgedist[0] += delta[0];
+		if(edgedist.x < edgedist.y && edgedist.x < edgedist.z) {
+			edgedist.x += delta.x;
 			res.x += step[0];
 			res.hit_face = BLOCK_FACE_X_NEG + ofsface[0];
-		} else if(edgedist[1] < edgedist[2]) {
-			edgedist[1] += delta[1];
+		} else if(edgedist.y < edgedist.z) {
+			edgedist.y += delta.y;
 			res.y += step[1];
 			res.hit_face = BLOCK_FACE_Y_NEG + ofsface[1];
 		} else {
-			edgedist[2] += delta[2];
+			edgedist.z += delta.z;
 			res.z += step[2];
 			res.hit_face = BLOCK_FACE_Z_NEG + ofsface[2];
 		}

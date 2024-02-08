@@ -12,6 +12,17 @@ void in_init(void);
 void in_update(void);
 void in_shutdown(void);
 
+struct gamekeys {
+	ubyte forward : 1;
+	ubyte back : 1;
+	ubyte left : 1;
+	ubyte right : 1;
+	ubyte attack : 1;
+	ubyte attack2 : 1;
+	ubyte jump : 1;
+	ubyte sneak : 1;
+};
+
 struct key_status {
 	bool pressed       : 1; // this is true while the key is pressed
 	bool just_pressed  : 1; // this is only true for 1 frame

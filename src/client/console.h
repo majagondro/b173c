@@ -3,31 +3,31 @@
 
 #include "common.h"
 
-#define COLOR_BLACK "\xa7" "0"
-#define COLOR_DBLUE "\xa7" "1"
-#define COLOR_DGREEN "\xa7" "2"
-#define COLOR_DCYAN "\xa7" "3"
-#define COLOR_DRED "\xa7" "4"
-#define COLOR_DPINK "\xa7" "6"
-#define COLOR_DYELLOW "\xa7" "7"
-#define COLOR_GRAY "\xa7" "7"
-#define COLOR_DGRAY "\xa7" "8"
-#define COLOR_BLUE "\xa7" "9"
-#define COLOR_GREEN "\xa7" "a"
-#define COLOR_CYAN "\xa7" "b"
-#define COLOR_RED "\xa7" "c"
-#define COLOR_PINK "\xa7" "d"
-#define COLOR_YELLOW "\xa7" "e"
-#define COLOR_WHITE "\xa7" "f"
-#define COLOR_INVISIBLE "\xa7" "i"
-/* must be followed by an integer */
-/* moves the cursor right by (the integer) pixels */
-#define COLOR_PADPX "\xa7" "p"
+#define CON_STYLE_PREFIX_STR  "\xa7"
+#define CON_STYLE_PREFIX_CHAR '\xa7'
+
+#define CON_STYLE_BLACK       CON_STYLE_PREFIX_STR "0"
+#define CON_STYLE_DARK_BLUE   CON_STYLE_PREFIX_STR "1"
+#define CON_STYLE_DARK_GREEN  CON_STYLE_PREFIX_STR "2"
+#define CON_STYLE_DARK_CYAN   CON_STYLE_PREFIX_STR "3"
+#define CON_STYLE_DARK_RED    CON_STYLE_PREFIX_STR "4"
+#define CON_STYLE_PURPLE      CON_STYLE_PREFIX_STR "6"
+#define CON_STYLE_ORANGE      CON_STYLE_PREFIX_STR "7"
+#define CON_STYLE_LIGHT_GRAY  CON_STYLE_PREFIX_STR "7"
+#define CON_STYLE_GRAY        CON_STYLE_PREFIX_STR "8"
+#define CON_STYLE_BLUE        CON_STYLE_PREFIX_STR "9"
+#define CON_STYLE_LIME        CON_STYLE_PREFIX_STR "a"
+#define CON_STYLE_CYAN        CON_STYLE_PREFIX_STR "b"
+#define CON_STYLE_RED         CON_STYLE_PREFIX_STR "c"
+#define CON_STYLE_PINK        CON_STYLE_PREFIX_STR "d"
+#define CON_STYLE_YELLOW      CON_STYLE_PREFIX_STR "e"
+#define CON_STYLE_WHITE       CON_STYLE_PREFIX_STR "f"
+#define CON_STYLE_INVISIBLE   CON_STYLE_PREFIX_STR "i"
+#define CON_STYLE_PADPX       CON_STYLE_PREFIX_STR "p"
 
 typedef struct cvar {
 	char *name;
 	char *default_value;
-
 	void (*onchange)(void);
 
 	char *string;
@@ -47,7 +47,6 @@ struct cmd {
 struct alias {
 	char *name;
 	char *cmd;
-	bool server;
 
 	struct alias *next;
 };
@@ -68,7 +67,7 @@ void con_printf(char *text, ...);
 // cvar/cmd related
 
 void cmd_init(void);
-void cmd_exec(char *text, bool from_server);
+void cmd_exec(char *text);
 
 void cvar_register(cvar *c);
 void cmd_register(const char *name, void (*func)(void));
@@ -81,12 +80,11 @@ struct cmd *cmd_find(const char *name);
 struct alias *alias_find(const char *name);
 
 bool cvar_set(const char *name, const char *value);
-// doesnt call onchange functions
+// silent set doesn't call onchange functions
 bool cvar_set_silent(const char *name, const char *value);
 
 char *cmd_argv(int i);
 int cmd_argc(void);
-bool cmd_is_stuffed(void);
 char *cmd_args(int from, int to);
 
 #endif

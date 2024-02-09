@@ -7,14 +7,16 @@
 
 #define CONSOLE_MAX_LINES 512
 #define CONSOLE_MAX_LINE 256
+#define HISTORY_MAX_LINES 1024
 
-static char conbuf[1024 * 1024] = {0};
+static char conbuf[1024 * 1024] = {0}; // fixme buf?
 static size_t conbuf_len = 0;
-static size_t conbuf_lines = 0;
 static char input_line[CONSOLE_MAX_LINE + 1] = {0};
 static int input_pos = 0;
-static int history_idx = 0;
 static int line_count = 0;
+static char history[HISTORY_MAX_LINES][sizeof(input_line)] = {0};
+static int history_idx = 0;
+static int history_len = 0;
 
 bool con_opened = true;
 int con_scroll = 0;
@@ -46,11 +48,11 @@ void con_init(void)
 	cmd_register("toggleconsole", toggleconsole_f);
 }
 
-static void con_putinc(ubyte c)
+static void con_put_char(ubyte c)
 {
 	if(input_pos < CONSOLE_MAX_LINE) {
 		if(strnlen(input_line, CONSOLE_MAX_LINE) == CONSOLE_MAX_LINE) {
-			// dont
+			// reached the end of the input line
 		} else {
 			memmove(&input_line[input_pos + 1], &input_line[input_pos], CONSOLE_MAX_LINE - input_pos - 1);
 			input_line[input_pos++] = c;
@@ -62,21 +64,22 @@ static void con_submit(void)
 {
 	con_printf("]%s\n", input_line);
 
-	cmd_exec((char *) input_line, false);
+	cmd_exec(input_line);
+
+	if(input_line[0] != 0) {
+		strlcpy(history[history_len], input_line, sizeof(history[history_len]));
+		history_len++;
+		if(history_len >= HISTORY_MAX_LINES - 1) {
+			memmove(history, &history[HISTORY_MAX_LINES / 2 - 1], HISTORY_MAX_LINES / 2 * sizeof(history[0]));
+			memset(&history[HISTORY_MAX_LINES / 2], 0, HISTORY_MAX_LINES / 2 * sizeof(history[0]));
+			history_len = HISTORY_MAX_LINES / 2;
+		}
+	}
 
 	memset(input_line, 0, CONSOLE_MAX_LINE);
 	input_pos = 0;
-
-	// reset history index
-	history_idx = 0;
-
-	// scroll back to bottom
 	con_scroll = 0;
-}
-
-static const char *get_nth_inputted_line(int n)
-{
-	return NULL;
+	history_idx = 0;
 }
 
 static int calc_max_scroll(void)
@@ -103,13 +106,13 @@ bool con_handle_key(int key, int keymod)
 			char *clipboard = SDL_GetClipboardText();
 			int i;
 			for(i = 0; i < (int) strlen(clipboard); i++)
-				con_putinc(clipboard[i]);
+				con_put_char(clipboard[i]);
 			SDL_free(clipboard);
 			return true;
 		}
 
 		c = (char) ((key - KEY_A) + 'a' - (caps_strength * ('a' - 'A')));
-		con_putinc((ubyte) c);
+		con_put_char((ubyte) c);
 		return true;
 	}
 
@@ -150,7 +153,7 @@ bool con_handle_key(int key, int keymod)
 			if(keymod & KEYMOD_CTRL) {
 				con_scroll = calc_max_scroll();
 			} else {
-				input_pos = CONSOLE_MAX_LINE;
+				input_pos = strlen(input_line);
 			}
 		} break;
 
@@ -166,30 +169,37 @@ bool con_handle_key(int key, int keymod)
 			}
 		} break;
 
-		case KEY_DOWN:
-			history_idx -= 2;
-			if(history_idx < -1)
-				history_idx = -1;
-			/* fall through */
-		case KEY_UP: {
-			/*struct conline *l;
-			l = get_nth_inputted_line(history_idx);
-			if(l == NULL) {
-				if(history_idx != 0) {
-					history_idx = 0;
-					memset(input_line, 0, sizeof(input_line));
-					input_pos = 0;
-				}
-				return true;
-			}
-			strlcpy(input_line, l->line+1, CONSOLE_MAX_LINE - 1);
-			input_pos = strlen(input_line) - 1;
-			input_line[input_pos] = 0;
-			history_idx++;*/
+		case KEY_MOUSEWHEELDOWN: {
+			con_scroll--;
 		} break;
 
-#define checkkey(k, c) case (k): { con_putinc(c); } break
-#define checkkey2(k, c_norm, c_shift) case (k): { con_putinc((char)((keymod & KEYMOD_SHIFT) ? (c_shift) : (c_norm))); } break
+		case KEY_MOUSEWHEELUP: {
+			con_scroll++;
+		} break;
+
+		// TODO: THIS IS JANK!
+		case KEY_DOWN:
+			history_idx -= 2;
+			if(history_idx < 0) {
+				history_idx = 0;
+				memset(input_line, 0, CONSOLE_MAX_LINE);
+				input_pos = 0;
+				break;
+			}
+			/* fall through */
+		case KEY_UP: {
+			char *l;
+			l = history[history_len-history_idx++-1];
+			// todo: this loops when it reaches the end and it should not do that
+			if(history_idx >= history_len)
+				history_idx = 0;
+			strlcpy(input_line, l, CONSOLE_MAX_LINE);
+			input_pos = strlen(input_line);
+			input_line[input_pos] = 0;
+		} break;
+
+#define checkkey(k, c) case (k): { con_put_char(c); } break
+#define checkkey2(k, c_norm, c_shift) case (k): { con_put_char((char)((keymod & KEYMOD_SHIFT) ? (c_shift) : (c_norm))); } break
 
 		checkkey(KEY_SPACE, ' ');
 		checkkey2(KEY_1, '1', '!');
@@ -221,16 +231,6 @@ bool con_handle_key(int key, int keymod)
 	return true;
 }
 
-static void recalc_num_lines(void)
-{
-	conbuf_lines = 0;
-	for(size_t i = 0; i < sizeof(conbuf); i++) {
-		if(conbuf[i] == '\n') {
-			conbuf_lines++;
-		}
-	}
-}
-
 void con_printf(char *fmt, ...)
 {
 	va_list va;
@@ -242,7 +242,7 @@ void con_printf(char *fmt, ...)
 	va_start(va, fmt);
 	n = (size_t) vsnprintf(conbuf + conbuf_len, sizeof(conbuf), fmt, va);
 	printf("%s", conbuf + conbuf_len);
-	conbuf_len += n + 1;
+	conbuf_len += n + 1; // todo do not include the null terminator
 
 	va_end(va);
 
@@ -254,8 +254,6 @@ void con_printf(char *fmt, ...)
 		conbuf_len = nb;
 		conbuf_len += snprintf(conbuf, sizeof(conbuf), "console buffer truncated\n");
 	}
-
-	recalc_num_lines();
 }
 
 static void draw_input_line(int y)
@@ -275,7 +273,8 @@ static void draw_input_line(int y)
 		blink = !blink;
 	}
 }
-static char *textwidthwordmax(char *text, int maxwidth)
+
+static char *get_last_word_that_fits_in_width(char *text, int maxwidth)
 {
 	int w = 0;
 	char *lastword = text;
@@ -298,7 +297,7 @@ static void drawwrap(int x, int *y, char *p, int *scroll)
 		return;
 
 	// todo: calculate proper y and go down instead of up? thus removing recursion
-	end = textwidthwordmax(p, ui_w);
+	end = get_last_word_that_fits_in_width(p, ui_w);
 
 	if(!end)
 		// drawtext p?
@@ -308,7 +307,7 @@ static void drawwrap(int x, int *y, char *p, int *scroll)
 		drawwrap(x, y, end, scroll);
 	} else {
 		if(*scroll <= 0) {
-			ui_drawtext(end, x, *y);
+			ui_drawtext(x, *y, end);
 			*y -= LINE_HEIGHT_PX;
 		}
 		(*scroll)--;
@@ -317,7 +316,7 @@ static void drawwrap(int x, int *y, char *p, int *scroll)
 	if(*scroll <= 0) {
 		old = *end;
 		*end = 0;
-		ui_drawtext(p, x, *y);
+		ui_drawtext(x, *y, p);
 		*end = old;
 		*y -= LINE_HEIGHT_PX;
 	} else {
@@ -334,10 +333,12 @@ void ui_draw_console(void)
 
 	if(!con_opened)
 		return;
+
+	draw_input_line(y);
+
 	if(conbuf_len <= 0)
 		return;
 
-	draw_input_line(y);
 	y -= LINE_HEIGHT_PX;
 
 	p = conbuf + conbuf_len - 2;
@@ -356,6 +357,7 @@ void ui_draw_console(void)
 			break;
 		}
 		if(y <= -LINE_HEIGHT_PX) {
+			// further lines can't be seen
 			break;
 		}
 		p -= 2;

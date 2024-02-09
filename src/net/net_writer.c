@@ -9,21 +9,24 @@ void net_write_packets(void)
 	static bool sent_handshake = false;
 
 	if(cl.state == cl_disconnected && sent_handshake) {
+		// this is executed at the end of net_process (in net.c)
+		// used to reset this handshake flag
 		sent_handshake = false;
 		return;
 	}
 
 	if(cl.state == cl_connecting && !sent_handshake) {
+		// send handshake to the server
 		extern cvar cvar_name;
-		// send handshake once
-		con_printf(COLOR_DGRAY "awaiting handshake...\n");
 		net_write_0x02(c16(cvar_name.string));
 		sent_handshake = true;
+		con_printf(CON_STYLE_GRAY "awaiting handshake...\n");
 	}
 
 	if(cl.state != cl_connected)
 		return;
 
+	// write movement packet depending on what the user did
 	if(cl.game.moved && cl.game.rotated) {
 		cl.game.moved = false;
 		cl.game.rotated = false;
@@ -39,7 +42,7 @@ void net_write_packets(void)
 	}
 }
 
-// macro trickery so the packet IDS get properly expanded
+// macro trickery so the packet id gets properly expanded
 // so we get
 //    void net_write_0x00(void)
 // instead of

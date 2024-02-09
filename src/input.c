@@ -4,17 +4,10 @@
 #include "client/console.h"
 #include "client/client.h"
 #include "vid/ui.h"
-#include "net/net_internal.h"
 
-extern SDL_Window *window_handle;
 struct key_status input_keys[512] = {0};
 
 static int capslock_keymod = 0;
-
-struct keyname {
-	char *name;
-	int keynum;
-};
 
 struct gamekeys gamekeys = {0};
 
@@ -37,7 +30,10 @@ void attackup_f(void) { gamekeys.attack = 0; }
 void attack2down_f(void) { gamekeys.attack2 = 1; }
 void attack2up_f(void) { gamekeys.attack2 = 0; }
 
-struct keyname keynames[] = {
+struct keyname {
+	char *name;
+	int keynum;
+} keynames[] = {
 	{"TAB",        KEY_TAB},
 	{"ENTER",      KEY_RETURN},
 	{"ESCAPE",     KEY_ESCAPE},
@@ -88,7 +84,7 @@ struct keyname keynames[] = {
 
 	{"SEMICOLON",  KEY_SEMICOLON},
 
-	// todo: add more
+	// add more?
 
 	{NULL,         0}
 };
@@ -99,6 +95,7 @@ int key_from_name(const char *name)
 
 	if (!name || !name[0])
 		return -1;
+
 	if (name[1] == 0) {
 		if(name[0] >= 'A' && name[0] <= 'Z') {
 			return name[0] - 'A' + KEY_A;
@@ -149,7 +146,7 @@ void bind_f(void)
 	char *cmd;
 
 	if (cmd_argc() != 2 && cmd_argc() != 3) {
-		con_printf("usage: %s <key> [command]\n", cmd_argv(0));
+		con_printf("usage: %s <key> [<command>]\n", cmd_argv(0));
 		return;
 	}
 
@@ -184,7 +181,7 @@ void bindlist_f(void)
 		if(input_keys[i].binding) {
 			const char *name = name_from_key(i);
 			int px = maxwidth - ui_strwidth(name);
-			con_printf("%s"COLOR_PADPX"%d : \"%s\"\n", name, px, input_keys[i].binding);
+			con_printf("%s"CON_STYLE_PADPX"%d : \"%s\"\n", name, px, input_keys[i].binding);
 		}
 	}
 }
@@ -239,6 +236,7 @@ void in_init(void)
 
 static void handle_mouse(int x, int y, int scroll)
 {
+	// todo: maybe move to con_handle_key, since KEY_MOUSEWHEELUP/DOWN exists now?
 	if(con_opened) {
 		con_scroll += scroll;
 		if(con_scroll < 0)
@@ -248,15 +246,11 @@ static void handle_mouse(int x, int y, int scroll)
 
 	cl.game.rot.pitch += ((float)(y)) * 0.022f * sensitivity.value;
 	cl.game.rot.yaw -= ((float)(x)) * 0.022f * sensitivity.value;
+	cl.game.rotated = true;
 
 	// limit camera angles
 	cl.game.rot.yaw = fmodf(cl.game.rot.yaw, 360.0f);
-	if(cl.game.rot.pitch > 90.0f)
-		cl.game.rot.pitch = 90.0f;
-	if(cl.game.rot.pitch < -90.0f)
-		cl.game.rot.pitch = -90.0f;
-
-	cl.game.rotated = true;
+	cl.game.rot.pitch = bound(-90.0f, cl.game.rot.pitch, 90.0f);
 }
 
 static void handle_keys(void)
@@ -285,10 +279,10 @@ static void handle_keys(void)
 			continue;
 
 		if (input_keys[key].just_pressed) {
-			cmd_exec(input_keys[key].binding, false);
+			cmd_exec(input_keys[key].binding);
 		} else if (input_keys[key].just_released && input_keys[key].binding[0] == '+') {
 			input_keys[key].binding[0] = '-';
-			cmd_exec(input_keys[key].binding, false);
+			cmd_exec(input_keys[key].binding);
 			input_keys[key].binding[0] = '+';
 		}
 	}
@@ -334,9 +328,8 @@ static void handle_keys(void)
 void in_update(void)
 {
 	SDL_Event e;
-	int key;
 
-	for (key = 0; key < KEY_NUM; key++) {
+	for (int key = 0; key < KEY_NUM; key++) {
 		if(key == KEY_MOUSEWHEELUP || key == KEY_MOUSEWHEELDOWN) {
 			if(input_keys[key].just_pressed || input_keys[key].pressed) {
 				input_keys[key].just_released = true;
@@ -370,6 +363,7 @@ void in_update(void)
 			} break;
 
 			case SDL_MOUSEBUTTONDOWN: {
+				int key;
 				switch(e.button.button) {
 					case SDL_BUTTON_LEFT:
 						key = KEY_MOUSE1;
@@ -386,6 +380,7 @@ void in_update(void)
 			} break;
 
 			case SDL_MOUSEBUTTONUP: {
+				int key;
 				switch(e.button.button) {
 					case SDL_BUTTON_LEFT:
 						key = KEY_MOUSE1;
@@ -405,8 +400,10 @@ void in_update(void)
 				handle_mouse(e.motion.xrel, e.motion.yrel, 0);
 			} break;
 
-			case SDL_MOUSEWHEEL: { // fixme
+			case SDL_MOUSEWHEEL: {
+				int key;
 				key = e.wheel.y > 0 ? KEY_MOUSEWHEELUP : KEY_MOUSEWHEELDOWN;
+				// fixme: mousewheel in input_keys is jank
 				input_keys[key].pressed = true;
 				input_keys[key].just_pressed = true;
 				handle_mouse(0, 0, e.wheel.y);

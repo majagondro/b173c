@@ -6,10 +6,10 @@ cvar *cvarlist = NULL;
 struct cmd *cmdlist = NULL;
 struct alias *aliaslist = NULL;
 
-static char *$argv[64];
-static int $argc = 0;
+static char *_cmd_argv[64]; // fixme buf
+static int _cmd_argc = 0;
 
-static char *emptystr = "";
+static char * emptystr = "";
 
 cvar developer = {"developer", "0"};
 cvar cvar_name = {"name", "player"};
@@ -25,19 +25,19 @@ void cmd_init(void)
 
 char *cmd_argv(int i)
 {
-	if(i < 0 || i >= $argc)
+	if(i < 0 || i >= _cmd_argc)
 		return emptystr;
-	return $argv[i];
+	return _cmd_argv[i];
 }
 
 int cmd_argc(void)
 {
-	return $argc;
+	return _cmd_argc;
 }
 
 char *cmd_args(int from, int to)
 {
-	static char buf[4096]; // :|
+	static char buf[4096]; // fixme buf
 	int i;
 
 	if(from < 0)
@@ -108,8 +108,6 @@ void alias_register(const char *name, const char *command)
 
 	a->cmd = mem_alloc(strlen(command) + 1);
 	strcpy(a->cmd, command);
-
-	a->server = cmd_is_stuffed();
 
 	a->next = aliaslist;
 	aliaslist = a;
@@ -225,24 +223,23 @@ static void cmd_cvar(void)
 {
 	char *name = cmd_argv(0);
 	cvar *c = cvar_find(name);
-	size_t len;
 
 	if(c == NULL) {
 		con_printf("cmd_cvar: WTF?!\n");
-		exit(1);
+		return;
 	}
 
 	if(cmd_argc() == 1) {
 		// display info
 		con_printf("%s : default value is \"%s\"\n", name, c->string);
-		con_printf(COLOR_INVISIBLE "%s : " COLOR_WHITE "current value is \"%s\"\n", name, c->string);
+		con_printf(CON_STYLE_INVISIBLE "%s : " CON_STYLE_WHITE "current value is \"%s\"\n", name, c->string);
 	} else {
 		// set
 		cvar_set(name, cmd_argv(1));
 	}
-
 }
 
+// kind of like strtok, but customized
 char *tokenize(char *text)
 {
 	static char *totok;
@@ -312,11 +309,11 @@ char *tokenize(char *text)
 	}
 }
 
-void cmd_exec_impl(char *text, bool from_server);
-void cmd_exec(char *text, bool from_server)
+void cmd_exec_impl(char *text);
+void cmd_exec(char *text)
 {
 	bool quoted = false;
-	char buf[2048] = {0};
+	char buf[2048] = {0}; // fixme buf
 	int len = 0;
 
 	while(*text) {
@@ -326,7 +323,7 @@ void cmd_exec(char *text, bool from_server)
 			if(!quoted) {
 				// dont bother executing if its empty
 				if(buf[0] != 0)
-					cmd_exec_impl(buf, from_server);
+					cmd_exec_impl(buf);
 				memset(buf, 0, sizeof(buf));
 				len = 0;
 				text++;
@@ -337,18 +334,13 @@ void cmd_exec(char *text, bool from_server)
 	}
 
 	if(buf[0] != 0) {
-		cmd_exec_impl(buf, from_server);
+		cmd_exec_impl(buf);
 	}
 }
 
-static bool stuffed = false;
-bool cmd_is_stuffed(void) { return stuffed; }
-
-static int recurse_protection = 0;
-
 static bool is_color_code(char c)
 {
-	return isdigit(c) || (c >= 'a' && c <= 'f') || c == 'p' || c == 'i';
+	return isdigit(c) || (c >= 'a' && c <= 'f') || c == 'p' || c == '-' || c == 'i';
 }
 
 static void replace_color_codes(char *text)
@@ -358,7 +350,7 @@ static void replace_color_codes(char *text)
 	for(i = 0; i < len - 1; i++) {
 		if(text[i] == '&' && is_color_code(text[i+1])) {
 			if(i == 0 || (i > 0 && text[i-1] != '\\')) {
-				text[i] = '\xa7';
+				text[i] = CON_STYLE_PREFIX_CHAR;
 			} else if((i > 0 && text[i-1] == '\\')) {
 				memmove(&text[i-1], &text[i], len - i);
 				text[len - 1] = 0;
@@ -367,7 +359,7 @@ static void replace_color_codes(char *text)
 	}
 }
 
-void cmd_exec_impl(char *text, bool from_server)
+void cmd_exec_impl(char *text)
 {
 	char *tok;
 	char *totok;
@@ -375,14 +367,13 @@ void cmd_exec_impl(char *text, bool from_server)
 	cvar *cvar;
 	struct alias *alias;
 	int i;
-	char buf[4096] = {0};
-
-	stuffed = from_server;
+	char buf[4096] = {0}; // fixme buf
+	static int runaway_protection = 0;
 
 // reset old args
-	for(i = 0; i < $argc; i++)
-		mem_free($argv[i]);
-	$argc = 0;
+	for(i = 0; i < _cmd_argc; i++)
+		mem_free(_cmd_argv[i]);
+	_cmd_argc = 0;
 
 // make new args
 	// new var because strtok modifies the string
@@ -391,44 +382,44 @@ void cmd_exec_impl(char *text, bool from_server)
 	strlcpy(totok, text, 4096);
 	replace_color_codes(totok);
 	for(tok = tokenize(totok); tok != NULL; tok = tokenize(NULL))
-		$argv[$argc++] = copystr(tok);
+		_cmd_argv[_cmd_argc++] = copystr(tok);
 	mem_free(totok);
 
-	if($argc == 0)
+	if(_cmd_argc == 0)
 		return;
 
 // try to find cmd
-	cmd = cmd_find($argv[0]);
+	cmd = cmd_find(_cmd_argv[0]);
 	if(cmd != NULL) {
 		cmd->func();
 		return;
 	}
 
 // not found, so alias
-	alias = alias_find($argv[0]);
+	alias = alias_find(_cmd_argv[0]);
 	if(alias != NULL) {
-		if(recurse_protection < 1000) {
-			if($argc > 1) {
+		if(runaway_protection < 1000) {
+			if(_cmd_argc > 1) {
 				snprintf(buf, sizeof(buf), "%s %s", alias->cmd, cmd_args(1, cmd_argc()));
-				cmd_exec(buf, from_server);
+				cmd_exec(buf);
 			} else {
-				cmd_exec(alias->cmd, from_server);
+				cmd_exec(alias->cmd);
 			}
-			recurse_protection++;
+			runaway_protection++;
 		} else {
 			con_printf("recursing alias detected - stopping execution\n");
-			recurse_protection = 0;
+			runaway_protection = 0;
 		}
 		return;
 	}
 
 // not found, so cvar
-	cvar = cvar_find($argv[0]);
+	cvar = cvar_find(_cmd_argv[0]);
 	if(cvar != NULL) {
 		cmd_cvar();
 		return;
 	}
 
 // nothing was found
-	con_printf("unknown command \"%s\"\n", $argv[0]);
+	con_printf("unknown command \"%s\"\n", _cmd_argv[0]);
 }

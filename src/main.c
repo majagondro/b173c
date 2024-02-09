@@ -28,7 +28,7 @@ void *_mem_alloc_impl(size_t sz, const char *file, int line)
 
 const char *va(const char *fmt, ...)
 {
-	static char buf[4096];
+	static char buf[4096]; // fixme buf
 	va_list va;
 
 	va_start(va, fmt);
@@ -62,10 +62,8 @@ int main(void)
 
 	world_init();
 
-	cmd_exec("exec config", false);
-	cmd_exec("exec autoexec", false);
-
-	con_printf("lorem ipsum dolor sit amet.\n");
+	cmd_exec("exec config");
+	cmd_exec("exec autoexec");
 
 	while(!cl.done) {
 		cl.frametime = calc_frametime();
@@ -75,12 +73,7 @@ int main(void)
 		phys_timeout -= cl.frametime;
 		if(phys_timeout <= 0.0f) {
 			net_process();
-
-			if(world_is_init()) {
-				world_set_time(world_get_time() + 1); // client prediction of time
-			}
-
-			phys_timeout = 0.05f; // 20 u/s
+			phys_timeout = 0.05f; // 20 updates per second
 		}
 
 		vid_update();

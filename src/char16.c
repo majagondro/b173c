@@ -3,7 +3,7 @@
 
 char16 *c16(const char *s)
 {
-	static char16 buf[4096]; // .....
+	static char16 buf[4096]; // fixme buf
 	int i;
 	for(i = 0; s && i < (int) strlen(s) && i < 4096; i++)
 		buf[i] = s[i];
@@ -13,7 +13,7 @@ char16 *c16(const char *s)
 
 char *c8(const char16 *s)
 {
-	static char buf[4096];
+	static char buf[4096]; // fixme buf
 	int i;
 	for(i = 0; s && i < (int) c16strlen(s) && i < 4096; i++) {
 		buf[i] = s[i] >> 8;

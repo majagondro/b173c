@@ -13,6 +13,7 @@
 typedef char byte;
 typedef unsigned char ubyte;
 
+// used in net only so maybe get this shit out
 typedef char *string8;
 typedef char16 *string16;
 

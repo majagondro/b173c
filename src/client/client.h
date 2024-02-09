@@ -18,7 +18,8 @@ extern struct client_state {
 
 	enum { cl_disconnected, cl_connecting, cl_connected } state;
 
-	bool done, active;
+	bool done;   // used in the main loop
+	bool active; // whether the window is focused
 
 	ulong fps;
 	float frametime;

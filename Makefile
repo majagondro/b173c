@@ -1,5 +1,7 @@
 CC := gcc
-CFLAGS := -ggdb3 -Wall -Wpedantic -Wextra -Wdeclaration-after-statement -Iinclude -Wno-unused-parameter -Wno-missing-field-initializers
+CFLAGS := -ggdb3 -Iinclude -Wall -Wpedantic -Wextra -Wdeclaration-after-statement -Wno-missing-field-initializers
+# temporary because of net_handler.c and net_writer.c
+CFLAGS += -Wno-unused-parameter
 # CFLAGS += -fsanitize=address
 LDFLAGS := -lm
 

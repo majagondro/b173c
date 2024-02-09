@@ -226,7 +226,7 @@ void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_
 	int y_start, y_end;
 
 	if((i = inflate_data(compressed, data, compressed_size, sizeof(data))) != Z_OK) {
-		con_printf(COLOR_RED"error while decompressing chunk data:"COLOR_WHITE"%s\n", zError(i)); // should this print?
+		con_printf(CON_STYLE_RED"error while decompressing chunk data:"CON_STYLE_WHITE"%s\n", zError(i)); // should this print?
 		return;
 	}
 

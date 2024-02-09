@@ -14,11 +14,11 @@
 #define RAD2DEG(r) ((r) * (180.0f / PI))
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
-
-#define roundf2i(f) ((int)roundf(f))
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#define bound(low, x, up) max((low), min((x), (up)))
 
 typedef union {
-	float ptr[2];
+	float array[2];
 	struct { float x, y; };
 	struct { float u, v; };
 } vec2;
@@ -31,7 +31,7 @@ typedef union {
 } vec3;
 
 typedef union {
-	float ptr[4];
+	float array[4];
 	struct { float x, y, z, w; };
 	struct { float r, g, b, a; };
 } vec4;
@@ -39,16 +39,16 @@ typedef union {
 typedef float mat4[4][4];
 
 #define vec3_from(xv, yv, zv) ((vec3){.x=(xv), .y=(yv), .z=(zv)})
-#define vec3_from1(x)      vec3_from((x), (x), (x))
+#define vec3_from1(x) vec3_from((x), (x), (x))
 
 #define vec3_add(a, b) vec3_from((a).x + (b).x, (a).y + (b).y, (a).z + (b).z)
 #define vec3_sub(a, b) vec3_from((a).x - (b).x, (a).y - (b).y, (a).z - (b).z)
 #define vec3_mul(v, s) vec3_from((v).x * (s)  , (v).y * (s)  , (v).z * (s)  )
-#define vec3_div(v, s) vec3_mul(v, 1.0f / s)
+#define vec3_div(v, s) vec3_from((v).x / (s)  , (v).y / (s)  , (v).z / (s)  )
 #define vec3_invert(v) vec3_sub(vec3_from1(0), (v))
 #define vec3_dot(a, b)   ((a).x * (b).x + (a).y * (b).y + (a).z * (b).z)
 #define vec3_len(a) sqrtf(vec3_dot((a), (a)))
-// these are not macros because clion could not handle them ;-)
+// these are not macros because clion could not handle them lololol
 vec3 vec3_normalize(vec3 v);
 vec3 vec3_cross(vec3 a, vec3 b);
 
@@ -59,6 +59,7 @@ void mat_view(mat4 dest, vec3 pos, vec3 ang);
 void mat_frustrum(mat4 dest, float l, float r, float b, float t, float n, float f);
 void mat_projection(mat4 dest, float fov, float aspect, float znear, float zfar);
 
-void cam_angles(vec3 *fwd, vec3 *side, vec3 *up, float yaw, float pitch);
+// todo: roll? (and in mat_view as well)
+void cam_angles(vec3 *forward_dir, vec3 *right_dir, vec3 *up_dir, float yaw, float pitch);
 
 #endif

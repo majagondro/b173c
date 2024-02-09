@@ -97,7 +97,8 @@ void net_write_string16(string16 v);
                        INCOMING PACKET HANDLERS
 *********************************************************************/
 
-
+// ni - net internal
+// wi - window items
 struct ni_off_coord { byte off_x, off_y, off_z; };
 struct ni_wi_payload { short item_id, metadata; byte count; };
 

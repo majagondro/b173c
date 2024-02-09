@@ -98,9 +98,9 @@ static uint load_shader(const char *vs, const char *fs)
 
 void gl_debug_message(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
 {
-	/*fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+	fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
 			(type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
-			type, severity, message);*/
+			type, severity, message);
 	if(type == GL_DEBUG_TYPE_ERROR) {
 		exit(1);
 	}
@@ -110,7 +110,6 @@ void vid_init(void)
 {
 	int flags, ok;
 	int x = SDL_WINDOWPOS_CENTERED, y = SDL_WINDOWPOS_CENTERED;
-	extern unsigned char geom_spirv[];
 
 	cvar_register(&vid_height);
 	cvar_register(&vid_width);
@@ -144,8 +143,8 @@ void vid_init(void)
 	glDebugMessageCallback(gl_debug_message, 0);
 
 	// load shaders
-	gl.shader3d = load_shader(blocks_v_glsl, blocks_f_glsl);
-	gl.shader2d = load_shader(font_v_glsl, font_f_glsl);
+	gl.shader_blocks = load_shader(blocks_v_glsl, blocks_f_glsl);
+	gl.shader_text = load_shader(text_v_glsl, text_f_glsl);
 
 	now = SDL_GetPerformanceCounter();
 
@@ -177,8 +176,8 @@ void vid_shutdown(void)
 
 	world_renderer_shutdown();
 
-	glDeleteProgram(gl.shader3d);
-	glDeleteProgram(gl.shader2d);
+	glDeleteProgram(gl.shader_blocks);
+	glDeleteProgram(gl.shader_text);
 	SDL_DestroyWindow(window_handle);
 }
 
@@ -214,13 +213,13 @@ void vid_display_frame(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	/* draw 3d stuff */
-	glUseProgram(gl.shader3d);
+	glUseProgram(gl.shader_blocks);
 	world_render();
 
 	/* draw 2d stuff */
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	glUseProgram(gl.shader2d);
-	ui_commit();
+	glUseProgram(gl.shader_text);
+	ui_render();
 
 	SDL_GL_SwapWindow(window_handle);
 

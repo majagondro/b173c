@@ -163,11 +163,11 @@ void world_renderer_init(void)
 
 	recalculate_projection_matrix();
 
-	loc_chunkpos = glGetUniformLocation(gl.shader3d, "CHUNK_POS");
-	loc_view = glGetUniformLocation(gl.shader3d, "VIEW");
-	loc_proj = glGetUniformLocation(gl.shader3d, "PROJECTION");
+	loc_chunkpos = glGetUniformLocation(gl.shader_blocks, "CHUNK_POS");
+	loc_view = glGetUniformLocation(gl.shader_blocks, "VIEW");
+	loc_proj = glGetUniformLocation(gl.shader_blocks, "PROJECTION");
 
-	loc_nightlightmod = glGetUniformLocation(gl.shader3d, "NIGHTTIME_LIGHT_MODIFIER");
+	loc_nightlightmod = glGetUniformLocation(gl.shader_blocks, "NIGHTTIME_LIGHT_MODIFIER");
 
 	/* init vao */
 	glGenVertexArrays(1, &gl_world_vao);

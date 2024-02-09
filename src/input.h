@@ -31,7 +31,7 @@ struct key_status {
 	char *binding;          // the console command bound to this key
 };
 
-extern struct key_status input_keys[512]; // KEY_* maps to info about that key
+extern struct key_status input_keys[512]; // use KEY_* as the index
 
 void key_bind(int key, char *bind);
 

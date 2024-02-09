@@ -4,7 +4,7 @@
 #include "client/client.h"
 #include "vid/vid.h"
 
-void skip_metadata(void);
+void skip_entity_metadata(void);
 
 // macro trickery so the packet IDS get properly expanded
 // so we get
@@ -25,9 +25,8 @@ HANDLER(PKT_KEEP_ALIVE, void)
 HANDLER(PKT_LOGIN_REQUEST, int ent_id, string16 unused, long seed, byte dimension)
 {
 	cl.state = cl_connected;
-	con_printf(COLOR_DGREEN "connected!\n");
+	con_printf(CON_STYLE_DARK_GREEN"connected!\n");
 	cl.game.seed = seed;
-	// con_hide();
 	cl.game.our_id = ent_id;
 	vid_unlock_fps();
 	mem_free(unused);
@@ -40,7 +39,7 @@ HANDLER(PKT_HANDSHAKE, string16 conn_hash)
 	// if conn_hash[0] == '+', auth to mojang or something
 	// nah
 	NET_WRITE(PKT_LOGIN_REQUEST, PROTOCOL_VERSION, c16(cvar_name.string), 0, 0);
-	con_printf(COLOR_GRAY "awaiting login approval...\n");
+	con_printf(CON_STYLE_LIGHT_GRAY "awaiting login approval...\n");
 	mem_free(conn_hash);
 }
 
@@ -138,7 +137,7 @@ HANDLER(PKT_ADD_OBJECT_OR_VEHICLE, int ent_id, byte type, int x, int y, int z, i
 
 HANDLER(PKT_MOB_SPAWN, int ent_id, byte type, int x, int y, int z, byte yaw, byte pitch, ...)
 {
-	skip_metadata();
+	skip_entity_metadata();
 }
 
 HANDLER(PKT_ENTITY_PAINTING, int ent_id, string16 title, int x, int y, int z, int direction)
@@ -206,7 +205,7 @@ HANDLER(PKT_ATTACH_ENTITY, int ent_id, int vehicle_id)
 
 HANDLER(PKT_ENTITY_METADATA, int ent_id, ...)
 {
-	skip_metadata();
+	skip_entity_metadata();
 }
 
 HANDLER(PKT_PRE_CHUNK, int chunk_x, int chunk_z, bool load)
@@ -333,7 +332,7 @@ HANDLER(PKT_INCREMENT_STATISTIC, int stat_id, byte amount)
 HANDLER(PKT_DISCONNECT, string16 reason)
 {
 	con_printf("you got kicked: %s\n", c8(reason));
-	cmd_exec("disconnect", false);
+	cmd_exec("disconnect");
 	cl.state = cl_disconnected;
 	mem_free(reason);
 }

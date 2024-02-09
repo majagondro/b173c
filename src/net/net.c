@@ -2,6 +2,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -67,7 +68,7 @@ void net_init(void)
 	/* set socket to nonblocking */
 	setblocking(sockfd, false);
 
-	/* register connection commands */
+	/* register net-related commands */
 	if(!cmds_reg) {
 		cmd_register("connect", connect_f);
 		cmd_register("disconnect", disconnect_f);
@@ -79,15 +80,14 @@ void net_init(void)
 	init_ok = true;
 }
 
-void net_connect(const char *ipaddr, int port)
+void net_connect(struct sockaddr_in *sockaddr, int port)
 {
 	struct sockaddr_in addr = {0};
-	if(ipaddr != NULL) {
-		addr.sin_family = AF_INET;
+	if(sockaddr != NULL) {
+		addr = *sockaddr;
 		addr.sin_port = htons(port);
-		addr.sin_addr.s_addr = inet_addr(ipaddr);
 	} else {
-		/* disconnect */
+		// disconnect
 		addr.sin_family = AF_UNSPEC;
 	}
 
@@ -96,7 +96,7 @@ void net_connect(const char *ipaddr, int port)
 
 	cl.state = cl_disconnected;
 
-	/* connect to server */
+	// connect to server
 	// set socket to blocking for this because its easier this way
 	setblocking(sockfd, true);
 	if(connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
@@ -106,7 +106,7 @@ void net_connect(const char *ipaddr, int port)
 	}
 	setblocking(sockfd, false);
 
-	if(ipaddr != NULL) {
+	if(sockaddr != NULL) {
 		cl.state = cl_connecting;
 	}
 }
@@ -115,30 +115,31 @@ static bool net_read_packet(void);
 
 void net_process(void)
 {
-	/* do not do anything if not properly initialized */
+	// do not do anything if not properly initialized
 	if(!init_ok)
 		return;
 
-
-	/* read and handle incoming packets */
+	// read and handle incoming packets
 	if(cl.state > cl_disconnected) {
 		if(setjmp(read_abort)) {
-			// longjmp to here means that recv failed
-			// usually not enough data to read an entire packet
+			// longjmp to here means that recv failed, which usually
+			// means we did not receive enough data to read an entire packet
+
 			net_write_packets();
 			return;
 		}
 
-		while(net_read_packet());
+		while(net_read_packet())
+			;
 
 		net_write_packets();
 	}
 
-	/* disconnect if requested */
+	// disconnect if requested
 	if(should_disconnect) {
 		net_connect(NULL, 0);
 		cl.state = cl_disconnected;
-		vid_lock_fps();
+		vid_lock_fps(); // no need to exhaust the cpu by drawing the menu in 1 billion fps
 		net_write_packets(); // reset handshake flag
 		should_disconnect = false;
 	}
@@ -150,17 +151,21 @@ static bool net_read_packet(void)
 	ubyte packet_id;
 	int i;
 
-	/* consume the old bytes */
+	// consume the old bytes
 	if(read_ok)
 		read(sockfd, read_buffer, total_read);
 	total_read = 0;
 
-	/* try to read a packet */
+	// try to read a packet
 	packet_id = net_read_byte();
 	if(!read_ok) {
 		return false;
 	}
 
+	// read the packet data and call the handler
+	// alloca is sometimes used for byte buffers, that is because net_read_buf can longjmp
+	// and if malloc were to be used, that would be leaked memory!!
+	// i hope that the stack size is big enough lol!!!!
 	switch(packet_id) {
 		case PKT_KEEP_ALIVE:
 			net_handle_0x00();
@@ -572,13 +577,15 @@ static bool net_read_packet(void)
 			net_handle_0xC8(stat, amount);
 			break;
 		}
-		case PKT_DISCONNECT:
+		case PKT_DISCONNECT: {
 			net_handle_0xFF(net_read_string16());
 			break;
-		default:
-			con_printf("unknown packet_id %hhd (0x%hhx)!\n", packet_id, packet_id);
+		}
+		default: {
+			con_printf("unknown packet_id %hhd (0x%hhx)! disconnecting\n", packet_id, packet_id);
 			net_shutdown();
 			return false;
+		}
 	}
 	return true;
 }
@@ -588,13 +595,12 @@ void net_shutdown(void)
 	init_ok = false;
 	con_printf("net shutting down...\n");
 
-
-	/* close socket */
+	// close socket
 	setblocking(sockfd, true);
 	if(sockfd != -1) {
 		if(close(sockfd) < 0) {
 			perror("close");
-			// :|
+			// bruh :|
 		}
 		sockfd = -1;
 	}
@@ -610,9 +616,13 @@ void net_read_buf(void *dest, size_t n)
 	if(!init_ok || !dest || n == 0)
 		return;
 
+	// peek does not consume the bytes
+	// we save them in a buffer in case we are missing some for an entire packet
+	// if we are missing some then we can try to read them during the next frame
 	n_read = recv(sockfd, read_buffer, total_read+n, MSG_PEEK);
+
 	if(n_read == 0) {
-		// EOF - todo: disonnect here as well? read recv man page for more info as to why
+		// EOF - todo: disonnect here? read recv man page and see return value 0
 		read_ok = false;
 		longjmp(read_abort, 1);
 	} else if(n_read == -1) {
@@ -624,6 +634,7 @@ void net_read_buf(void *dest, size_t n)
 		longjmp(read_abort, 1);
 	} else if((size_t) n_read - total_read != n) {
 		// read some, but not everything
+		// delay until next frame
 		read_ok = false;
 		total_read = n_read;
 		longjmp(read_abort, 1);
@@ -645,21 +656,21 @@ short net_read_short(void)
 {
 	short s;
 	net_read_buf(&s, 2);
-	return SDL_Swap16(s);
+	return SDL_SwapBE16(s);
 }
 
 int net_read_int(void)
 {
 	int i;
 	net_read_buf(&i, 4);
-	return SDL_Swap32(i);
+	return SDL_SwapBE32(i);
 }
 
 long net_read_long(void)
 {
 	long l;
 	net_read_buf(&l, 8);
-	return SDL_Swap64(l);
+	return SDL_SwapBE64(l);
 }
 
 float net_read_float(void)
@@ -697,7 +708,7 @@ string8 net_read_string8(void)
 	net_read_buf(s, len);
 	s[len] = 0;
 
-	return s; // you take care of it now ;-)
+	return s; // you take care of freeing me now ;-)
 }
 
 string16 net_read_string16(void)
@@ -710,11 +721,12 @@ string16 net_read_string16(void)
 	size = (len + 1) * sizeof(char16);
 	s = mem_alloc(size);
 	for(i = 0; i < len; i++) {
-		s[i] = SDL_Swap16(net_read_short());
+		// swap twice becauseeeee... java? yeah, it's all java's fault
+		s[i] = SDL_SwapBE16(net_read_short());
 	}
 	s[len] = 0;
 
-	return s; // you take care of it now ;-)
+	return s; // you take care of freeing me now ;-)
 }
 
 void net_write_buf(const void *buf, size_t n)
@@ -738,7 +750,8 @@ void net_write_buf(const void *buf, size_t n)
 			return;
 		}
 	} else if((size_t) n_written != n) {
-		con_printf("net_write_buf: wrote only %ld/%lu bytes! gonna block!\n", n_written, n);
+		// is this right?
+		con_printf("net_write_buf: wrote only %ld/%lu bytes, gonna block\n", n_written, n);
 		setblocking(sockfd, true);
 		write(sockfd, (byte *)buf + n_written, n - n_written);
 		setblocking(sockfd, false);
@@ -752,19 +765,19 @@ void net_write_byte(ubyte v)
 
 void net_write_short(short v)
 {
-	v = SDL_Swap16(v);
+	v = SDL_SwapBE16(v);
 	net_write_buf(&v, 2);
 }
 
 void net_write_int(int v)
 {
-	v = SDL_Swap32(v);
+	v = SDL_SwapBE32(v);
 	net_write_buf(&v, 4);
 }
 
 void net_write_long(long v)
 {
-	v = SDL_Swap64(v);
+	v = SDL_SwapBE64(v);
 	net_write_buf(&v, 8);
 }
 
@@ -810,7 +823,7 @@ void net_write_string16(string16 v)
 	}
 }
 
-void skip_metadata(void)
+void skip_entity_metadata(void)
 {
 	byte field_id;
 	while((field_id = net_read_byte()) != 0x7F && read_ok) {
@@ -846,70 +859,67 @@ void skip_metadata(void)
 
 void connect_f(void)
 {
-	char *addrstr;
-	int port = 25565;
-	int i, len, part, n;
+	struct addrinfo hints = {0}, *info;
+	char *addrstr, *p;
+	int port, err;
 
 	if(cmd_argc() != 2) {
-		con_printf("usage: %s ip[:port]\n", cmd_argv(0));
+		con_printf("usage: %s <ip>[:<port>]\n", cmd_argv(0));
 	}
 
 	addrstr = cmd_argv(1);
 
-	if(cl.state >= cl_connecting) {
+	if(cl.state != cl_disconnected) {
 		con_printf("disconnect first\n");
 		return;
 	}
 
-	n = 0;
-	len = strlen(addrstr);
-	for(i = 0; i < len; i++) {
-		if(addrstr[i] == '.') {
-			if(n > 4)
-				goto invalid_ip;
-		} else if(addrstr[i] == ':') {
-			if(n != 4 || i == len - 1)
-				goto invalid_ip;
-			port = strtol(&addrstr[i+1], NULL, 10);
-			if(port < 0 || port > 65536) {
-				goto invalid_ip;
-			}
-		} else {
-			if(isdigit(addrstr[i])) {
-				part = strtol(&addrstr[i], NULL, 10);
-				i += part >= 100 ? 2 : (part >= 10 ? 1 : 0);
-				n++;
-				if(part < 0 || part > 255)
-					goto invalid_ip;
+	p = addrstr;
+	while(*p != '\0' && *p != ':')
+		p++;
 
-			} else {
-				goto invalid_ip;
-			}
+	if(*p == '\0') {
+		// no port specified
+		port = 25565;
+	} else {
+		port = strtol(p, NULL, 10);
+		if(errno == EINVAL) {
+			con_printf("invalid ip\n");
+			return;
 		}
+		*p = 0; // set to 0 for ip address parsing (probably needed but idk)
 	}
 
-	if(n != 4)
-		goto invalid_ip;
+	// todo: ipv6 support if you can even use that with a beta server
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	if((err = getaddrinfo(addrstr, "http", &hints, &info))) {
+		con_printf("error: %s\n", gai_strerror(err));
+		return;
+	}
 
-	net_init();
-	net_connect(addrstr, port);
+	if(info != NULL) {
+		net_init();
+		net_connect((struct sockaddr_in *) info->ai_addr, port);
+	}
+
+	freeaddrinfo(info);
 	return;
-
-invalid_ip:
-	con_printf("invalid ip address\n");
 }
 
 void disconnect_f(void)
 {
 	if(cl.state != cl_disconnected) {
 		if(cl.state == cl_connected) {
-			// set to blocking so the packet gets sent
+			// set to blocking so the disconnect packet gets sent
 			// before the socket is closed
 			setblocking(sockfd, true);
 			net_write_0xFF(c16("Quitting"));
 			setblocking(sockfd, false);
 		}
 
+		// todo: world_cleanup() or something
+		// or just move world vars to cl.game
 		memset(&cl.game, 0, sizeof(cl.game));
 
 		// net_update will disconnect next update
@@ -924,7 +934,7 @@ void disconnect_f(void)
 void say_f(void)
 {
 	if(cmd_argc() == 1) {
-		con_printf("usage: %s message\n", cmd_argv(0));
+		con_printf("usage: %s <message>\n", cmd_argv(0));
 	}
 
 	if(cl.state != cl_connected) {
@@ -932,11 +942,15 @@ void say_f(void)
 		return;
 	}
 
-
 	net_write_0x03(c16(cmd_args(1, cmd_argc())));
 }
 
+// fixme: this is temporary (or maybe leave it for dat sweet customizability and just make the respawn button execute this command)
 void respawn_f(void)
 {
+	if(cl.state != cl_connected) {
+		con_printf("can't \"%s\", not connected\n", cmd_argv(0));
+		return;
+	}
 	net_write_0x09(0);
 }

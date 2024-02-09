@@ -31,7 +31,7 @@ void cvarlist_f(void)
 
 	for(c = cvarlist; c != NULL; c = c->next) {
 		int px = maxwidth - ui_strwidth(c->name);
-		con_printf("%s"COLOR_PADPX"%d : \"%s\"\n", c->name, px, c->string);
+		con_printf("%s"CON_STYLE_PADPX"%d : \"%s\"\n", c->name, px, c->string);
 	}
 }
 
@@ -49,7 +49,7 @@ void aliaslist_f(void)
 
 	for(a = aliaslist; a != NULL; a = a->next) {
 		int px = maxwidth - ui_strwidth(a->name);
-		con_printf("%s"COLOR_PADPX"%d : \"%s\"\n", a->name, px, a->cmd);
+		con_printf("%s"CON_STYLE_PADPX"%d : \"%s\"\n", a->name, px, a->cmd);
 	}
 }
 
@@ -76,7 +76,7 @@ void alias_f(void)
 			con_printf("\"%s\" = \"%s\"\n", name, a->cmd);
 		}
 	} else {
-		con_printf("usage: %s <name> [command]\n", cmd_argv(0));
+		con_printf("usage: %s <name> [<command>]\n", cmd_argv(0));
 	}
 }
 
@@ -98,7 +98,7 @@ void echo_f(void)
 void exec_f(void)
 {
 	char *line, *data;
-	char file[512] = {0};
+	char file[512] = {0}; // fixme buf
 
 	if(cmd_argc() != 2) {
 		con_printf("usage: %s <filename>\n", cmd_argv(0));
@@ -114,7 +114,7 @@ void exec_f(void)
 		return;
 
 	for(line = strtok(data, "\n"); line != NULL; line = strtok(NULL, "\n"))
-		cmd_exec(line, cmd_is_stuffed());
+		cmd_exec(line);
 
 	SDL_free(data);
 }

@@ -1,8 +1,7 @@
+#include "net/packets.h"
 #include "net_internal.h"
 #include "client/client.h"
 #include "client/console.h"
-#include "game/block.h"
-#include "game/world.h"
 
 void net_write_packets(void)
 {
@@ -18,7 +17,13 @@ void net_write_packets(void)
 	if(cl.state == cl_connecting && !sent_handshake) {
 		// send handshake to the server
 		extern cvar cvar_name;
-		net_write_0x02(c16(cvar_name.string));
+
+        string16 username = net_make_string16(cvar_name.string);
+        net_write_pkt_handshake((pkt_handshake) {
+            .connection_hash_or_username = username
+        });
+        net_free_string16(username);
+
 		sent_handshake = true;
 		con_printf(CON_STYLE_GRAY "awaiting handshake...\n");
 	}
@@ -30,151 +35,67 @@ void net_write_packets(void)
 	if(cl.game.moved && cl.game.rotated) {
 		cl.game.moved = false;
 		cl.game.rotated = false;
-		net_write_0x0D(cl.game.pos.x, cl.game.pos.y, cl.game.pos.y + 0.2f, cl.game.pos.z, -cl.game.rot.yaw, cl.game.rot.pitch, false);
+        net_write_pkt_player_look_move((pkt_player_look_move) {
+            .x = cl.game.pos.x,
+            .stance_or_y = cl.game.pos.y,
+            .y_or_stance = cl.game.pos.y + 0.2f,
+            .z = cl.game.pos.z,
+            .yaw = -cl.game.rot.yaw,
+            .pitch = cl.game.rot.pitch,
+            .on_ground = false
+        });
 	} else if(cl.game.moved) {
-		net_write_0x0B(cl.game.pos.x, cl.game.pos.y, cl.game.pos.y + 0.2f, cl.game.pos.z, false);
+        net_write_pkt_player_move((pkt_player_move) {
+            .x = cl.game.pos.x,
+            .y = cl.game.pos.y,
+            .stance = cl.game.pos.y + 0.2f,
+            .z = cl.game.pos.z,
+            .on_ground = false
+        });
 		cl.game.moved = false;
 	} else if(cl.game.rotated) {
-		net_write_0x0C(-cl.game.rot.yaw, cl.game.rot.pitch, false);
+        net_write_pkt_player_look((pkt_player_look) {
+            .pitch = cl.game.rot.pitch,
+            .yaw = -cl.game.rot.yaw,
+            .on_ground = false
+        });
 		cl.game.rotated = false;
 	} else {
-		net_write_0x0A(false);
+        net_write_pkt_flying((pkt_flying) {.on_ground = false});
 	}
 }
 
-// macro trickery so the packet id gets properly expanded
-// so we get
-//    void net_write_0x00(void)
-// instead of
-//    void net_write_PKT_KEEP_ALIVE(void)
-#define WRITER2(id, ...) void net_write_ ## id (__VA_ARGS__) { net_write_byte(id);
-#define WRITER(id, ...) WRITER2(id, __VA_ARGS__)
-
-WRITER(PKT_KEEP_ALIVE, void)
-
+void write_window_items_payload(struct ni_wi_payload data)
+{
+    net_write_short(data.item_id);
+    if(data.item_id != -1) {
+        net_write_byte(data.count);
+        net_write_short(data.metadata);
+    }
 }
 
-WRITER(PKT_LOGIN_REQUEST, int protocol_version, string16 username, long unused1, byte unused2)
-	net_write_int(protocol_version);
-	net_write_string16(username);
-	net_write_long(unused1);
-	net_write_byte(unused2);
+void write_metadata(struct net_entity_metadata data)
+{
+    // todo :-(
+    net_write_byte(0x7f);
 }
 
-WRITER(PKT_HANDSHAKE, string16 username)
-	net_write_string16(username);
-}
+#define UBYTE(name) net_write_byte(this.name);
+#define BYTE(name) net_write_byte(this.name);
+#define SHORT(name) net_write_short(this.name);
+#define INT(name) net_write_int(this.name);
+#define LONG(name) net_write_long(this.name);
+#define FLOAT(name) net_write_float(this.name);
+#define DOUBLE(name) net_write_double(this.name);
+#define STRING8(name) net_write_string8(this.name);
+#define STRING16(name) net_write_string16(this.name);
+#define BOOL(name) net_write_byte(this.name);
+#define METADATA(name) write_metadata(this.name);
+#define WINDOW_ITEMS_PAYLOAD(name) write_window_items_payload(this.name);
 
-WRITER(PKT_CHAT_MESSAGE, string16 message)
-	net_write_string16(message);
-}
+#define OPT(cond, stuff) if(cond) { stuff }
+#define BUF(type, name, size) for(size_t i = 0; i < (size_t) (size); i++) type(name[i])
 
-WRITER(PKT_USE_ENTITY, int user_id, int target_id, bool left_click)
-	net_write_int(user_id);
-	net_write_int(target_id);
-	net_write_bool(left_click);
-}
+#define PACKET(id, name, stuff) void net_write_pkt_ ## name (pkt_ ## name this) { net_write_byte(id); stuff }
 
-WRITER(PKT_RESPAWN, byte dimension)
-	net_write_byte(dimension);
-}
-
-WRITER(PKT_PLAYER, bool on_ground)
-	net_write_bool(on_ground);
-}
-
-WRITER(PKT_PLAYER_MOVE, double x, double y, double stance, double z, bool on_ground)
-	net_write_double(x);
-	net_write_double(y);
-	net_write_double(stance);
-	net_write_double(z);
-	net_write_bool(on_ground);
-}
-
-WRITER(PKT_PLAYER_LOOK, float yaw, float pitch, bool on_ground)
-	net_write_float(yaw);
-	net_write_float(pitch);
-	net_write_bool(on_ground);
-}
-
-WRITER(PKT_PLAYER_MOVE_AND_LOOK, double x, double y, double stance, double z, float yaw, float pitch, bool on_ground)
-	net_write_double(x);
-	net_write_double(y);
-	net_write_double(stance);
-	net_write_double(z);
-	net_write_float(yaw);
-	net_write_float(pitch);
-	net_write_bool(on_ground);
-}
-
-WRITER(PKT_PLAYER_MINE, byte action, int x, byte y, int z, byte face)
-	net_write_byte(action);
-	net_write_int(x);
-	net_write_byte(y);
-	net_write_int(z);
-	net_write_byte(face);
-}
-
-WRITER(PKT_PLAYER_PLACE, int x, byte y, int z, byte face, short item_id, byte item_count, short item_metadata)
-	net_write_int(x);
-	net_write_byte(y);
-	net_write_int(z);
-	net_write_byte(face);
-	net_write_short(item_id);
-	if(item_id >= 0) {
-		net_write_byte(item_count);
-		net_write_short(item_metadata);
-	}
-}
-
-WRITER(PKT_ANIMATION, int ent_id, byte animation)
-	net_write_int(ent_id);
-	net_write_byte(animation);
-}
-
-WRITER(PKT_HOLDING_CHANGE, short slot)
-	net_write_short(slot);
-}
-
-WRITER(PKT_ENTITY_ACTION, int ent_id, byte action)
-	net_write_int(ent_id);
-	net_write_byte(action);
-}
-
-WRITER(PKT_CLOSE_WINDOW, int gui_id)
-	net_write_int(gui_id);
-}
-
-WRITER(PKT_WINDOW_CLICK, int gui_id, short slot, byte mouse_button, short action, bool shift, short item_id, byte item_count, short item_metadata)
-	net_write_int(gui_id);
-	net_write_short(slot);
-	net_write_byte(mouse_button);
-	net_write_short(action);
-	net_write_bool(shift);
-	net_write_short(item_id);
-	net_write_byte(item_count);
-	net_write_short(item_metadata);
-}
-
-WRITER(PKT_TRANSACTION, int gui_id, short action, bool accepted)
-	net_write_int(gui_id);
-	net_write_short(action);
-	net_write_bool(accepted);
-}
-
-WRITER(PKT_UPDATE_SIGN, int x, short y, int z, string16 line1, string16 line2, string16 line3, string16 line4)
-	net_write_int(x);
-	net_write_short(y);
-	net_write_int(z);
-	net_write_string16(line1);
-	net_write_string16(line2);
-	net_write_string16(line3);
-	net_write_string16(line4);
-}
-
-WRITER(PKT_DISCONNECT, string16 reason)
-	net_write_string16(reason);
-}
-
-#undef WRITER2
-#undef WRITER
+#include "packets_def.h"

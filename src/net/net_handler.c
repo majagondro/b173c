@@ -3,239 +3,206 @@
 #include "client/console.h"
 #include "client/client.h"
 #include "vid/vid.h"
+#include "net/packets.h"
 
-void skip_entity_metadata(void);
+#define UNPACK_ANGLE(angle) ((float)(angle * 360) / 256.0f)
 
-// macro trickery so the packet IDS get properly expanded
-// so we get
-//    void net_handle_0x00(void)
-// instead of
-//    void net_handle_PKT_KEEP_ALIVE(void)
-#define HANDLER2(id, ...) void net_handle_ ## id (__VA_ARGS__)
-#define HANDLER(id, ...) HANDLER2(id, __VA_ARGS__)
+#define EMPTY_HANDLER(pkt) void net_handle_ ## pkt (pkt p attr(unused)) {}
 
-#define NW2(id, ...) net_write_ ## id (__VA_ARGS__)
-#define NET_WRITE(id, ...) NW2(id, __VA_ARGS__)
-
-HANDLER(PKT_KEEP_ALIVE, void)
+void net_handle_pkt_login_request(pkt_login_request pkt)
 {
-	net_write_0x00(); // ping pong :-)
+    cl.game.seed = pkt.seed;
+    cl.game.our_id = pkt.entity_id_or_protocol_version;
+    cl.state = cl_connected;
+
+    vid_unlock_fps();
+    con_printf(CON_STYLE_DARK_GREEN"connected!\n");
+
+    net_free_string16(pkt.username);
 }
 
-HANDLER(PKT_LOGIN_REQUEST, int ent_id, string16 unused, long seed, byte dimension)
+void net_handle_pkt_handshake(pkt_handshake pkt)
 {
-	cl.state = cl_connected;
-	con_printf(CON_STYLE_DARK_GREEN"connected!\n");
-	cl.game.seed = seed;
-	cl.game.our_id = ent_id;
-	vid_unlock_fps();
-	mem_free(unused);
-}
+    // if pkt.conn_hash[0] == '+', auth to mojang or something
 
-HANDLER(PKT_HANDSHAKE, string16 conn_hash)
-{
 	extern cvar cvar_name;
+    string16 username = net_make_string16(cvar_name.string);
+
 	cl.state = cl_connecting;
-	// if conn_hash[0] == '+', auth to mojang or something
-	// nah
-	NET_WRITE(PKT_LOGIN_REQUEST, PROTOCOL_VERSION, c16(cvar_name.string), 0, 0);
+    net_write_pkt_login_request((pkt_login_request) {
+        .entity_id_or_protocol_version = PROTOCOL_VERSION,
+        .username = username,
+        .dimension = 0,
+        .seed = 0
+    });
+
 	con_printf(CON_STYLE_LIGHT_GRAY "awaiting login approval...\n");
-	mem_free(conn_hash);
+
+    net_free_string16(pkt.connection_hash_or_username);
+    net_free_string16(username);
 }
 
-HANDLER(PKT_CHAT_MESSAGE, string16 message)
+void net_handle_pkt_chat_message(pkt_chat_message pkt)
 {
-	con_printf("%s\n", c8(message));
-	mem_free(message);
+    char *msg = mem_alloc(pkt.message.length + 1);
+
+    for(int i = 0; i < pkt.message.length; i++) {
+        msg[i] = (char) pkt.message.data[i];
+    }
+
+	con_printf("%s\n", msg);
+
+    mem_free(msg);
+    net_free_string16(pkt.message);
 }
 
-HANDLER(PKT_TIME_UPDATE, long time)
+void net_handle_pkt_time_update(pkt_time_update pkt)
 {
-	world_set_time(time);
+	world_set_time(pkt.time);
 }
 
-HANDLER(PKT_ENTITY_EQUIPMENT, int ent_id, short slot, short item_id, short metadata)
-{
+EMPTY_HANDLER(pkt_player_inventory)
 
+void net_handle_pkt_spawn_position(pkt_spawn_position pkt)
+{
+	cl.game.pos = vec3_from(pkt.x, pkt.y, pkt.z);
 }
 
-HANDLER(PKT_SPAWN_POSITION, int x, int y, int z)
-{
-	cl.game.pos = vec3_from(x, y, z);
-}
+EMPTY_HANDLER(pkt_use_entity)
 
-HANDLER(PKT_USE_ENTITY, int user_id, int target_id, bool attack)
+void net_handle_pkt_update_health(pkt_update_health pkt)
 {
-
-}
-
-HANDLER(PKT_UPDATE_HEALTH, short health)
-{
-	if(health <= 0) {
+	if(pkt.new_health <= 0) {
 		con_printf("u died idiot\n");
 	}
 }
 
-HANDLER(PKT_RESPAWN, byte dimension)
-{
+EMPTY_HANDLER(pkt_respawn)
+EMPTY_HANDLER(pkt_flying)
+EMPTY_HANDLER(pkt_player_move)
+EMPTY_HANDLER(pkt_player_look)
 
+void net_handle_pkt_player_look_move(pkt_player_look_move pkt)
+{
+	cl.game.pos = vec3_from(pkt.x, pkt.y_or_stance, pkt.z);
+	cl.game.stance = pkt.stance_or_y;
+	cl.game.rot.yaw = pkt.yaw;
+	cl.game.rot.pitch = pkt.pitch;
+
+	// send back or the server gets mad
+    pkt.y_or_stance = cl.game.stance;
+    pkt.stance_or_y = cl.game.pos.y;
+    net_write_pkt_player_look_move(pkt);
 }
 
-// 0x0A, 0x0B, 0x0C are not sent by the server
-HANDLER(PKT_PLAYER_MOVE_AND_LOOK, double x, double stance, double y, double z, float yaw, float pitch, bool on_ground)
+EMPTY_HANDLER(pkt_block_dig)
+EMPTY_HANDLER(pkt_place)
+EMPTY_HANDLER(pkt_holding_change)
+EMPTY_HANDLER(pkt_multiplayer_sleep)
+EMPTY_HANDLER(pkt_animation)
+EMPTY_HANDLER(pkt_entity_action)
+
+void net_handle_pkt_named_entity_spawn(pkt_named_entity_spawn pkt)
 {
-	cl.game.pos = vec3_from(x, y, z);
-	cl.game.stance = stance;
-	cl.game.rot.yaw = yaw;
-	cl.game.rot.pitch = pitch;
-
-	// send back
-	net_write_0x0D(cl.game.pos.x, cl.game.pos.y, cl.game.stance, cl.game.pos.z, cl.game.rot.yaw, cl.game.rot.pitch, false);
-}
-
-// 0x0E, 0x0F, 0x10, are not sent by the server
-HANDLER(PKT_USE_BED, int ent_id, bool unused, int bed_x, byte bed_y, int bed_z)
-{
-
-}
-
-HANDLER(PKT_ANIMATION, int ent_id, byte animation_type)
-{
-
-}
-
-HANDLER(PKT_ENTITY_ACTION, int ent_id, byte action)
-{
-
-}
-
-HANDLER(PKT_NAMED_ENTITY_SPAWN, int ent_id, string16 name, int x, int y, int z, byte yaw, byte pitch, short held_item)
-{
-	if(ent_id == cl.game.our_id) {
-		cl.game.pos = vec3_div(vec3_from(x, y, z), 32.0f);
-		cl.game.rot.yaw = (float)(yaw * 360) / 256.0f;
-		cl.game.rot.pitch = (float)(pitch * 360) / 256.0f;
+	if(pkt.entity_id == cl.game.our_id) {
+		cl.game.pos = vec3_div(vec3_from(pkt.x, pkt.y, pkt.z), 32.0f);
+		cl.game.rot.yaw = UNPACK_ANGLE(pkt.yaw);
+		cl.game.rot.pitch = UNPACK_ANGLE(pkt.pitch);
 	}
 
-	mem_free(name);
+    net_free_string16(pkt.name);
 }
 
-HANDLER(PKT_PICKUP_SPAWN, int ent_id, short item_id, byte count, short metadata, int x, int y, int z, byte yaw, byte pitch, byte roll)
-{
+EMPTY_HANDLER(pkt_item_spawn)
+EMPTY_HANDLER(pkt_collect_item)
+EMPTY_HANDLER(pkt_vehicle_spawn)
+EMPTY_HANDLER(pkt_mob_spawn)
 
+void net_handle_pkt_entity_painting(pkt_entity_painting pkt)
+{
+    net_free_string16(pkt.title);
 }
 
-HANDLER(PKT_COLLECT_ITEM, int pickup_id, int collector_id)
+EMPTY_HANDLER(pkt_stance_update)
+EMPTY_HANDLER(pkt_entity_velocity)
+EMPTY_HANDLER(pkt_destroy_entity)
+EMPTY_HANDLER(pkt_entity)
+
+void net_handle_pkt_entity_move(pkt_entity_move pkt)
 {
-
-}
-
-HANDLER(PKT_ADD_OBJECT_OR_VEHICLE, int ent_id, byte type, int x, int y, int z, int owner_id, short vel_x, short vel_y, short vel_z)
-{
-
-}
-
-HANDLER(PKT_MOB_SPAWN, int ent_id, byte type, int x, int y, int z, byte yaw, byte pitch, ...)
-{
-	skip_entity_metadata();
-}
-
-HANDLER(PKT_ENTITY_PAINTING, int ent_id, string16 title, int x, int y, int z, int direction)
-{
-	mem_free(title);
-}
-
-HANDLER(PKT_ENTITY_VELOCITY, int ent_id, short vel_x, short vel_y, short vel_z)
-{
-
-}
-
-HANDLER(PKT_DESTROY_ENTITY, int ent_id)
-{
-
-}
-
-HANDLER(PKT_ENTITY, int ent_id)
-{
-
-}
-
-HANDLER(PKT_ENTITY_RELATIVE_MOVE, int ent_id, byte rel_x, byte rel_y, byte rel_z)
-{
-	if(ent_id == cl.game.our_id) {
-		cl.game.pos = vec3_add(cl.game.pos, vec3_div(vec3_from(rel_x, rel_y, rel_z), 32.0f));
+	if(pkt.entity_id == cl.game.our_id) {
+		cl.game.pos = vec3_add(cl.game.pos, vec3_div(vec3_from(pkt.rel_x, pkt.rel_y, pkt.rel_z), 32.0f));
 	}
 }
 
-HANDLER(PKT_ENTITY_LOOK, int ent_id, byte yaw, byte pitch)
+void net_handle_pkt_entity_look(pkt_entity_look pkt)
 {
-	if(ent_id == cl.game.our_id) {
-		cl.game.rot.yaw = (float)(yaw * 360) / 256.0f;
-		cl.game.rot.pitch = (float)(pitch * 360) / 256.0f;
+	if(pkt.entity_id == cl.game.our_id) {
+		cl.game.rot.yaw = UNPACK_ANGLE(pkt.yaw);
+		cl.game.rot.pitch = UNPACK_ANGLE(pkt.pitch);
 	}
 }
 
-HANDLER(PKT_ENTITY_LOOK_AND_RELATIVE_MOVE, int ent_id, byte rel_x, byte rel_y, byte rel_z, byte yaw, byte pitch)
+void net_handle_pkt_entity_look_move(pkt_entity_look_move pkt)
 {
-	if(ent_id == cl.game.our_id) {
-		cl.game.pos = vec3_add(cl.game.pos, vec3_div(vec3_from(rel_x, rel_y, rel_z), 32.0f));
-		cl.game.rot.yaw = (float)(yaw * 360) / 256.0f;
-		cl.game.rot.pitch = (float)(pitch * 360) / 256.0f;
+    net_handle_pkt_entity_look((pkt_entity_look) {
+        .entity_id = pkt.entity_id,
+        .pitch = pkt.pitch,
+        .yaw = pkt.yaw
+    });
+    net_handle_pkt_entity_move((pkt_entity_move) {
+       .entity_id = pkt.entity_id,
+       .rel_x = pkt.rel_x,
+       .rel_y = pkt.rel_y,
+       .rel_z = pkt.rel_z
+    });
+}
+
+void net_handle_pkt_entity_teleport(pkt_entity_teleport pkt)
+{
+    net_handle_pkt_entity_look((pkt_entity_look) {
+        .entity_id = pkt.entity_id,
+        .pitch = pkt.pitch,
+        .yaw = pkt.yaw
+    });
+
+	if(pkt.entity_id == cl.game.our_id) {
+		cl.game.pos = vec3_div(vec3_from(pkt.x, pkt.y, pkt.z), 32.0f);
 	}
 }
 
-HANDLER(PKT_ENTITY_TELEPORT, int ent_id, int x, int y, int z, byte yaw, byte pitch)
+EMPTY_HANDLER(pkt_entity_status)
+EMPTY_HANDLER(pkt_attach_entity)
+EMPTY_HANDLER(pkt_entity_metadata)
+
+void net_handle_pkt_pre_chunk(pkt_pre_chunk pkt)
 {
-	if(ent_id == cl.game.our_id) {
-		cl.game.pos = vec3_div(vec3_from(x, y, z), 32.0f);
-		cl.game.rot.yaw = (float)(yaw * 360) / 256.0f;
-		cl.game.rot.pitch = (float)(pitch * 360) / 256.0f;
-	}
-}
-
-HANDLER(PKT_ENTITY_STATUS, int ent_id, byte status)
-{
-
-}
-
-HANDLER(PKT_ATTACH_ENTITY, int ent_id, int vehicle_id)
-{
-
-}
-
-HANDLER(PKT_ENTITY_METADATA, int ent_id, ...)
-{
-	skip_entity_metadata();
-}
-
-HANDLER(PKT_PRE_CHUNK, int chunk_x, int chunk_z, bool load)
-{
-	if(load) {
-		world_alloc_chunk(chunk_x, chunk_z);
+	if(pkt.load) {
+		world_alloc_chunk(pkt.x, pkt.z);
 	} else {
-		world_free_chunk(chunk_x, chunk_z);
+		world_free_chunk(pkt.x, pkt.z);
 	}
 }
 
-HANDLER(PKT_MAP_CHUNK, int x, short y, int z, byte size_x, byte size_y, byte size_z, int data_size, ubyte *data)
+void net_handle_pkt_map_chunk(pkt_map_chunk pkt)
 {
-	world_load_compressed_chunk_data(x, y, z, (int)size_x + 1, (int)size_y + 1, (int)size_z + 1, (size_t) data_size, data);
+	world_load_compressed_chunk_data(pkt.x, pkt.y, pkt.z, (int)pkt.size_x + 1, (int)pkt.size_y + 1, (int)pkt.size_z + 1, (size_t) pkt.data_size, pkt.data);
 }
 
-HANDLER(PKT_MULTI_BLOCK_CHANGE, int chunk_x, int chunk_z, short array_size, short *coord_array, byte *id_array, byte *metadata_array)
+void net_handle_pkt_multi_block_change(pkt_multi_block_change pkt)
 {
-	if(!world_chunk_exists(chunk_x, chunk_z))
+	if(!world_chunk_exists(pkt.chunk_x, pkt.chunk_z))
 		return;
 
-	for(int i = 0; i < array_size; i++) {
+	for(int i = 0; i < pkt.size; i++) {
 		int x, y, z;
-		int c = coord_array[i];
-		block_id id = id_array[i];
-		ubyte metadata = metadata_array[i];
+		int c = pkt.coords[i];
+		block_id id = pkt.block_ids[i];
+		ubyte metadata = pkt.metadatas[i];
 
 		/* unpack */
-		x = ((c >> 12) & 15) + chunk_x * WORLD_CHUNK_SIZE;
-		z = ((c >> 8) & 15) + chunk_z * WORLD_CHUNK_SIZE;
+		x = ((c >> 12) & 15) + pkt.chunk_x * WORLD_CHUNK_SIZE;
+		z = ((c >> 8) & 15) + pkt.chunk_z * WORLD_CHUNK_SIZE;
 		y = c & 255;
 
 		world_set_block_id(x, y, z, id);
@@ -243,103 +210,55 @@ HANDLER(PKT_MULTI_BLOCK_CHANGE, int chunk_x, int chunk_z, short array_size, shor
 	}
 }
 
-HANDLER(PKT_BLOCK_CHANGE, int x, byte y, int z, byte block_id, byte metadata)
+void net_handle_pkt_block_change(pkt_block_change pkt)
 {
-	world_set_block_id(x, y, z, block_id);
-	world_set_block_metadata(x, y, z, metadata);
+	world_set_block_id(pkt.x, pkt.y, pkt.z, pkt.block_id);
+	world_set_block_metadata(pkt.x, pkt.y, pkt.z, pkt.metadata);
 }
 
 // noteblock: data1 = instrument  data2 = pitch
 // piston:    data1 = state       data2 = direction
-HANDLER(PKT_BLOCK_ACTION, int x, short y, int z, byte data1, byte data2)
-{
+EMPTY_HANDLER(pkt_block_action)
+EMPTY_HANDLER(pkt_explosion)
+EMPTY_HANDLER(pkt_sound_effect)
+EMPTY_HANDLER(pkt_rain_or_bed_message)
+EMPTY_HANDLER(pkt_weather_event)
 
+void net_handle_pkt_open_window(pkt_open_window pkt)
+{
+    net_free_string8(pkt.window_title);
 }
 
-HANDLER(PKT_EXPLOSION, double x, double y, double z, float radius, int num_affected_blocks, struct ni_off_coord *affected_blocks)
-{
+EMPTY_HANDLER(pkt_close_window)
+EMPTY_HANDLER(pkt_window_click)
+EMPTY_HANDLER(pkt_set_slot)
+EMPTY_HANDLER(pkt_window_items)
+EMPTY_HANDLER(pkt_update_progress_bar)
+EMPTY_HANDLER(pkt_transaction)
 
+void net_handle_pkt_update_sign(pkt_update_sign pkt)
+{
+    net_free_string16(pkt.line1);
+    net_free_string16(pkt.line2);
+    net_free_string16(pkt.line3);
+    net_free_string16(pkt.line4);
 }
 
-HANDLER(PKT_SOUND_EFFECT, int effect_id, int x, byte y, int z, int extra_data)
+EMPTY_HANDLER(pkt_item_data)
+EMPTY_HANDLER(pkt_increment_statistic)
+
+void net_handle_pkt_disconnect(pkt_disconnect pkt)
 {
+    char *msg = mem_alloc(pkt.reason.length + 1);
 
-}
+    for(int i = 0; i < pkt.reason.length; i++) {
+        msg[i] = (char) pkt.reason.data[i];
+    }
 
-HANDLER(PKT_NEW_OR_INVALID_STATE, byte something)
-{
-
-}
-
-HANDLER(PKT_THUNDERBOLT, int ent_id, bool unused, int x, int y, int z)
-{
-
-}
-
-HANDLER(PKT_OPEN_WINDOW, byte gui_id, byte gui_type, string8 gui_title, byte num_slots)
-{
-	mem_free(gui_title);
-}
-
-HANDLER(PKT_CLOSE_WINDOW, byte gui_id)
-{
-
-}
-
-HANDLER(PKT_WINDOW_CLICK, byte gui_id, short slot, byte mouse_buton, short action_num, bool shift_held, short item_id, byte item_count, short item_metadata)
-{
-
-}
-
-HANDLER(PKT_SET_SLOT, byte gui_id, short slot, short item_id, byte item_count, short item_metadata)
-{
-
-}
-
-HANDLER(PKT_WINDOW_ITEMS, byte gui_id, short count, struct ni_wi_payload *payload)
-{
-
-}
-
-HANDLER(PKT_UPDATE_PROGRESS_BAR, byte gui_id, short type, short progress)
-{
-
-}
-
-HANDLER(PKT_TRANSACTION, byte gui_id, short action, bool accepted)
-{
-
-}
-
-HANDLER(PKT_UPDATE_SIGN, int x, short y, int z, string16 line1, string16 line2, string16 line3, string16 line4)
-{
-	mem_free(line1);
-	mem_free(line2);
-	mem_free(line3);
-	mem_free(line4);
-}
-
-HANDLER(PKT_ITEM_DATA, short item_type, short item_id, ubyte data_size, byte *data)
-{
-
-}
-
-HANDLER(PKT_INCREMENT_STATISTIC, int stat_id, byte amount)
-{
-
-}
-
-HANDLER(PKT_DISCONNECT, string16 reason)
-{
-	con_printf("you got kicked: %s\n", c8(reason));
+	con_printf("you got kicked: %s\n", msg);
 	cmd_exec("disconnect");
 	cl.state = cl_disconnected;
-	mem_free(reason);
+
+    mem_free(msg);
+    net_free_string16(pkt.reason);
 }
-
-
-#undef HANDLER2
-#undef HANDLER
-
-
-

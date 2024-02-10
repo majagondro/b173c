@@ -506,7 +506,7 @@ void remesh_chunk(world_chunk *chunk)
 			}
 		}
 
-		meshbuilder_finish(&glbuf->vertices, &glbuf->num_vertices, &glbuf->indices, &glbuf->num_indices);
+		meshbuilder_finish((void **) &glbuf->vertices, &glbuf->num_vertices, &glbuf->indices, &glbuf->num_indices);
 
 		glBindBuffer(GL_ARRAY_BUFFER, glbuf->vbo);
 		glBufferData(GL_ARRAY_BUFFER,
@@ -668,7 +668,6 @@ void world_render(void)
 		if(chunk->visible) {
 			/* go from top to bottom so that the gpu can discard pixels of cave meshes which won't be seen */
 			for(int j = 7; j >= 0; j--) {
-				float chunkpos[3];
 				vec3 chunk_pos = vec3_from(chunk->x << 4, j << 4, chunk->z << 4);
 				glUniform3fv(loc_chunkpos, 1, chunk_pos.array);
 

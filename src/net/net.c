@@ -13,9 +13,17 @@
 #include "client/console.h"
 #include "vid/vid.h"
 #include <setjmp.h>
+#include <uchar.h>
+#include "packets.h"
+
+#define PACKET(id, name, stuff) [id] = #name,
+const char *packet_names[256] = {
+#include "packets_def.h"
+};
+#undef PACKET
 
 static bool init_ok = false;
-static bool cmds_reg = false;
+static bool cmds_registered = false;
 static bool should_disconnect = false;
 
 static bool read_ok = false;
@@ -69,12 +77,12 @@ void net_init(void)
 	setblocking(sockfd, false);
 
 	/* register net-related commands */
-	if(!cmds_reg) {
+	if(!cmds_registered) {
 		cmd_register("connect", connect_f);
 		cmd_register("disconnect", disconnect_f);
 		cmd_register("say", say_f);
 		cmd_register("respawn", respawn_f);
-		cmds_reg = true;
+        cmds_registered = true;
 	}
 
 	init_ok = true;
@@ -146,10 +154,55 @@ void net_process(void)
 
 }
 
+// TODO
+void read_entity_metadata(void)
+{
+    byte field_id;
+    while((field_id = net_read_byte()) != 0x7F && read_ok) {
+        switch((field_id >> 5) & 7) {
+            case 0:
+                net_read_byte();
+                break;
+            case 1:
+                net_read_short();
+                break;
+            case 2:
+                net_read_int();
+                break;
+            case 3:
+                net_read_float();
+                break;
+            case 4:
+                net_free_string16(net_read_string16());
+                break;
+            case 5:
+                net_read_short();
+                net_read_byte();
+                net_read_short();
+                break;
+            case 6:
+                net_read_int();
+                net_read_int();
+                net_read_int();
+                break;
+        }
+    }
+}
+
+static struct ni_wi_payload read_window_items_payload(void)
+{
+    struct ni_wi_payload item;
+    item.item_id = net_read_short();
+    if(item.item_id != -1) {
+        item.count = net_read_byte();
+        item.metadata = net_read_short();
+    }
+    return item;
+}
+
 static bool net_read_packet(void)
 {
 	ubyte packet_id;
-	int i;
 
 	// consume the old bytes
 	if(read_ok)
@@ -162,431 +215,38 @@ static bool net_read_packet(void)
 		return false;
 	}
 
-	// read the packet data and call the handler
-	// alloca is sometimes used for byte buffers, that is because net_read_buf can longjmp
-	// and if malloc were to be used, that would be leaked memory!!
-	// i hope that the stack size is big enough lol!!!!
+#define UBYTE(name)                this.name = (ubyte) net_read_byte();
+#define BYTE(name)                 this.name = net_read_byte();
+#define SHORT(name)                this.name = net_read_short();
+#define INT(name)                  this.name = net_read_int();
+#define LONG(name)                 this.name = net_read_long();
+#define FLOAT(name)                this.name = net_read_float();
+#define DOUBLE(name)               this.name = net_read_double();
+#define STRING8(name)              this.name = net_read_string8();
+#define STRING16(name)             this.name = net_read_string16();
+#define BOOL(name)                 this.name = net_read_byte();
+#define METADATA(name)             /*this.name = */read_entity_metadata();
+#define WINDOW_ITEMS_PAYLOAD(name) this.name = read_window_items_payload();
+
+#define OPT(cond, stuff) if(cond) { stuff }
+// todo: wrapper for alloca in case of bad size
+#define BUF(type, name, size) this.name = alloca((size) * sizeof(*this.name)); for(size_t i = 0; i < (size_t) (size); i++) type(name[i])
+
+#define PACKET(id, name, stuff) case id: { pkt_ ## name this = {0}; stuff; net_handle_pkt_ ## name(this); return true; }
+
 	switch(packet_id) {
-		case PKT_KEEP_ALIVE:
-			net_handle_0x00();
-			break;
-		case PKT_LOGIN_REQUEST: {
-			int eid = net_read_int();
-			string16 unk = net_read_string16();
-			long seed = net_read_long();
-			byte dim = net_read_byte();
-			net_handle_0x01(eid, unk, seed, dim);
-			break;
-		}
-		case PKT_HANDSHAKE:
-			net_handle_0x02(net_read_string16());
-			break;
-		case PKT_CHAT_MESSAGE:
-			net_handle_0x03(net_read_string16());
-			break;
-		case PKT_TIME_UPDATE:
-			net_handle_0x04(net_read_long());
-			break;
-		case PKT_ENTITY_EQUIPMENT: {
-			int eid = net_read_int();
-			short slot = net_read_short();
-			short item_id = net_read_short();
-			short item_metadata = net_read_short();
-			net_handle_0x05(eid, slot, item_id, item_metadata);
-			break;
-		}
-		case PKT_SPAWN_POSITION: {
-			int x = net_read_int(),
-				y = net_read_int(),
-				z = net_read_int();
-			net_handle_0x06(x, y, z);
-			break;
-		}
-		case PKT_USE_ENTITY: {
-			int user_id = net_read_int(),
-				target_id = net_read_int();
-			bool is_attack = net_read_bool();
-			net_handle_0x07(user_id, target_id, is_attack);
-			break;
-		}
-		case PKT_UPDATE_HEALTH:
-			net_handle_0x08(net_read_short());
-			break;
-		case PKT_RESPAWN:
-			net_handle_0x09(net_read_byte());
-			break;
-		case PKT_PLAYER_MOVE_AND_LOOK: {
-			double x = net_read_double(),
-				s = net_read_double(),
-				y = net_read_double(),
-				z = net_read_double();
-			float yaw = net_read_float(),
-				pitch = net_read_float();
-			bool on_ground = net_read_bool();
-			net_handle_0x0D(x, s, y, z, yaw, pitch, on_ground);
-			break;
-		}
-		case PKT_USE_BED: {
-			int ent_id = net_read_int();
-			byte unused = net_read_byte();
-			int x = net_read_int();
-			byte y = net_read_byte();
-			int z = net_read_int();
-			net_handle_0x11(ent_id, unused, x, y, z);
-			break;
-		}
-		case PKT_ANIMATION: {
-			int eid = net_read_int();
-			byte anim = net_read_byte();
-			net_handle_0x12(eid, anim);
-			break;
-		}
-		case PKT_ENTITY_ACTION: {
-			int eid = net_read_int();
-			byte anim = net_read_byte();
-			net_handle_0x13(eid, anim);
-			break;
-		}
-		case PKT_NAMED_ENTITY_SPAWN: {
-			int ent_id = net_read_int();
-			string16 name = net_read_string16();
-			int x = net_read_int(),
-				y = net_read_int(),
-				z = net_read_int();
-			byte yaw = net_read_byte(),
-				pitch = net_read_byte();
-			short held_item = net_read_short();
-			net_handle_0x14(ent_id, name, x, y, z, yaw, pitch, held_item);
-			break;
-		}
-		case PKT_PICKUP_SPAWN: {
-			int ent_id = net_read_int();
-			short item_id = net_read_short();
-			byte cnt = net_read_byte();
-			short item_md = net_read_short();
-			int x = net_read_int(),
-				y = net_read_int(),
-				z = net_read_int();
-			byte yaw = net_read_byte(),
-				pitch = net_read_byte(),
-				roll = net_read_byte();
-			net_handle_0x15(ent_id, item_id, cnt, item_md, x, y, z, yaw, pitch, roll);
-			break;
-		}
-		case PKT_COLLECT_ITEM: {
-			int eid = net_read_int(),
-				pid = net_read_int();
-			net_handle_0x16(eid, pid);
-			break;
-		}
-		case PKT_ADD_OBJECT_OR_VEHICLE: {
-			int ent_id = net_read_int();
-			byte type = net_read_byte();
-			int x = net_read_int(),
-				y = net_read_int(),
-				z = net_read_int(),
-				owner_id = net_read_int();
-			short vx = 0, vy = 0, vz = 0;
-			if(owner_id > 0) {
-				vx = net_read_short();
-				vy = net_read_short();
-				vz = net_read_short();
-			}
-			net_handle_0x17(ent_id, type, x, y, z, owner_id, vx, vy, vz);
-			break;
-		}
-		case PKT_MOB_SPAWN: {
-			int eid = net_read_int();
-			byte type = net_read_byte();
-			int x = net_read_int(),
-				y = net_read_int(),
-				z = net_read_int();
-			byte yaw = net_read_byte(),
-				pitch = net_read_byte();
-			net_handle_0x18(eid, type, x, y, z, yaw, pitch);
-			break;
-		}
-		case PKT_ENTITY_PAINTING: {
-			int eid = net_read_int();
-			string16 title = net_read_string16();
-			int x = net_read_int(),
-				y = net_read_int(),
-				z = net_read_int(),
-				dir = net_read_int();
-			net_handle_0x19(eid, title, x, y, z, dir);
-			break;
-		}
-		case PKT_ENTITY_VELOCITY: {
-			int eid = net_read_int();
-			short vx = net_read_short(),
-				vy = net_read_short(),
-				vz = net_read_short();
-			net_handle_0x1C(eid, vx, vy, vz);
-			break;
-		}
-		case PKT_DESTROY_ENTITY:
-			net_handle_0x1D(net_read_int());
-			break;
-		case PKT_ENTITY:
-			net_handle_0x1E(net_read_int());
-			break;
-		case PKT_ENTITY_RELATIVE_MOVE: {
-			int eid = net_read_int();
-			byte x = net_read_byte(),
-				y = net_read_byte(),
-				z = net_read_byte();
-			net_handle_0x1F(eid, x, y, z);
-			break;
-		}
-		case PKT_ENTITY_LOOK: {
-			int eid = net_read_int();
-			byte yaw = net_read_byte(),
-				pitch = net_read_byte();
-			net_handle_0x20(eid, yaw, pitch);
-			break;
-		}
-		case PKT_ENTITY_LOOK_AND_RELATIVE_MOVE: {
-			int eid = net_read_int();
-			byte x = net_read_byte(),
-				y = net_read_byte(),
-				z = net_read_byte(),
-				yaw = net_read_byte(),
-				pitch = net_read_byte();
-			net_handle_0x21(eid, x, y, z, yaw, pitch);
-			break;
-		}
-		case PKT_ENTITY_TELEPORT: {
-			int eid = net_read_int(),
-				x = net_read_int(),
-				y = net_read_int(),
-				z = net_read_int();
-			byte yaw = net_read_byte(),
-				pitch = net_read_byte();
-			net_handle_0x22(eid, x, y, z, yaw, pitch);
-			break;
-		}
-		case PKT_ENTITY_STATUS: {
-			int eid = net_read_int();
-			byte status = net_read_byte();
-			net_handle_0x26(eid, status);
-			break;
-		}
-		case PKT_ATTACH_ENTITY: {
-			int eid = net_read_int(),
-				vehid = net_read_int();
-			net_handle_0x27(eid, vehid);
-			break;
-		}
-		case PKT_ENTITY_METADATA:
-			net_handle_0x28(net_read_int());
-			break;
-		case PKT_PRE_CHUNK: {
-			int cx = net_read_int(),
-				cy = net_read_int();
-			bool load = net_read_bool();
-			net_handle_0x32(cx, cy, load);
-			break;
-		}
-		case PKT_MAP_CHUNK: {
-			int x, y, z;
-			byte sx, sy, sz;
-			void *b;
-
-			x = net_read_int();
-			y = net_read_short();
-			z = net_read_int();
-			sx = net_read_byte();
-			sy = net_read_byte();
-			sz = net_read_byte();
-
-			i = net_read_int();
-			b = alloca(i);
-			net_read_buf(b, i);
-
-			net_handle_0x33(x, y, z, sx, sy, sz, i, b);
-
-			break;
-		}
-		case PKT_MULTI_BLOCK_CHANGE: {
-			int cx = net_read_int(),
-				cz = net_read_int();
-			short sz = net_read_short();
-
-			short *b1 = alloca(sz * sizeof(short));
-			byte *b2 = alloca(sz);
-			byte *b3 = alloca(sz);
-
-			for(i = 0; i < sz; i++)
-				b1[i] = net_read_short();
-			net_read_buf(b2, sz);
-			net_read_buf(b3, sz);
-
-			net_handle_0x34(cx, cz, sz, b1, b2, b3);
-
-			break;
-		}
-		case PKT_BLOCK_CHANGE: {
-			int x = net_read_int();
-			byte y = net_read_byte();
-			int z = net_read_int();
-			byte id = net_read_byte();
-			byte md = net_read_byte();
-			net_handle_0x35(x, y, z, id, md);
-			break;
-		}
-		case PKT_BLOCK_ACTION: {
-			int x = net_read_int();
-			short y = net_read_short();
-			int z = net_read_int();
-			byte d1 = net_read_byte(),
-				d2 = net_read_byte();
-			net_handle_0x36(x, y, z, d1, d2);
-			break;
-		}
-		case PKT_EXPLOSION: {
-			struct ni_off_coord *b;
-			double x = net_read_double(),
-				y = net_read_double(),
-				z = net_read_double();
-			float r = net_read_float();
-			int n = net_read_int();
-
-			b = alloca(n * sizeof(*b));
-			for(i = 0; i < n; i++)
-				net_read_buf(&b[i], sizeof(b[i]));
-
-			net_handle_0x3C(x, y, z, r, n, b);
-			break;
-		}
-		case PKT_SOUND_EFFECT: {
-			int effid = net_read_int();
-			int x = net_read_int();
-			byte y = net_read_byte();
-			int z = net_read_int();
-			int extra = net_read_int();
-			net_handle_0x3D(effid, x, y, z, extra);
-			break;
-		}
-		case PKT_NEW_OR_INVALID_STATE:
-			net_handle_0x46(net_read_byte());
-			break;
-		case PKT_THUNDERBOLT: {
-			int eid = net_read_int();
-			bool unused = net_read_bool();
-			int x = net_read_int(),
-				y = net_read_int(),
-				z = net_read_int();
-			net_handle_0x47(eid, unused, x, y, z);
-			break;
-		}
-		case PKT_OPEN_WINDOW: {
-			byte gui_id = net_read_byte(),
-				gui_type = net_read_byte();
-			string8 title = net_read_string8();
-			byte num_slots = net_read_byte();
-			net_handle_0x64(gui_id, gui_type, title, num_slots);
-			break;
-		}
-		case PKT_CLOSE_WINDOW:
-			net_handle_0x65(net_read_byte());
-			break;
-		case PKT_WINDOW_CLICK: {
-			byte b[4] = {0};
-			short s[4] = {0};
-			b[0] = net_read_byte();
-			s[0] = net_read_short();
-			b[1] = net_read_byte();
-			s[1] = net_read_short();
-			b[2] = net_read_bool();
-			s[2] = net_read_short();
-			if(s[2] != -1) {
-				b[3] = net_read_byte();
-				s[3] = net_read_short();
-			}
-			net_handle_0x66(b[0], s[0], b[1], s[1], b[2], s[2], b[3], s[3]);
-			break;
-		}
-		case PKT_SET_SLOT: {
-			byte b[2] = {0};
-			short s[3] = {0};
-			b[0] = net_read_byte();
-			s[0] = net_read_short();
-			s[1] = net_read_short();
-			if(s[1] != -1) {
-				b[1] = net_read_byte();
-				s[2] = net_read_short();
-			}
-			net_handle_0x67(b[0], s[0], s[1], b[1], s[2]);
-			break;
-		}
-		case PKT_WINDOW_ITEMS: {
-			struct ni_wi_payload *p;
-			byte gui = net_read_byte();
-			short cnt = net_read_short();
-			p = alloca(cnt * sizeof(*p));
-			for(i = 0; i < cnt; i++) {
-				p[i].item_id = net_read_short();
-				if(p[i].item_id != -1) {
-					p[i].count = net_read_byte();
-					p[i].metadata = net_read_short();
-				}
-			}
-			net_handle_0x68(gui, cnt, p);
-			break;
-		}
-		case PKT_UPDATE_PROGRESS_BAR: {
-			byte gui_id = net_read_byte();
-			short type = net_read_short(),
-				prog = net_read_short();
-			net_handle_0x69(gui_id, type, prog);
-			break;
-		}
-		case PKT_TRANSACTION: {
-			byte gui_id = net_read_byte();
-			short act = net_read_short();
-			bool accepted = net_read_bool();
-			net_handle_0x6A(gui_id, act, accepted);
-			break;
-		}
-		case PKT_UPDATE_SIGN: {
-			int x = net_read_int();
-			short y = net_read_short();
-			int z = net_read_int();
-			string16 l[4];
-			l[0] = net_read_string16();
-			l[1] = net_read_string16();
-			l[2] = net_read_string16();
-			l[3] = net_read_string16();
-			net_handle_0x82(x, y, z, l[0], l[1], l[2], l[3]);
-			break;
-		}
-		case PKT_ITEM_DATA: {
-			short s[2];
-			byte n, *b;
-			s[0] = net_read_short();
-			s[1] = net_read_short();
-			n = net_read_byte();
-			b = alloca(n);
-			net_read_buf(b, n);
-			net_handle_0x83(s[0], s[1], n, b);
-			break;
-		}
-		case PKT_INCREMENT_STATISTIC: {
-			int stat = net_read_int();
-			byte amount = net_read_byte();
-			net_handle_0xC8(stat, amount);
-			break;
-		}
-		case PKT_DISCONNECT: {
-			net_handle_0xFF(net_read_string16());
-			break;
-		}
+#include "packets_def.h"
+        case 0x00: { // keep alive packet
+            net_write_byte(0x00);
+            return true;
+        }
 		default: {
 			con_printf("unknown packet_id %hhd (0x%hhx)! disconnecting\n", packet_id, packet_id);
 			net_shutdown();
 			return false;
 		}
 	}
+
 	return true;
 }
 
@@ -701,32 +361,63 @@ bool net_read_bool(void)
 string8 net_read_string8(void)
 {
 	string8 s;
-	short len;
 
-	len = net_read_short();
-	s = mem_alloc(len + 1);
-	net_read_buf(s, len);
-	s[len] = 0;
+	s.length = net_read_short();
+	s.data = mem_alloc(s.length + 1);
+	net_read_buf(s.data, s.length);
+	s.data[s.length] = 0;
 
-	return s; // you take care of freeing me now ;-)
+	return s;
 }
 
 string16 net_read_string16(void)
 {
 	string16 s;
-	short size, len;
+	short size;
 	int i;
 
-	len = net_read_short();
-	size = (len + 1) * sizeof(char16);
-	s = mem_alloc(size);
-	for(i = 0; i < len; i++) {
+	s.length = net_read_short();
+	size = (s.length + 1) * sizeof(*s.data);
+	s.data = mem_alloc(size);
+	for(i = 0; i < s.length; i++) {
 		// swap twice becauseeeee... java? yeah, it's all java's fault
-		s[i] = SDL_SwapBE16(net_read_short());
+		s.data[i] = SDL_SwapBE16(net_read_short());
 	}
-	s[len] = 0;
+	s.data[s.length] = 0;
 
-	return s; // you take care of freeing me now ;-)
+	return s;
+}
+
+void net_free_string8(string8 v)
+{
+    mem_free(v.data);
+}
+
+void net_free_string16(string16 v)
+{
+    mem_free(v.data);
+}
+
+string8 net_make_string8(const char *text)
+{
+    string8 str;
+    str.length = strlen(text);
+    str.data = mem_alloc(str.length + 1);
+    strlcpy(str.data, text, str.length);
+    return str;
+}
+
+string16 net_make_string16(const char *text)
+{
+    string16 str;
+    int i;
+    str.length = strlen(text);
+    str.data = mem_alloc((str.length + 1) * sizeof(*str.data));
+    for(i = 0; i < str.length; i++) {
+        str.data[i] = (char16_t) text[i];
+    }
+    str.data[i] = u'\0';
+    return str;
 }
 
 void net_write_buf(const void *buf, size_t n)
@@ -808,52 +499,16 @@ void net_write_bool(bool v)
 
 void net_write_string8(string8 v)
 {
-	short len = strlen(v);
-	net_write_short(len);
-	net_write_buf(v, len);
+	net_write_short(v.length);
+	net_write_buf(v.data, v.length);
 }
 
 void net_write_string16(string16 v)
 {
-	short len = c16strlen(v);
-	int i;
+	short len = v.length;
 	net_write_short(len);
-	for(i = 0; i < len; i++) {
-		net_write_short(v[i]);
-	}
-}
-
-void skip_entity_metadata(void)
-{
-	byte field_id;
-	while((field_id = net_read_byte()) != 0x7F && read_ok) {
-		switch((field_id >> 5) & 7) {
-			case 0:
-				net_read_byte();
-				break;
-			case 1:
-				net_read_short();
-				break;
-			case 2:
-				net_read_int();
-				break;
-			case 3:
-				net_read_float();
-				break;
-			case 4:
-				net_read_string16();
-				break;
-			case 5:
-				net_read_short();
-				net_read_byte();
-				net_read_short();
-				break;
-			case 6:
-				net_read_int();
-				net_read_int();
-				net_read_int();
-				break;
-		}
+	for(int i = 0; i < len; i++) {
+		net_write_short(v.data[i]);
 	}
 }
 
@@ -911,10 +566,15 @@ void disconnect_f(void)
 {
 	if(cl.state != cl_disconnected) {
 		if(cl.state == cl_connected) {
+            string16 reason;
 			// set to blocking so the disconnect packet gets sent
 			// before the socket is closed
 			setblocking(sockfd, true);
-			net_write_0xFF(c16("Quitting"));
+            reason = net_make_string16("Quitting");
+            net_write_pkt_disconnect((pkt_disconnect) {
+                .reason = reason
+            });
+            net_free_string16(reason);
 			setblocking(sockfd, false);
 		}
 
@@ -933,6 +593,9 @@ void disconnect_f(void)
 
 void say_f(void)
 {
+    char *msg;
+    string16 message;
+
 	if(cmd_argc() == 1) {
 		con_printf("usage: %s <message>\n", cmd_argv(0));
 	}
@@ -942,7 +605,14 @@ void say_f(void)
 		return;
 	}
 
-	net_write_0x03(c16(cmd_args(1, cmd_argc())));
+    msg = cmd_args(1, cmd_argc());
+    message = net_make_string16(msg);
+
+    net_write_pkt_chat_message((pkt_chat_message) {
+       .message = message
+    });
+
+    net_free_string16(message);
 }
 
 // fixme: this is temporary (or maybe leave it for dat sweet customizability and just make the respawn button execute this command)
@@ -952,5 +622,7 @@ void respawn_f(void)
 		con_printf("can't \"%s\", not connected\n", cmd_argv(0));
 		return;
 	}
-	net_write_0x09(0);
+    net_write_pkt_respawn((pkt_respawn) {
+       .dimension = 0
+    });
 }

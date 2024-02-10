@@ -197,6 +197,7 @@ ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int 
 			break;
 		case BLOCK_PUMPKIN_LANTERN:
 			off = 1;
+            /* fall through */
 		case BLOCK_PUMPKIN:
 			if(IS_SIDE_FACE(face)) {
 				// BRUH??????????
@@ -245,9 +246,8 @@ bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_f
 		if(face == BLOCK_FACE_Y_POS) {
 			return true;
 		}
-	} else {
-		return block_is_transparent(other);
 	}
+    return block_is_transparent(other);
 }
 
 static float fluid_get_percent_air(ubyte metadata)
@@ -318,6 +318,8 @@ static int compute_flow_decay(int x, int y, int z, block_id self_id)
 
 bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id self_id)
 {
+    return false;
+    // todo: this was written before the vec3 refactor
 	/*vec3 dir = {0};
 	int decay = compute_flow_decay(x, y, z, self_id);
 	float l;

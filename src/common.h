@@ -6,16 +6,13 @@
 #include <strings.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "char16.h"
+
+_Static_assert(__STDC_UTF_16__ == 1, "WHAT THE FUCK");
 
 #define attr(a) __attribute__((__##a##__))
 
 typedef char byte;
 typedef unsigned char ubyte;
-
-// used in net only so maybe get this shit out
-typedef char *string8;
-typedef char16 *string16;
 
 void *_mem_alloc_impl(size_t sz, const char *file, int line);
 #define mem_alloc(size) _mem_alloc_impl(size, __FILE__, __LINE__)

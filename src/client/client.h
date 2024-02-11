@@ -13,6 +13,7 @@ extern struct client_state {
 		bool rotated, moved;
 		int our_id;
 		long seed;
+        long time;
 		struct trace_result look_trace;
 	} game;
 

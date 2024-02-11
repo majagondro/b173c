@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include "console.h"
 #include "common.h"
+#include "vid/ui.h"
 
 cvar *cvarlist = NULL;
 struct cmd *cmdlist = NULL;
@@ -231,7 +232,7 @@ static void cmd_cvar(void)
 
 	if(cmd_argc() == 1) {
 		// display info
-		con_printf("%s : default value is \"%s\"\n", name, c->string);
+		con_printf("%s : "CON_STYLE_PADPX"%ddefault value is \"%s\"\n", name, ui_strwidth("current") - ui_strwidth("default"), c->string);
 		con_printf(CON_STYLE_INVISIBLE "%s : " CON_STYLE_WHITE "current value is \"%s\"\n", name, c->string);
 	} else {
 		// set

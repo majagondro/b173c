@@ -182,7 +182,7 @@ void ui_render(void)
 		ui_printf(x, y+=8, "y: %.14f", cl.game.pos.y);
 		ui_printf(x, y+=8, "z: %.14f (%d)", cl.game.pos.z, (int)cl.game.pos.z >> 4);
 		ui_printf(x, y+=24, "Seed: %ld", cl.game.seed);
-		ui_printf(x, y+=8, "Time: %lu (day %lu)", world_get_time(), world_get_time() / 24000);
+		ui_printf(x, y+=8, "Time: %lu (day %lu)", cl.game.time, cl.game.time / 24000);
 	}
 
 	// crosshair
@@ -222,7 +222,7 @@ int ui_strwidth(const char *text)
 
 bool ui_drawchar(float x, float y, ubyte character, int color)
 {
-	if(color >= 0) // draw shadow
+	if(color > 0) // draw shadow
 		ui_drawchar(x + 1, y + 1, character, -color);
 
 	if(text_char_count > MAX_CON_CHARS - 100) {

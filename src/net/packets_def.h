@@ -163,17 +163,17 @@ PACKET(0x16, collect_item,
        INT(collector_entity_id)
 )
 
-PACKET(0x17, vehicle_spawn,
+PACKET(0x17, nonliving_entity_spawn,
        INT(entity_id)
        BYTE(type)
        INT(x)
        INT(y)
        INT(z)
-       INT(unknown1)
-       OPT(this.unknown1 > 0,
-           SHORT(unknown2)
-           SHORT(unknown3)
-           SHORT(unknown4)
+       INT(owner_id)
+       OPT(this.owner_id > 0,
+           SHORT(velocity_x)
+           SHORT(velocity_y)
+           SHORT(velocity_z)
        )
 )
 
@@ -331,7 +331,7 @@ PACKET(0x46, rain_or_bed_message,
        BYTE(type)
 )
 
-PACKET(0x47, weather_event,
+PACKET(0x47, thunderbolt,
        INT(entity_id)
        BYTE(type)
        INT(x)

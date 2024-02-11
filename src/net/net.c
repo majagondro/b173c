@@ -379,10 +379,8 @@ string16 net_read_string16(void)
 	s.length = net_read_short();
 	size = (s.length + 1) * sizeof(*s.data);
 	s.data = mem_alloc(size);
-	for(i = 0; i < s.length; i++) {
-		// swap twice becauseeeee... java? yeah, it's all java's fault
-		s.data[i] = SDL_SwapBE16(net_read_short());
-	}
+	for(i = 0; i < s.length; i++)
+		s.data[i] = net_read_short();
 	s.data[s.length] = 0;
 
 	return s;

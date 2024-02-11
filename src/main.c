@@ -38,6 +38,16 @@ const char *va(const char *fmt, ...)
 	return buf;
 }
 
+const char *utf16toutf8(const char16_t *str, size_t len)
+{
+    static char buf[4096]; // fixme buf
+    memset(buf, 0, sizeof(buf));
+    for(size_t i = 0; i < len && i < sizeof(buf); i++) {
+        buf[i] = (char) str[i];
+    }
+    return buf;
+}
+
 float calc_frametime(void)
 {
 	static ulong now = 0;

@@ -6,6 +6,7 @@
 #include <strings.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <uchar.h>
 
 _Static_assert(__STDC_UTF_16__ == 1, "WHAT THE FUCK");
 
@@ -22,5 +23,8 @@ void con_printf(char *text, ...);
 
 // does a sprintf into a temp static buffer
 const char *va(const char *fmt, ...);
+
+// USES A STATIC BUFFER!!!!
+const char *utf16toutf8(const char16_t *str, size_t len);
 
 #endif

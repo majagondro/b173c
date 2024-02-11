@@ -263,10 +263,21 @@ static void draw_input_line(int y)
 	static ubyte blink_char = '|';
 	static bool blink = false;
 
-	if(blink)
-		ui_printf(1, y, "]%.*s%c%s", input_pos, input_line, blink_char, input_line + input_pos);
-	else
-		ui_printf(1, y, "]%s", input_line);
+    ui_printf(1, y, "]%s", input_line);
+    if(blink) {
+        float x = ui_charwidth(']');
+        // calculate width of input line until input pos
+        char old = input_line[input_pos];
+        input_line[input_pos] = 0;
+        x += ui_strwidth(input_line);
+        input_line[input_pos] = old;
+
+        // draw the cursor twice, once a bit up and once a bit down,
+        // so that it is taller than normal text
+        // it also results in a straight line using the default mc font
+        ui_drawchar(x, y-1, blink_char, 0xf);
+        ui_drawchar(x, y+1, blink_char, 0xf);
+    }
 
 	if(SDL_GetTicks64() - blink_tick > 800) {
 		blink_tick = SDL_GetTicks64();

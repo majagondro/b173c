@@ -38,6 +38,10 @@ typedef union {
 
 typedef float mat4[4][4];
 
+typedef struct {
+    vec3 mins, maxs;
+} bbox;
+
 #define vec3_from(xv, yv, zv) ((vec3){.x=(xv), .y=(yv), .z=(zv)})
 #define vec3_from1(x) vec3_from((x), (x), (x))
 

@@ -2,15 +2,17 @@
 #include "world.h"
 #include "client/console.h"
 #include "hashmap.h"
+#include "client/client.h"
+#include "entity.h"
 
 static const block_data AIR_BLOCK_DATA = {.id = 0, .metadata = 0, .skylight = 15, .blocklight = 0};
 static const block_data EMPTY_BLOCK_DATA = {.id = 0, .metadata = 0, .skylight = 0, .blocklight = 0};
 static const block_data SOLID_BLOCK_DATA = {.id = 1, .metadata = 0, .skylight = 0, .blocklight = 0};
 
 struct hashmap *world_chunk_map = NULL;
-ulong time = 0;
+struct hashmap *world_entity_map = NULL;
 
-/* functions for the hashmap */
+/* functions for the hashmaps */
 int chunk_compare(const void *a, const void *b, void *udata attr(unused))
 {
 	const world_chunk *ca = a, *cb = b;
@@ -34,15 +36,39 @@ void chunk_free(void *c)
 	mem_free(chunk->data);
 }
 
+int entity_compare(const void *a, const void *b, void *udata attr(unused))
+{
+    const entity *ent1 = a, *ent2 = b;
+    return ent1->id != ent2->id;
+}
+
+uint64_t entity_hash(const void *item, uint64_t seed0, uint64_t seed1)
+{
+    const entity *ent = item;
+    return hashmap_xxhash3(&ent->id, sizeof(ent->id), seed0, seed1);
+}
+
+void entity_free(void *c)
+{
+    entity *ent = c;
+    mem_free(ent->name);
+}
+
+extern cvar cl_2b2tmode;
 void world_init(void)
 {
+    cvar_register(&cl_2b2tmode);
 	world_chunk_map = hashmap_new(sizeof(world_chunk), 0, 0, 0, chunk_hash, chunk_compare, chunk_free, NULL);
+    world_entity_map = hashmap_new(sizeof(entity), 0, 0, 0, entity_hash, entity_compare, entity_free, NULL);
 }
 
 void world_shutdown(void)
 {
 	hashmap_free(world_chunk_map);
-	world_set_time(0);
+	hashmap_free(world_entity_map);
+    world_chunk_map = NULL;
+    world_entity_map = NULL;
+	cl.game.time = 0;
 }
 
 void world_alloc_chunk(int chunk_x, int chunk_z)
@@ -369,23 +395,12 @@ void world_set_block_metadata(int x, int y, int z, byte new_metadata)
 	world_set_block(x, y, z, data);
 }
 
-void world_set_time(ulong t)
-{
-	time = t;
-}
-
-ulong world_get_time(void)
-{
-	return time;
-}
-
-
 #define is_between(t, a, b) t >= a && t <= b
 vec4 world_calculate_sky_color(void)
 {
 	static vec4 color = {.a = 1};
 
-	int t = time % 24000;
+	int t = cl.game.time % 24000;
 
 	if(is_between(t, 14000, 22000)) {
 		// night
@@ -424,7 +439,7 @@ float world_calculate_sun_angle(void)
 float world_calculate_sky_light_modifier(void)
 {
 	float lmod;
-	int t = time % 24000;
+	int t = cl.game.time % 24000;
 	if(is_between(t, 14000, 22000)) {
 		// darkest night
 		lmod = 1.0f;
@@ -501,3 +516,20 @@ struct trace_result world_trace_ray(vec3 origin, vec3 dir, float maxlen)
 	return res;
 }
 
+entity *world_get_entity(int entity_id)
+{
+    entity key = {.id = entity_id};
+    return (entity *) hashmap_get(world_entity_map, &key);
+}
+
+void world_add_entity(entity *ent)
+{
+    // todo: init bbox maybe?
+    hashmap_set(world_entity_map, ent);
+}
+
+void world_remove_entity(int entity_id)
+{
+    entity key = {.id = entity_id};
+    hashmap_delete(world_entity_map, &key);
+}

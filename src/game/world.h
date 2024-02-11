@@ -5,6 +5,7 @@
 #include "mathlib.h"
 #include "hashmap.h"
 #include "block.h"
+#include "entity.h"
 
 #define WORLD_CHUNK_SIZE 16
 #define WORLD_CHUNK_HEIGHT 128
@@ -45,7 +46,7 @@ extern struct hashmap *world_chunk_map;
 
 void world_init(void);
 void world_shutdown(void); // todo: rename me to cleanup or something?
-#define world_is_init() (cl.state == cl_connected)
+#define world_is_init() (cl.state == cl_connected && world_chunk_map != NULL) // fixme
 
 /* chunks */
 void world_alloc_chunk(int chunk_x, int chunk_z);
@@ -57,15 +58,20 @@ void world_mark_all_for_remesh(void);
 void world_load_compressed_chunk_data(int x, int y, int z, int size_x, int size_y, int size_z, size_t compressed_size, ubyte *compressed);
 
 /* blocks */
+// todo: define in block.c maybe
 block_data world_get_block(int x, int y, int z);
 void world_set_block(int x, int y, int z, block_data data);
 void world_set_block_id(int x, int y, int z, block_id id);
 void world_set_block_metadata(int x, int y, int z, byte new_metadata);
 ubyte world_get_block_lighting(int x, int y, int z);
 
-/* time, daylight cycle, etc. */
-void world_set_time(ulong time);
-ulong world_get_time(void);
+/* entities */
+// defined in entity.c
+entity *world_get_entity(int entity_id);
+void world_add_entity(entity *ent); // ent is copied so dw about it
+void world_remove_entity(int entity_id);
+
+/* daylight cycle stuff */
 vec4 world_calculate_sky_color(void); // fixme: 'color' type
 float world_calculate_sun_angle(void);
 float world_calculate_sky_light_modifier(void);

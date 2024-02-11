@@ -7,4 +7,7 @@ extern const char *blocks_f_glsl;
 extern const char *text_v_glsl;
 extern const char *text_f_glsl;
 
+extern const char *model_v_glsl;
+extern const char *model_f_glsl;
+
 #endif

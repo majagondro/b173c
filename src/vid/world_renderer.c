@@ -13,8 +13,8 @@
 
 #define VIEW_HEIGHT 1.62f
 
-static mat4 view_mat = {0};
-static mat4 proj_mat = {0};
+mat4 view_mat = {0};
+mat4 proj_mat = {0};
 static uint gl_world_vao;
 static uint gl_world_texture; // fixme
 static uint gl_block_selection_vbo;

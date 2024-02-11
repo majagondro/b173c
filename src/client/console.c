@@ -9,8 +9,8 @@
 #define CONSOLE_MAX_LINE 256
 #define HISTORY_MAX_LINES 1024
 
-static char conbuf[1024 * 1024] = {0}; // fixme buf?
 static size_t conbuf_len = 0;
+static char conbuf[1024 * 64] = {0}; // fixme buf?
 static char input_line[CONSOLE_MAX_LINE + 1] = {0};
 static int input_pos = 0;
 static int line_count = 0;
@@ -240,13 +240,13 @@ void con_printf(char *fmt, ...)
 		return;
 
 	va_start(va, fmt);
-	n = (size_t) vsnprintf(conbuf + conbuf_len, sizeof(conbuf), fmt, va);
+	n = (size_t) vsnprintf(conbuf + conbuf_len, sizeof(conbuf) - conbuf_len, fmt, va);
 	printf("%s", conbuf + conbuf_len);
 	conbuf_len += n + 1; // todo do not include the null terminator
 
 	va_end(va);
 
-	if(n >= sizeof(conbuf)) {
+	if(conbuf_len >= sizeof(conbuf)) {
 		// free old stuff
 		// todo reprint again
 		size_t nb = sizeof(conbuf) / 2;

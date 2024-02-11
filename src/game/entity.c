@@ -1,5 +1,6 @@
 #include "entity.h"
 #include "common.h"
+#include "client/client.h"
 
 void entity_handle_status_update(entity *ent, byte status)
 {

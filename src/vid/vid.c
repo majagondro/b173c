@@ -144,6 +144,7 @@ void vid_init(void)
 
 	// load shaders
 	gl.shader_blocks = load_shader(blocks_v_glsl, blocks_f_glsl);
+	gl.shader_model = load_shader(model_v_glsl, model_f_glsl);
 	gl.shader_text = load_shader(text_v_glsl, text_f_glsl);
 
 	now = SDL_GetPerformanceCounter();
@@ -215,6 +216,8 @@ void vid_display_frame(void)
 	/* draw 3d stuff */
 	glUseProgram(gl.shader_blocks);
 	world_render();
+    glUseProgram(gl.shader_model);
+    entity_renderer_render();
 
 	/* draw 2d stuff */
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

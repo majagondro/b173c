@@ -125,7 +125,7 @@ void net_handle_pkt_player_look_move(pkt_player_look_move pkt)
 {
 	cl.game.pos = vec3_from(pkt.x, pkt.y_or_stance, pkt.z);
 	cl.game.stance = pkt.stance_or_y;
-	cl.game.rot.yaw = pkt.yaw;
+	cl.game.rot.yaw = -pkt.yaw;
 	cl.game.rot.pitch = pkt.pitch;
 
 	// send back or the server gets mad
@@ -146,11 +146,18 @@ EMPTY_HANDLER(pkt_entity_action)
 
 void net_handle_pkt_named_entity_spawn(pkt_named_entity_spawn pkt)
 {
-	if(pkt.entity_id == cl.game.our_id) {
-		cl.game.pos = vec3_div(vec3_from(pkt.x, pkt.y, pkt.z), 32.0f);
-		cl.game.rot.yaw = UNPACK_ANGLE(pkt.yaw);
-		cl.game.rot.pitch = UNPACK_ANGLE(pkt.pitch);
-	}
+    entity ent = {0};
+    ent.type = ENTITY_PLAYER;
+    ent.id = pkt.entity_id;
+    ent.position = vec3_div(vec3_from(pkt.x, pkt.y, pkt.z), 32.0f);
+    ent.rotation.yaw = UNPACK_ANGLE(-pkt.yaw);
+    ent.rotation.pitch = UNPACK_ANGLE(pkt.pitch);
+
+    ent.name = mem_alloc(pkt.name.length + 1);
+    memcpy(ent.name, utf16toutf8(pkt.name.data, pkt.name.length), pkt.name.length);
+    ent.name[pkt.name.length] = 0;
+
+    world_add_entity(&ent);
 
     net_free_string16(pkt.name);
 }
@@ -164,7 +171,7 @@ void net_handle_pkt_item_spawn(pkt_item_spawn pkt)
     ent.position.y = pkt.y / 32.0f;
     ent.position.z = pkt.z / 32.0f;
     ent.rotation.pitch = UNPACK_ANGLE(pkt.pitch);
-    ent.rotation.yaw = UNPACK_ANGLE(pkt.yaw);
+    ent.rotation.yaw = UNPACK_ANGLE(-pkt.yaw);
     ent.rotation.roll = UNPACK_ANGLE(pkt.roll);
     ent.item.id = pkt.item_id;
     ent.item.count = pkt.count;
@@ -243,7 +250,7 @@ void net_handle_pkt_mob_spawn(pkt_mob_spawn pkt)
     ent.position.y = pkt.y / 32.0f;
     ent.position.z = pkt.z / 32.0f;
     ent.rotation.pitch = UNPACK_ANGLE(pkt.pitch);
-    ent.rotation.yaw = UNPACK_ANGLE(pkt.yaw);
+    ent.rotation.yaw = UNPACK_ANGLE(-pkt.yaw);
 
     world_add_entity(&ent);
 }
@@ -267,6 +274,8 @@ void net_handle_pkt_entity_painting(pkt_entity_painting pkt)
         // todo: set yaw
     }
 
+    world_add_entity(&ent);
+
     net_free_string16(pkt.title);
 }
 
@@ -278,7 +287,7 @@ void net_handle_pkt_entity_velocity(pkt_entity_velocity pkt)
     if(!ent)
         return;
 
-    ent->position = vec3_add(ent->position, vec3_div(vec3_from(pkt.velocity_x, pkt.velocity_y, pkt.velocity_z), 8000.0f));
+    ent->velocity = vec3_div(vec3_from(pkt.velocity_x, pkt.velocity_y, pkt.velocity_z), 8000.0f);
 }
 
 void net_handle_pkt_destroy_entity(pkt_destroy_entity pkt)
@@ -291,6 +300,8 @@ EMPTY_HANDLER(pkt_entity) // base for pkt_entity_look/move packets, does not do 
 void net_handle_pkt_entity_move(pkt_entity_move pkt)
 {
 	entity *ent = world_get_entity(pkt.entity_id);
+    vec3 np;
+
     if(!ent)
         return;
 
@@ -303,7 +314,7 @@ void net_handle_pkt_entity_look(pkt_entity_look pkt)
     if(!ent)
         return;
 
-    ent->rotation.yaw = UNPACK_ANGLE(pkt.yaw);
+    ent->rotation.yaw = UNPACK_ANGLE(-pkt.yaw);
     ent->rotation.pitch = UNPACK_ANGLE(pkt.pitch);
 }
 

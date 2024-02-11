@@ -42,18 +42,47 @@ void mat_multiply(mat4 dest, const mat4 a, const mat4 b) {
 
 void mat_identity(float dest[4][4])
 {
-	int i;
 	memset(dest, 0, 16 * sizeof(float));
-	for(i = 0; i < 4; i++) {
+	for(int i = 0; i < 4; i++) {
 		dest[i][i] = 1;
 	}
 }
 
-void mat_translate(mat4 dest, float x, float y, float z)
+void mat_translate(mat4 dest, vec3 translation)
 {
-	dest[0][3] = x;
-	dest[1][3] = y;
-	dest[2][3] = z;
+	dest[3][0] = translation.x;
+	dest[3][1] = translation.y;
+	dest[3][2] = translation.z;
+}
+
+void mat_rotate(mat4 dest, vec3 rotation)
+{
+	// https://en.wikipedia.org/wiki/Rotation_matrix#General_3D_rotations
+	// THX
+
+	float sina = sin(DEG2RAD(rotation.pitch));
+	float cosa = cos(DEG2RAD(rotation.pitch));
+	float sinb = sin(DEG2RAD(rotation.yaw));
+	float cosb = cos(DEG2RAD(rotation.yaw));
+	float siny = sin(DEG2RAD(rotation.roll));
+	float cosy = cos(DEG2RAD(rotation.roll));
+
+	dest[0][0] = cosb * cosy;
+	dest[0][1] = cosb * siny;
+	dest[0][2] = -sinb;
+
+	dest[1][0] = sina * sinb * cosy - cosa * siny;
+	dest[1][1] = sina * sinb * siny + cosa * cosy;
+	dest[1][2] = sina * cosb;
+
+	dest[2][0] = cosa * sinb * cosy + sina * siny;
+	dest[2][1] = cosa * sinb * siny - sina * cosy;
+	dest[2][2] = cosa * cosb;
+}
+
+void mat_scale(mat4 dest, vec3 scale)
+{
+
 }
 
 void cam_angles(vec3 *fwd, vec3 *side, vec3 *up, float yaw, float pitch)

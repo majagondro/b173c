@@ -69,6 +69,7 @@ int main(void)
 	net_init();
 	vid_init();
 	ui_init();
+    entity_renderer_init();
 
 	world_init();
 
@@ -79,6 +80,7 @@ int main(void)
 		cl.frametime = calc_frametime();
 
 		in_update();
+
 
 		phys_timeout -= cl.frametime;
 		if(phys_timeout <= 0.0f) {
@@ -97,6 +99,7 @@ int main(void)
 
 	net_shutdown();
 	in_shutdown();
+    entity_renderer_shutdown();
 	ui_shutdown();
 	vid_shutdown();
 

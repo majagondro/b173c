@@ -52,7 +52,7 @@ $(BUILD_DIR):
 	mkdir $(BUILD_DIR)
 
 
-# dont care about warnings from ext
+# dont care about warnings from ext/s
 $(OBJ_DIR)/ext/%.o: $(SRC_DIR)/ext/%.c $(HDR_FILES)
 	./mkdirs.sh $@
 	$(CC) -c -Iinclude -o $@ $<

@@ -6,7 +6,7 @@
 
 struct gl_state {
 	int w, h;
-	uint shader_blocks, shader_text;
+	uint shader_blocks, shader_text, shader_model;
 };
 
 void vid_init(void);

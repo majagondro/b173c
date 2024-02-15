@@ -10,12 +10,6 @@
 #include "meshbuilder.h"
 #include "assets.h"
 
-vec3 entity_model_verts[] = {
-    vec3_from(0,0,0),
-    vec3_from(1,0,0),
-    vec3_from(0,1,0)
-};
-
 uint gl_vao, gl_vbo;
 uint gl_uniform_model, gl_uniform_view, gl_uniform_projection;
 extern struct gl_state gl;
@@ -23,6 +17,12 @@ extern mat4 view_mat, proj_mat;
 
 void entity_renderer_init(void)
 {
+	vec3 entity_model_verts[] = {
+			vec3_from(0,0,0),
+			vec3_from(1,0,0),
+			vec3_from(0,1,0)
+	};
+
     glGenVertexArrays(1, &gl_vao);
     glGenBuffers(1, &gl_vbo);
 
@@ -36,12 +36,12 @@ void entity_renderer_init(void)
     gl_uniform_model = glGetUniformLocation(gl.shader_model, "MODEL");
     gl_uniform_view = glGetUniformLocation(gl.shader_model, "VIEW");
     gl_uniform_projection = glGetUniformLocation(gl.shader_model, "PROJECTION");
-
 }
 
 void entity_renderer_shutdown(void)
 {
-
+	glDeleteVertexArrays(1, &gl_vao);
+	glDeleteBuffers(1, &gl_vbo);
 }
 
 void entity_renderer_render(void)
@@ -55,17 +55,16 @@ void entity_renderer_render(void)
     glBindVertexArray(gl_vao);
 
     glDisable(GL_CULL_FACE);
-
     i = 0;
     while(hashmap_iter(world_entity_map, &i, &it)) {
         entity *ent = it;
         mat4 model, t, r;
 
-        mat_identity(t);
-        mat_identity(r);
-        mat_translate(t, ent->position);
-        mat_rotate(r, ent->rotation);
-        mat_multiply(model, r, t);
+		mat4_identity(t);
+		mat4_identity(r);
+		mat4_translation(t, ent->position);
+		mat4_rotation(r, ent->rotation);
+		mat4_multiply(model, r, t);
 
         glUniformMatrix4fv(gl_uniform_model, 1, GL_FALSE, (const GLfloat *) model);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 3);

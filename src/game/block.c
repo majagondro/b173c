@@ -303,54 +303,6 @@ float block_fluid_get_height(int x, int y, int z, block_id self_id)
 	return 1.0f - total_air / (float) total;
 }
 
-static int compute_flow_decay(int x, int y, int z, block_id self_id)
-{
-	if(!is_same_fluid_material(world_get_block(x, y, z).id, self_id)) {
-		return -1;
-	} else {
-		block_data data = world_get_block(x, y, z);
-		if(data.metadata >= 8)
-			data.metadata = 0;
-		return data.metadata;
-	}
-}
-
-bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id self_id)
-{
-    return false;
-    // todo: this was written before the vec3 refactor
-	/*vec3 dir = {0};
-	int decay = compute_flow_decay(x, y, z, self_id);
-	float l;
-
-	for(int side = 0; side < 4; side++) {
-		int xoff = x - (2 * (side & 1) - 1);
-		int zoff = z - (2 * (side >> 1 & 1) - 1);
-		block_data other = world_get_block(xoff, y, zoff);
-		int decay2 = compute_flow_decay(xoff, y, zoff, other.id);
-		if(decay2 < 0) {
-			if(!block_is_solid(other)) {
-				decay2 = compute_flow_decay(xoff, y - 1, zoff, other.id);
-				if(decay2 >= 0) {
-					float diff = decay2 - (decay - 8);
-					vec3_add(dir, dir, ((vec3) {(xoff - x) * diff, 0, (zoff - z) * diff}));
-				}
-			}
-		} else {
-			float diff = decay2 - decay;
-			vec3_add(dir, dir, ((vec3) {(xoff - x) * diff, 0, (zoff - z) * diff}));
-		}
-	}
-
-	l = vec3_len(dir);
-	if(l > 0.0f) {
-		vec3_mul(dir, dir, 1.0f / vec3_len(dir));
-	}
-	vec3_copy(dest, dir);
-
-	return (dir[0] != 0 || dir[2] != 0);*/
-}
-
 void onchange_block_render_modes(void)
 {
 	blocks[BLOCK_LEAVES].opaque = !r_fancyleaves.integer;

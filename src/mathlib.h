@@ -5,7 +5,6 @@
 #include "common.h"
 #include <math.h>
 
-
 #define SQRT_2 1.4142f
 #define SQRT_3 1.7321f
 #define PI 3.1415f
@@ -42,28 +41,27 @@ typedef struct {
     vec3 mins, maxs;
 } bbox;
 
-#define vec3_from(xv, yv, zv) ((vec3){.x=(xv), .y=(yv), .z=(zv)})
+#define vec3_from(x, y, z) ((vec3){{x, y, z}})
 #define vec3_from1(x) vec3_from((x), (x), (x))
-
 #define vec3_add(a, b) vec3_from((a).x + (b).x, (a).y + (b).y, (a).z + (b).z)
 #define vec3_sub(a, b) vec3_from((a).x - (b).x, (a).y - (b).y, (a).z - (b).z)
 #define vec3_mul(v, s) vec3_from((v).x * (s)  , (v).y * (s)  , (v).z * (s)  )
 #define vec3_div(v, s) vec3_from((v).x / (s)  , (v).y / (s)  , (v).z / (s)  )
 #define vec3_invert(v) vec3_sub(vec3_from1(0), (v))
-#define vec3_dot(a, b)   ((a).x * (b).x + (a).y * (b).y + (a).z * (b).z)
-#define vec3_len(a) sqrtf(vec3_dot((a), (a)))
+#define vec3_dot(a, b) ((a).x * (b).x + (a).y * (b).y + (a).z * (b).z)
+#define vec3_len(a)    sqrtf(vec3_dot((a), (a)))
 // these are not macros because clion could not handle them lololol
 vec3 vec3_normalize(vec3 v);
 vec3 vec3_cross(vec3 a, vec3 b);
 
-void mat_multiply(mat4 dest, const mat4 a, const mat4 b);
-void mat_identity(mat4 dest);
-void mat_translate(mat4 dest, vec3 translation);
-void mat_rotate(mat4 dest, vec3 rotation);
-void mat_scale(mat4 dest, vec3 scale);
-void mat_view(mat4 dest, vec3 pos, vec3 ang);
-void mat_frustrum(mat4 dest, float l, float r, float b, float t, float n, float f);
-void mat_projection(mat4 dest, float fov, float aspect, float znear, float zfar);
+void mat4_multiply(mat4 dest, mat4 a, mat4 b);
+void mat4_identity(mat4 dest);
+void mat4_translation(mat4 dest, vec3 translation);
+void mat4_rotation(mat4 dest, vec3 rotation);
+void mat4_scale(mat4 dest, vec3 scale);
+void mat4_view(mat4 dest, vec3 pos, vec3 ang);
+void mat4_frustrum(mat4 dest, float l, float r, float b, float t, float n, float f);
+void mat4_projection(mat4 dest, float fov, float aspect, float znear, float zfar);
 
 // todo: roll? (and in mat_view as well)
 void cam_angles(vec3 *forward_dir, vec3 *right_dir, vec3 *up_dir, float yaw, float pitch);

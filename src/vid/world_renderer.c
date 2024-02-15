@@ -108,7 +108,7 @@ static void update_view_matrix_and_frustum(void)
 	frustum.bottom = make_plane(cl.game.pos, vec3_cross(vec3_add(fwdFar, tmp), right));
 
 	/* update view matrix */
-	mat_view(view_mat, cl.game.pos, cl.game.rot);
+	mat4_view(view_mat, cl.game.pos, cl.game.rot);
 
 	/* update look trace */
 	if(cl.state == cl_connected) {
@@ -133,7 +133,7 @@ static void update_view_matrix_and_frustum(void)
 
 void recalculate_projection_matrix(void)
 {
-	mat_projection(proj_mat, fov.value, (vid_width.value / vid_height.value), r_znear.value, r_zfar.value);
+	mat4_projection(proj_mat, fov.value, (vid_width.value / vid_height.value), r_znear.value, r_zfar.value);
 	update_view_matrix_and_frustum();
 }
 
@@ -185,7 +185,7 @@ void world_renderer_shutdown(void)
 
 static void add_block_face(struct world_vertex v, block_face face)
 {
-	static const vec3 offsets[6][4] = {
+	vec3 offsets[6][4] = {
 		[BLOCK_FACE_Y_NEG] = {vec3_from(0, 0, 0), vec3_from(0, 0, 1), vec3_from(1, 0, 0), vec3_from(1, 0, 1)},
 		[BLOCK_FACE_Y_POS] = {vec3_from(0, 1, 0), vec3_from(1, 1, 0), vec3_from(0, 1, 1), vec3_from(1, 1, 1)},
 		[BLOCK_FACE_Z_NEG] = {vec3_from(1, 1, 0), vec3_from(0, 1, 0), vec3_from(1, 0, 0), vec3_from(0, 0, 0)},
@@ -394,12 +394,6 @@ void (*render_funcs[RENDER_TYPE_COUNT])(int, int, int, block_data) = {
 
 void remesh_chunk(world_chunk *chunk)
 {
-	static const vec3 axes[3] = {
-		vec3_from(1, 0, 0),
-		vec3_from(0, 1, 0),
-		vec3_from(0, 0, 1)
-	};
-
 	world_renderer_update_chunk_visibility(chunk);
 
 	for(int bufidx = 7; bufidx >= 0; bufidx--) {
@@ -432,8 +426,6 @@ void remesh_chunk(world_chunk *chunk)
 						render_funcs[block_get_properties(block.id).render_type](x, y, z, block);
 					} else if(!block_is_empty(block)) {
 						// greedy meshing here?
-						block_properties props = block_get_properties(block.id);
-
 						if(block_should_face_be_rendered(x, y, z, block, BLOCK_FACE_Y_NEG)) {
 							add_block_face(world_make_vertex(
 								xoff, yoff, zoff,

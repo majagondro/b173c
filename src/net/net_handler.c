@@ -298,7 +298,6 @@ EMPTY_HANDLER(pkt_entity) // base for pkt_entity_look/move packets, does not do 
 void net_handle_pkt_entity_move(pkt_entity_move pkt)
 {
 	entity *ent = world_get_entity(pkt.entity_id);
-    vec3 np;
 
     if(!ent)
         return;

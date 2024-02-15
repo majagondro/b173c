@@ -86,16 +86,16 @@ void meshbuilder_add_index(MESHBUILDER_INDEX_TYPE idx)
 
 void meshbuilder_add_vert(void *v)
 {
-	struct meshbuilder_pair key = {.vertex = v};
-	const struct meshbuilder_pair *value;
+	//struct meshbuilder_pair key = {.vertex = v};
+	//const struct meshbuilder_pair *value;
 
 	/*if((value = hashmap_get(vtx_2_idx_map, &key))) {
-		/* vertex already exists * /
+		// vertex already exists
 		meshbuilder_add_index(value->index);
 		return;
 	}*/
 
-	memcpy(vertices.data + vertices.count * vertices.elem_size, v, vertices.elem_size);
+	memcpy((byte *) vertices.data + vertices.count * vertices.elem_size, v, vertices.elem_size);
 	meshbuilder_add_index(vertices.count);
 	vertices.count++;
 

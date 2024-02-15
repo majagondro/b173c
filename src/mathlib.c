@@ -18,7 +18,7 @@ vec3 vec3_cross(vec3 a, vec3 b)
 	return vec3_normalize(s);
 }
 
-void mat_multiply(mat4 dest, const mat4 a, const mat4 b) {
+void mat4_multiply(mat4 dest, mat4 a, mat4 b) {
 	dest[0][0] = a[0][0] * b[0][0] + a[0][1] * b[1][0] + a[0][2] * b[2][0] + a[0][3] * b[3][0];
 	dest[0][1] = a[0][0] * b[0][1] + a[0][1] * b[1][1] + a[0][2] * b[2][1] + a[0][3] * b[3][1];
 	dest[0][2] = a[0][0] * b[0][2] + a[0][1] * b[1][2] + a[0][2] * b[2][2] + a[0][3] * b[3][2];
@@ -40,7 +40,7 @@ void mat_multiply(mat4 dest, const mat4 a, const mat4 b) {
 	dest[3][3] = a[3][0] * b[0][3] + a[3][1] * b[1][3] + a[3][2] * b[2][3] + a[3][3] * b[3][3];
 }
 
-void mat_identity(float dest[4][4])
+void mat4_identity(mat4 dest)
 {
 	memset(dest, 0, 16 * sizeof(float));
 	for(int i = 0; i < 4; i++) {
@@ -48,14 +48,14 @@ void mat_identity(float dest[4][4])
 	}
 }
 
-void mat_translate(mat4 dest, vec3 translation)
+void mat4_translation(mat4 dest, vec3 translation)
 {
 	dest[3][0] = translation.x;
 	dest[3][1] = translation.y;
 	dest[3][2] = translation.z;
 }
 
-void mat_rotate(mat4 dest, vec3 rotation)
+void mat4_rotation(mat4 dest, vec3 rotation)
 {
 	// https://en.wikipedia.org/wiki/Rotation_matrix#General_3D_rotations
 	// THX
@@ -80,9 +80,9 @@ void mat_rotate(mat4 dest, vec3 rotation)
 	dest[2][2] = cosa * cosb;
 }
 
-void mat_scale(mat4 dest, vec3 scale)
+void mat4_scale(mat4 dest, vec3 scale)
 {
-
+// todo:
 }
 
 void cam_angles(vec3 *fwd, vec3 *side, vec3 *up, float yaw, float pitch)
@@ -112,7 +112,7 @@ void cam_angles(vec3 *fwd, vec3 *side, vec3 *up, float yaw, float pitch)
 	}
 }
 
-void mat_view(mat4 dest, vec3 pos, vec3 ang)
+void mat4_view(mat4 dest, vec3 pos, vec3 ang)
 {
 	vec3 x, y, z;
 
@@ -132,29 +132,29 @@ void mat_view(mat4 dest, vec3 pos, vec3 ang)
 	dest[3][3] = 1.0f;
 }
 
-void mat_frustrum(mat4 dest, float left, float right, float bottom, float top, float znear, float zfar)
+void mat4_frustrum(mat4 dest, float l, float r, float b, float t, float n, float f)
 {
 	float z2, dw, dh, dz;
 
 	memset(dest, 0, 16 * sizeof(float));
 
-	z2 = 2.0f * znear;
-	dw = right - left;
-	dh = top - bottom;
-	dz = zfar - znear;
+	z2 = 2.0f * n;
+	dw = r - l;
+	dh = t - b;
+	dz = f - n;
 	dest[0][0] = z2 / dw;
 	dest[1][1] = z2 / dh;
-	dest[2][0] = (right + left) / dw;
-	dest[2][1] = (top + bottom) / dh;
-	dest[2][2] = (-zfar + znear) / dz;
+	dest[2][0] = (r + l) / dw;
+	dest[2][1] = (t + b) / dh;
+	dest[2][2] = (-f + n) / dz;
 	dest[2][3] = -1.0f;
-	dest[3][2] = (-z2 * zfar) / dz;
+	dest[3][2] = (-z2 * f) / dz;
 }
 
-void mat_projection(mat4 dest, float fov, float aspect, float znear, float zfar)
+void mat4_projection(mat4 dest, float fov, float aspect, float znear, float zfar)
 {
 	float ymax, xmax;
 	ymax = znear * tanf(DEG2RAD(fov) * 0.5f);
 	xmax = ymax * aspect;
-	mat_frustrum(dest, -xmax, xmax, -ymax, ymax, znear, zfar);
+	mat4_frustrum(dest, -xmax, xmax, -ymax, ymax, znear, zfar);
 }

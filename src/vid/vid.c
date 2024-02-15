@@ -7,6 +7,7 @@
 #include "client/client.h"
 #include "game/world.h"
 #include <SDL2/SDL_vulkan.h>
+#include "client/cvar.h"
 
 SDL_Window *window_handle;
 SDL_GLContext glcontext;
@@ -14,9 +15,6 @@ SDL_GLContext glcontext;
 ulong frames_drawn = 0;
 ulong last_check_tick = 0; // for fps because its a little more stable and looks nicer :)
 ulong then = 0, now = 0; // for frametime
-
-cvar vid_width = {"vid_width", "854"};
-cvar vid_height = {"vid_height", "480"};
 
 struct gl_state gl;
 
@@ -110,9 +108,6 @@ void vid_init(void)
 {
 	int flags, ok;
 	int x = SDL_WINDOWPOS_CENTERED, y = SDL_WINDOWPOS_CENTERED;
-
-	cvar_register(&vid_height);
-	cvar_register(&vid_width);
 
 	/* ----- SDL INIT ----- */
 	ok = SDL_Init(SDL_INIT_VIDEO);

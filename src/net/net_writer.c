@@ -2,6 +2,7 @@
 #include "net_internal.h"
 #include "client/client.h"
 #include "client/console.h"
+#include "client/cvar.h"
 
 void net_write_packets(void)
 {
@@ -16,8 +17,6 @@ void net_write_packets(void)
 
 	if(cl.state == cl_connecting && !sent_handshake) {
 		// send handshake to the server
-		extern cvar cvar_name;
-
         string16 username = net_make_string16(cvar_name.string);
         net_write_pkt_handshake((pkt_handshake) {
             .connection_hash_or_username = username

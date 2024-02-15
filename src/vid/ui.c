@@ -7,6 +7,7 @@
 #include "vid.h"
 #include "client/client.h"
 #include "assets.h"
+#include "client/cvar.h"
 
 // arbitrary limit, can be increased safely
 #define MAX_CON_CHARS 8192
@@ -17,11 +18,6 @@
 int CON_CHAR_SIZE = _CON_CHAR_SIZE;
 
 int ui_w, ui_h;
-
-extern cvar vid_width, vid_height;
-
-void onchange_ui_scale(void);
-cvar ui_scale = {"ui_scale", "2", onchange_ui_scale};
 
 vec2 glyph_vertices_original[] = {
 	{.x=0.0f, .y=0.0f}, {.u=0.0f, .v=0.0f},
@@ -121,8 +117,6 @@ static void calculate_char_widths(void)
 
 void ui_init(void)
 {
-	cvar_register(&ui_scale);
-
 	asset_font_image = asset_get_image(ASSET_TEXTURE_FONT_DEFAULT);
 	CON_CHAR_SIZE = _CON_CHAR_SIZE * asset_font_image->width / 128;
 

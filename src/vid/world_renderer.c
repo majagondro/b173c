@@ -8,6 +8,7 @@
 #include "hashmap.h"
 #include "meshbuilder.h"
 #include "assets.h"
+#include "client/cvar.h"
 
 // todo: mesher thread
 
@@ -26,19 +27,6 @@ struct {
 		float dist;
 	} top, bottom, right, left, far, near;
 } frustum = {0};
-
-static void recalculate_projection_matrix(void);
-void onchange_block_render_modes(void); // in block.c
-
-cvar fov = {"fov", "90", recalculate_projection_matrix};
-cvar r_zfar = {"r_zfar", "256", recalculate_projection_matrix};
-cvar r_znear = {"r_znear", "0.1", recalculate_projection_matrix};
-cvar r_max_remeshes = {"r_max_remeshes", "2"};
-cvar r_fancyleaves = {"r_fancyleaves", "1", onchange_block_render_modes};
-cvar r_smartleaves = {"r_smartleaves", "0", onchange_block_render_modes};
-cvar gl_polygon_mode = {"gl_polygon_mode", "GL_FILL"};
-
-extern cvar vid_width, vid_height;
 
 extern struct gl_state gl;
 
@@ -143,7 +131,7 @@ static void update_view_matrix_and_frustum(void)
 	}
 }
 
-static void recalculate_projection_matrix(void)
+void recalculate_projection_matrix(void)
 {
 	mat_projection(proj_mat, fov.value, (vid_width.value / vid_height.value), r_znear.value, r_zfar.value);
 	update_view_matrix_and_frustum();
@@ -152,14 +140,6 @@ static void recalculate_projection_matrix(void)
 void world_renderer_init(void)
 {
 	asset_image *terrain_asset;
-
-	cvar_register(&fov);
-	cvar_register(&r_zfar);
-	cvar_register(&r_znear);
-	cvar_register(&r_max_remeshes);
-	cvar_register(&r_fancyleaves);
-	cvar_register(&r_smartleaves);
-	cvar_register(&gl_polygon_mode);
 
 	recalculate_projection_matrix();
 

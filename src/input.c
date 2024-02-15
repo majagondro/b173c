@@ -4,14 +4,14 @@
 #include "client/console.h"
 #include "client/client.h"
 #include "vid/ui.h"
+#include "client/cvar.h"
+#include "client/cvar.h"
 
 struct key_status input_keys[512] = {0};
 
 static int capslock_keymod = 0;
 
 struct gamekeys gamekeys = {0};
-
-cvar sensitivity = {"sensitivity", "2.5"};
 
 void forwarddown_f(void) { gamekeys.forward = 1; }
 void forwardup_f(void) { gamekeys.forward = 0; }
@@ -227,8 +227,6 @@ void in_init(void)
 	cmd_register("bind", bind_f);
 	cmd_register("bindlist", bindlist_f);
 	cmd_register("unbind", unbind_f);
-
-	cvar_register(&sensitivity);
 
 	key_bind(KEY_ESCAPE, "toggleconsole");
 }

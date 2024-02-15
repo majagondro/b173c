@@ -2,25 +2,20 @@
 #include "console.h"
 #include "common.h"
 #include "vid/ui.h"
+#include "cvar.h"
 
-cvar *cvarlist = NULL;
 struct cmd *cmdlist = NULL;
 struct alias *aliaslist = NULL;
 
 static char *_cmd_argv[64]; // fixme buf
 static int _cmd_argc = 0;
 
-static char * emptystr = "";
-
-cvar developer = {"developer", "0"};
-cvar cvar_name = {"name", "player"};
+static char *emptystr = "";
 
 // cmds.c
 void cmds_register(void);
 void cmd_init(void)
 {
-	cvar_register(&developer);
-	cvar_register(&cvar_name);
 	cmds_register();
 }
 
@@ -55,20 +50,6 @@ char *cmd_args(int from, int to)
 	}
 
 	return buf;
-}
-
-void cvar_register(cvar *c)
-{
-	if(c->name == NULL)
-		return;
-	if(c->default_value == NULL)
-		return;
-
-	c->next = cvarlist;
-	cvarlist = c;
-	c->string = NULL;
-
-	cvar_set(c->name, c->default_value);
 }
 
 void cmd_register(const char *name, void (*func)(void))
@@ -138,17 +119,6 @@ void alias_remove(const char *name)
 	mem_free(a);
 }
 
-cvar *cvar_find(const char *name)
-{
-	cvar *cvar;
-
-	for(cvar = cvarlist; cvar != NULL; cvar = cvar->next)
-		if(strcmp(name, cvar->name) == 0)
-			return cvar;
-
-	return NULL;
-}
-
 struct cmd *cmd_find(const char *name)
 {
 	struct cmd *cmd = NULL;
@@ -169,45 +139,6 @@ struct alias *alias_find(const char *name)
 			return a;
 
 	return NULL;
-}
-
-bool cvar_set_silent(const char *name, const char *value)
-{
-	cvar *cvar;
-	size_t len;
-
-	if (name == NULL)
-		return false;
-	if (value == NULL)
-		return false;
-	if (!(cvar = cvar_find(name)))
-		return false;
-
-	len = strlen(value);
-
-	mem_free(cvar->string);
-	cvar->string = mem_alloc(len + 1);
-	memcpy(cvar->string, value, len);
-	cvar->string[len] = 0;
-
-	cvar->value = strtof(value, NULL);
-	cvar->integer = (int) strtol(value, NULL, 10);
-
-	return true;
-}
-
-bool cvar_set(const char *name, const char *value)
-{
-	cvar *cvar;
-
-	if(!cvar_set_silent(name, value))
-		return false;
-
-	cvar = cvar_find(name);
-	if(cvar->onchange)
-		cvar->onchange();
-
-	return true;
 }
 
 static char *copystr(char *s)

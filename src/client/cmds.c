@@ -3,6 +3,7 @@
 #include "input.h"
 #include "client.h"
 #include "vid/ui.h"
+#include "cvar.h"
 #include <SDL2/SDL.h>
 
 extern cvar *cvarlist;

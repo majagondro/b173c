@@ -2,13 +2,12 @@
 #include "game/world.h"
 #include "client/console.h"
 #include "client/client.h"
+#include "client/cvar.h"
 #include "vid/vid.h"
 #include "net/packets.h"
 
 #define UNPACK_ANGLE(angle) ((float)(angle * 360) / 256.0f)
 #define EMPTY_HANDLER(pkt) void net_handle_ ## pkt (pkt p attr(unused)) {}
-
-cvar cl_2b2tmode = {"cl_2b2tmode", "0"};
 
 entity_type nonliving_type_lookup[256] = {
     [1] = ENTITY_BOAT,
@@ -69,7 +68,6 @@ void net_handle_pkt_handshake(pkt_handshake pkt)
 {
     // if pkt.conn_hash[0] == '+', auth to mojang or something
 
-	extern cvar cvar_name;
     string16 username = net_make_string16(cvar_name.string);
 
 	cl.state = cl_connecting;

@@ -54,10 +54,8 @@ void entity_free(void *c)
     mem_free(ent->name);
 }
 
-extern cvar cl_2b2tmode;
 void world_init(void)
 {
-    cvar_register(&cl_2b2tmode);
 	world_chunk_map = hashmap_new(sizeof(world_chunk), 0, 0, 0, chunk_hash, chunk_compare, chunk_free, NULL);
     world_entity_map = hashmap_new(sizeof(entity), 0, 0, 0, entity_hash, entity_compare, entity_free, NULL);
 }

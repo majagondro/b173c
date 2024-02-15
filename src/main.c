@@ -7,6 +7,7 @@
 #include "vid/ui.h"
 #include "client/client.h"
 #include "assets.h"
+#include "client/cvar.h"
 
 struct client_state cl = {0};
 void *_mem_alloc_impl(size_t sz, const char *file, int line)
@@ -63,13 +64,15 @@ int main(void)
 {
 	float phys_timeout = 0.0f;
 
-	assets_init();
+   cvar_init();
+
+   assets_init();
 	in_init();
 	con_init();
 	net_init();
 	vid_init();
 	ui_init();
-    entity_renderer_init();
+   entity_renderer_init();
 
 	world_init();
 

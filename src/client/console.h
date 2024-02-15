@@ -25,18 +25,6 @@
 #define CON_STYLE_INVISIBLE   CON_STYLE_PREFIX_STR "i"
 #define CON_STYLE_PADPX       CON_STYLE_PREFIX_STR "p"
 
-typedef struct cvar {
-	char *name;
-	char *default_value;
-	void (*onchange)(void);
-
-	char *string;
-	float value;
-	int integer;
-
-	struct cvar *next;
-} cvar;
-
 struct cmd {
 	char *name;
 	void (*func)(void);
@@ -50,8 +38,6 @@ struct alias {
 
 	struct alias *next;
 };
-
-extern cvar developer;
 
 extern bool con_opened;
 extern int con_scroll;
@@ -69,19 +55,14 @@ void con_printf(char *text, ...);
 void cmd_init(void);
 void cmd_exec(char *text);
 
-void cvar_register(cvar *c);
 void cmd_register(const char *name, void (*func)(void));
 void alias_register(const char *name, const char *command);
 
 void alias_remove(const char *name);
 
-cvar *cvar_find(const char *name);
 struct cmd *cmd_find(const char *name);
 struct alias *alias_find(const char *name);
 
-bool cvar_set(const char *name, const char *value);
-// silent set doesn't call onchange functions
-bool cvar_set_silent(const char *name, const char *value);
 
 char *cmd_argv(int i);
 int cmd_argc(void);

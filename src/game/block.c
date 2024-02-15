@@ -3,6 +3,7 @@
 #include "world.h"
 #include "client/console.h"
 #include "client/client.h"
+#include "client/cvar.h"
 
 enum {
 	TRANSPARENT = 0, OPAQUE = 1
@@ -119,7 +120,6 @@ block_properties block_get_properties(block_id id)
 ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int x, int y, int z)
 {
 	block_properties props = block_get_properties(id);
-	extern cvar r_fancyleaves;
 	int off = 0;
 
 	switch(id) {
@@ -219,7 +219,6 @@ ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int 
 
 bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_face face)
 {
-	extern cvar r_smartleaves;
 	vec3 face_offsets[6] = {
 		[BLOCK_FACE_Y_NEG] = vec3_from(0, -1, 0),
 		[BLOCK_FACE_Y_POS] = vec3_from(0, 1, 0),
@@ -354,7 +353,6 @@ bool block_get_fluid_flow_direction(vec3 dest, int x, int y, int z, block_id sel
 
 void onchange_block_render_modes(void)
 {
-	extern cvar r_fancyleaves;
 	blocks[BLOCK_LEAVES].opaque = !r_fancyleaves.integer;
 	if(world_is_init()) {
 		world_mark_all_for_remesh();

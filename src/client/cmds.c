@@ -5,6 +5,7 @@
 #include "vid/ui.h"
 #include "cvar.h"
 #include <SDL2/SDL.h>
+#include <bsd/string.h>
 
 extern cvar *cvarlist;
 extern struct cmd *cmdlist;

@@ -32,4 +32,10 @@ const char *va(const char *fmt, ...);
 // USES A STATIC BUFFER!!!!
 const char *utf16toutf8(const char16_t *str, size_t len);
 
+typedef enum {
+    ERR_OK,
+    ERR_FATAL,
+    ERR_NETWORK
+} errcode;    
+
 #endif

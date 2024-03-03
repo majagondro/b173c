@@ -9,6 +9,7 @@ extern struct client_state {
     struct {
         bool rotated, moved;
         entity *our_ent;
+        int our_id;
         long seed;
         long time;
         struct trace_result look_trace;

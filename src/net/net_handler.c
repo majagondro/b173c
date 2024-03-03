@@ -5,9 +5,8 @@
 #include "client/cvar.h"
 #include "vid/vid.h"
 #include "net/packets.h"
-#include "../client/client.h"
 
-#define UNPACK_ANGLE(angle) ((float)(angle * 360) / 256.0f)
+#define UNPACK_ANGLE(angle) ((float)((angle) * 360) / 256.0f)
 #define EMPTY_HANDLER(pkt) void net_handle_ ## pkt (pkt p attr(unused)) {}
 
 entity_type nonliving_type_lookup[256] = {
@@ -57,6 +56,7 @@ void net_handle_pkt_login_request(pkt_login_request pkt)
 {
     cl.game.seed = pkt.seed;
     cl.state = cl_connected;
+    cl.game.our_id = pkt.entity_id_or_protocol_version;
     cl.game.our_ent = world_get_entity(pkt.entity_id_or_protocol_version);
     if(!cl.game.our_ent) {
         // create
@@ -181,14 +181,14 @@ void net_handle_pkt_item_spawn(pkt_item_spawn pkt)
     entity ent = {0};
     ent.id = pkt.entity_id;
     ent.type = ENTITY_ITEM;
-    ent.position.x = pkt.x / 32.0f;
-    ent.position.y = pkt.y / 32.0f;
-    ent.position.z = pkt.z / 32.0f;
+    ent.position.x = (float) pkt.x / 32.0f;
+    ent.position.y = (float) pkt.y / 32.0f;
+    ent.position.z = (float) pkt.z / 32.0f;
     ent.rotation.pitch = UNPACK_ANGLE(pkt.pitch);
     ent.rotation.yaw = UNPACK_ANGLE(-pkt.yaw);
     ent.rotation.roll = UNPACK_ANGLE(pkt.roll);
     ent.item.id = pkt.item_id;
-    ent.item.count = pkt.count;
+    ent.item.count = (int) pkt.count;
     ent.item.metadata = pkt.metadata;
     world_add_entity(&ent);
 }
@@ -201,9 +201,11 @@ void net_handle_pkt_collect_item(pkt_collect_item pkt)
         return;
 
     if(pkt.collector_entity_id == cl.game.our_ent->id && cl_2b2tmode.integer != 0) {
+        string16 s = net_make_string16(va("I just picked up %d %d!\n", ent->item.count, ent->item.id));
         net_write_pkt_chat_message((pkt_chat_message) {
-            .message = net_make_string16(va("I just picked up %d %d!\n", ent->item.count, ent->item.id))
+            .message = s
         });
+        net_free_string16(s);
     }
 
     world_remove_entity(ent->id); // todo: pickup animation
@@ -214,14 +216,14 @@ void net_handle_pkt_nonliving_entity_spawn(pkt_nonliving_entity_spawn pkt)
     entity ent = {0};
     ent.id = pkt.entity_id;
     ent.type = nonliving_type_lookup[pkt.type];
-    ent.position.x = pkt.x / 32.0f;
-    ent.position.y = pkt.y / 32.0f;
-    ent.position.z = pkt.z / 32.0f;
+    ent.position.x = (float) pkt.x / 32.0f;
+    ent.position.y = (float) pkt.y / 32.0f;
+    ent.position.z = (float) pkt.z / 32.0f;
     ent.rotation.pitch = 0.0f;
     ent.rotation.yaw = 0.0f;
-    ent.velocity.x = pkt.velocity_x / 8000.0f;
-    ent.velocity.y = pkt.velocity_y / 8000.0f;
-    ent.velocity.z = pkt.velocity_z / 8000.0f;
+    ent.velocity.x = (float) pkt.velocity_x / 8000.0f;
+    ent.velocity.y = (float) pkt.velocity_y / 8000.0f;
+    ent.velocity.z = (float) pkt.velocity_z / 8000.0f;
 
     switch(ent.type) {
         case ENTITY_MINECART:
@@ -259,10 +261,10 @@ void net_handle_pkt_mob_spawn(pkt_mob_spawn pkt)
 {
     entity ent = {0};
     ent.id = pkt.entity_id;
-    ent.type = pkt.type;
-    ent.position.x = pkt.x / 32.0f;
-    ent.position.y = pkt.y / 32.0f;
-    ent.position.z = pkt.z / 32.0f;
+    ent.type = (float) pkt.type;
+    ent.position.x = (float) pkt.x / 32.0f;
+    ent.position.y = (float) pkt.y / 32.0f;
+    ent.position.z = (float) pkt.z / 32.0f;
     ent.rotation.pitch = UNPACK_ANGLE(pkt.pitch);
     ent.rotation.yaw = UNPACK_ANGLE(-pkt.yaw);
 
@@ -275,9 +277,9 @@ void net_handle_pkt_entity_painting(pkt_entity_painting pkt)
     entity ent = {0};
     ent.id = pkt.entity_id;
     ent.type = ENTITY_PAINTING;
-    ent.position.x = pkt.x / 32.0f;
-    ent.position.y = pkt.y / 32.0f;
-    ent.position.z = pkt.z / 32.0f;
+    ent.position.x = (float) pkt.x / 32.0f;
+    ent.position.y = (float) pkt.y / 32.0f;
+    ent.position.z = (float) pkt.z / 32.0f;
 
     title = utf16toutf8(pkt.title.data, pkt.title.length);
     for(ent.painting.type = 0; ent.painting.type < PAINTING_TYPE_COUNT; ent.painting.type++)
@@ -455,9 +457,9 @@ void net_handle_pkt_thunderbolt(pkt_thunderbolt pkt)
     entity e = {0};
     e.id = pkt.entity_id;
     e.type = ENTITY_THUNDERBOLT;
-    e.position.x = pkt.x / 32.0f;
-    e.position.y = pkt.y / 32.0f;
-    e.position.z = pkt.z / 32.0f;
+    e.position.x = (float) pkt.x / 32.0f;
+    e.position.y = (float) pkt.y / 32.0f;
+    e.position.z = (float) pkt.z / 32.0f;
 
     world_add_entity(&e);
 }

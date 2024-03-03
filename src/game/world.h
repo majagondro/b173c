@@ -70,7 +70,7 @@ block_data world_get_block(int x, int y, int z);
 block_data world_get_blockf(float x, float y, float z);
 void world_set_block(int x, int y, int z, block_data data);
 void world_set_block_id(int x, int y, int z, block_id id);
-void world_set_block_metadata(int x, int y, int z, byte new_metadata);
+void world_set_block_metadata(int x, int y, int z, ubyte new_metadata);
 ubyte world_get_block_lighting(int x, int y, int z);
 bbox_t *world_get_colliding_blocks(bbox_t box);
 

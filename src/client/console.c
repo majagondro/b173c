@@ -354,7 +354,7 @@ void ui_draw_console(void)
 
 	p = conbuf + conbuf_len - 2;
 	for(int i = 0; i < num_lines_that_fit + con_scroll; i++) {
-		while(*p)
+		while(p > conbuf && *p)
 			p--;
 		p++;
 		if(ui_strwidth(p) >= ui_w - 8) {

@@ -471,7 +471,7 @@ void world_set_block_id(int x, int y, int z, block_id new_id)
     world_set_block(x, y, z, data);
 }
 
-void world_set_block_metadata(int x, int y, int z, byte new_metadata)
+void world_set_block_metadata(int x, int y, int z, ubyte new_metadata)
 {
     block_data data = world_get_block(x, y, z);
     data.metadata = new_metadata;
@@ -523,7 +523,7 @@ float world_calculate_sun_angle(void)
 float world_calculate_sky_light_modifier(void)
 {
     float lmod;
-    int t = cl.game.time % 24000;
+    long t = cl.game.time % 24000;
     if(is_between(t, 14000, 22000)) {
         // darkest night
         lmod = 1.0f;
@@ -568,9 +568,9 @@ struct trace_result world_trace_ray(vec3_t origin, vec3_t dir, float maxlen)
         }
     }
 
-    res.x = floorf(origin.x);
-    res.y = floorf(origin.y);
-    res.z = floorf(origin.z);
+    res.x = (int) floorf(origin.x);
+    res.y = (int) floorf(origin.y);
+    res.z = (int) floorf(origin.z);
 
     res.reached_end = true; // by default
 
@@ -616,12 +616,18 @@ entity *world_get_entity(int entity_id)
 
 void world_add_entity(entity *ent)
 {
-    entity_set_position(ent, ent->position);
+    entity_set_position(ent, ent->position); // update bbox
     hashmap_set(world_entity_map, ent);
+    // in case the hashmap resizes, we need to find our player entity again
+    // todo: maybe i can put this in entity_free() instead? (see top of this file)
+    cl.game.our_ent = world_get_entity(cl.game.our_id);
 }
 
 void world_remove_entity(int entity_id)
 {
     entity key = {.id = entity_id};
     hashmap_delete(world_entity_map, &key);
+    // in case the hashmap resizes, we need to find our player entity again
+    // todo: maybe i can put this in entity_free() instead? (see top of this file)
+    cl.game.our_ent = world_get_entity(cl.game.our_id);
 }

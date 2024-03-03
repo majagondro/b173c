@@ -61,10 +61,16 @@ void meshbuilder_start(size_t vtx_size)
 
 void meshbuilder_finish(void **verts_dest, size_t *num_verts_dest, MESHBUILDER_INDEX_TYPE **indices_dest, size_t *num_indices_dest)
 {
-	*verts_dest = reallocarray(vertices.data, vertices.count, vertices.elem_size);
+	if(vertices.count > 0)
+		*verts_dest = reallocarray(vertices.data, vertices.count, vertices.elem_size);
+	else
+		*verts_dest = NULL;
 	*num_verts_dest = vertices.count;
 
-	*indices_dest = reallocarray(indices.data, indices.count, sizeof(MESHBUILDER_INDEX_TYPE));
+	if(indices.count > 0)
+		*indices_dest = reallocarray(indices.data, indices.count, sizeof(MESHBUILDER_INDEX_TYPE));
+	else
+		*indices_dest = NULL;
 	*num_indices_dest = indices.count;
 
 	memset(&vertices, 0, sizeof(vertices));

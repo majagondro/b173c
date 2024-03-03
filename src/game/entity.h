@@ -50,10 +50,16 @@ typedef struct entity {
     entity_type type;
     char *name; // for named entities (players)
 
-    vec3 position;
-    vec3 velocity;
-    vec3 rotation;
-    bbox bbox;
+    vec3_t position;
+    vec3_t position_old;
+    vec3_t velocity;
+    float move_side, move_forward;
+    float smooth_step_view_height_offset, eye_offset;
+    vec3_t rotation;
+    bbox_t bbox;
+    bool onground;
+    bool collided_horizontally;
+    bool collided_vertically;
 
     struct entity *vehicle;
 
@@ -116,7 +122,13 @@ typedef struct entity {
 
 extern struct hashmap *world_entity_map;
 
+void entity_set_position(entity *ent, vec3_t pos);
+void entity_update(entity *ent);
 void entity_handle_status_update(entity *ent, byte status);
+
+bool entity_in_water(entity *ent);
+bool entity_in_lava(entity *ent);
+bool entity_on_ladder(entity *ent);
 
 errcode entity_renderer_init(void);
 void entity_renderer_shutdown(void);

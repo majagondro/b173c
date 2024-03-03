@@ -10,7 +10,10 @@
 #include "assets.h"
 #include "client/cvar.h"
 
-struct client_state cl = {0};
+#define TPS 20
+
+entity dummy_ent = {0};
+struct client_state cl = {.game.our_ent = &dummy_ent};
 void *_mem_alloc_impl(size_t sz, const char *file, int line)
 {
     void *ptr = calloc(sz, 1);
@@ -74,16 +77,39 @@ do {                                                    \
         con_printf("%s: %s\n", #func, errmsgs[err]);    \
 } while(0)
 
+void check_stuck(void)
+{
+    // server spawns us in blocks sometimes :/
+    if(world_is_init()) {
+        entity *ent = cl.game.our_ent;
+        bbox_t *colliders = world_get_colliding_blocks(cl.game.our_ent->bbox);
+
+        if(bbox_null(*colliders)) {
+            // not yet (or at all)
+            return;
+        }
+
+        while(!bbox_null(*colliders)) {
+            entity_set_position(ent, vec3_add(ent->position, vec3(0, 1, 0)));
+            colliders = world_get_colliding_blocks(cl.game.our_ent->bbox);
+        }
+
+        cl.game.moved = true;
+        cl.game.unstuck = true;
+    }
+}
+
 int main(void)
 {
     float phys_timeout = 0.0f;
     
     INIT(cvar_init);
     INIT(con_init);
-    
+    cmd_register("unstuck", check_stuck);
+
     cmd_exec("exec config");
     cmd_exec("exec autoexec");
-    
+
     INIT(assets_init);
     INIT(in_init);
     INIT(net_init);
@@ -93,21 +119,30 @@ int main(void)
     INIT(world_init);
 
     while(!cl.done) {
+        /* frame time stuff */
         cl.frametime = calc_frametime();
-
-        in_update();
-
+        cl.is_physframe = false;
         phys_timeout -= cl.frametime;
         if(phys_timeout <= 0.0f) {
-            net_process();
-            phys_timeout = 0.05f; // 20 updates per second
+            cl.is_physframe = true;
+            phys_timeout = 1.0f / TPS;
         }
 
+        /* user input */
+        in_update();
+
+        /* physics etc. */
+        if(cl.is_physframe) {
+            net_process();
+            entity_update(cl.game.our_ent);
+        }
+
+        /* rendering */
         vid_update();
         ui_draw();
         vid_display_frame();
 
-        if(!cl.active) { // todo: sys_inactivesleep cvar
+        if(!cl.active) {
             SDL_Delay(25);
         }
     }

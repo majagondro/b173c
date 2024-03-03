@@ -29,3 +29,34 @@ void entity_handle_status_update(entity *ent, byte status)
         }
     }
 }
+
+void entity_set_position(entity *ent, vec3_t pos)
+{
+    // size for a player tho
+    float w = 0.6f / 2.0f;
+    float h = 1.8f;
+
+    ent->position = pos;
+    ent->bbox = (bbox_t) {
+        .mins = vec3(pos.x - w, pos.y - ent->eye_offset + ent->smooth_step_view_height_offset, pos.z - w),
+        .maxs = vec3(pos.x + w, pos.y - ent->eye_offset + ent->smooth_step_view_height_offset + h, pos.z + w)
+    };
+}
+
+bool entity_in_water(entity *ent)
+{
+    block_data block = world_get_blockf(ent->position.x, ent->bbox.mins.y+0.4f, ent->position.z);
+    return block.id == BLOCK_WATER_MOVING || block.id == BLOCK_WATER_STILL;
+}
+
+bool entity_in_lava(entity *ent)
+{
+    block_data block = world_get_blockf(ent->position.x, ent->bbox.mins.y+0.4f, ent->position.z);
+    return block.id == BLOCK_LAVA_MOVING || block.id == BLOCK_LAVA_STILL;
+}
+
+bool entity_on_ladder(entity *ent)
+{
+    block_data block = world_get_blockf(ent->position.x, ent->bbox.mins.y, ent->position.z);
+    return block.id == BLOCK_LADDER;
+}

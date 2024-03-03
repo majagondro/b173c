@@ -11,8 +11,7 @@
 #define WORLD_CHUNK_SIZE   16
 #define WORLD_CHUNK_HEIGHT 128
 
-#define IDX_FROM_COORDS(x, y, z) \
-    ((((x) &15) << 11) | (((z) &15) << 7) | ((y) &127))
+#define IDX_FROM_COORDS(x, y, z) ((((x) & 15) << 11) | (((z) & 15) << 7) | ((y) & 127))
 
 typedef struct {
     int x, z;
@@ -61,29 +60,27 @@ void world_alloc_chunk(int chunk_x, int chunk_z);
 void world_free_chunk(int chunk_x, int chunk_z);
 bool world_chunk_exists(int chunk_x, int chunk_z);
 world_chunk *world_get_chunk(int chunk_x, int chunk_z);
-void world_mark_region_for_remesh(
-    int x_start, int y_start, int z_start, int x_end, int y_end, int z_end);
+void world_mark_region_for_remesh(int x_start, int y_start, int z_start, int x_end, int y_end, int z_end);
 void world_mark_all_for_remesh(void);
-void world_load_compressed_chunk_data(
-    int x, int y, int z, int size_x, int size_y, int size_z, size_t data_size,
-    ubyte *data);
+void world_load_compressed_chunk_data(int x, int y, int z, int sx, int sy, int sz, size_t size, ubyte *data);
 
 /* blocks */
 // todo: define in block.c maybe
 block_data world_get_block(int x, int y, int z);
+block_data world_get_blockf(float x, float y, float z);
 void world_set_block(int x, int y, int z, block_data data);
 void world_set_block_id(int x, int y, int z, block_id id);
 void world_set_block_metadata(int x, int y, int z, byte new_metadata);
 ubyte world_get_block_lighting(int x, int y, int z);
+bbox_t *world_get_colliding_blocks(bbox_t box);
 
 /* entities */
-// defined in entity.c
 entity *world_get_entity(int entity_id);
 void world_add_entity(entity *ent); // ent is copied so dw about it
 void world_remove_entity(int entity_id);
 
 /* daylight cycle stuff */
-vec4 world_calculate_sky_color(void); // fixme: 'color' type
+vec4_t world_calculate_sky_color(void);
 float world_calculate_sun_angle(void);
 float world_calculate_sky_light_modifier(void);
 
@@ -93,7 +90,7 @@ struct trace_result {
     block_data block;
     block_face hit_face;
     bool reached_end;
-} world_trace_ray(vec3 origin, vec3 dir, float max_length);
+} world_trace_ray(vec3_t origin, vec3_t dir, float max_length);
 
 /* rendering */
 void world_renderer_init(void);
@@ -101,7 +98,6 @@ void world_renderer_shutdown(void);
 void world_render(void);
 void world_init_chunk_glbufs(world_chunk *c);
 void world_free_chunk_glbufs(world_chunk *c);
-struct world_vertex world_make_vertex(
-    float x, float y, float z, ubyte texture_index, ubyte face, ubyte light);
+struct world_vertex world_make_vertex(float x, float y, float z, ubyte texture_index, ubyte face, ubyte light);
 
 #endif

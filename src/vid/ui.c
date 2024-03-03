@@ -180,10 +180,12 @@ void ui_render(void)
         ui_printf(x, y+=48, "x: %.14f (%d)", cl.game.our_ent->position.x, (int)cl.game.our_ent->position.x >> 4);
         ui_printf(x, y+=8, "y: %.14f", cl.game.our_ent->position.y);
         ui_printf(x, y+=8, "z: %.14f (%d)", cl.game.our_ent->position.z, (int)cl.game.our_ent->position.z >> 4);
-        ui_printf(x, y+=8, "state: %d %d/%d %d", cl.game.our_ent->onground,
+        ui_printf(x, y+=8, "state: %d %d/%d %d %f %f %f", cl.game.our_ent->onground,
                   cl.game.our_ent->collided_horizontally, cl.game.our_ent->collided_vertically,
-                  entity_in_water(cl.game.our_ent) || entity_in_lava(cl.game.our_ent));
-        ui_printf(x, y+=8, "looking at: %d %d %d", vec3_unpack(cl.game.look_trace));
+                  entity_in_water(cl.game.our_ent) || entity_in_lava(cl.game.our_ent),
+                  cl.game.our_ent->velocity.x, cl.game.our_ent->velocity.y, cl.game.our_ent->velocity.z);
+        ui_printf(x, y+=8, "looking at: %d %d %d / %d / %d ("BIN_FMT")", vec3_unpack(cl.game.look_trace),
+                  cl.game.look_trace.block.id, cl.game.look_trace.block.metadata, BIN_BYTE(cl.game.look_trace.block.metadata));
         ui_printf(x, y+=24, "Seed: %ld", cl.game.seed);
         ui_printf(x, y+=8, "Time: %lu (day %lu)", cl.game.time, cl.game.time / 24000);
     }

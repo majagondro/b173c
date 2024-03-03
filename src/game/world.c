@@ -3,6 +3,7 @@
 #include "client/console.h"
 #include "hashmap.c/hashmap.h"
 #include "client/client.h"
+#include "client/cvar.h"
 #include "entity.h"
 #include "block.h"
 #include "mathlib.h"
@@ -130,10 +131,8 @@ void world_mark_region_for_remesh(int x_start, int y_start, int z_start, int x_e
                 world_chunk *chunk = world_get_chunk(cx, cz);
                 if(!chunk)
                     continue;
-                if(cy >= 0 && cy < 8) {
-                    chunk->glbufs[cy].needs_remesh = true;
-                    chunk->needs_remesh = true;
-                }
+                chunk->gl.needs_remesh_simple = true;
+                chunk->gl.needs_remesh_complex = true;
             }
         }
     }
@@ -145,10 +144,8 @@ void world_mark_all_for_remesh(void)
     size_t i = 0;
     while(hashmap_iter(world_chunk_map, &i, &it)) {
         world_chunk *chunk = it;
-        chunk->needs_remesh = true;
-        for(int j = 0; j < 8; j++) {
-            chunk->glbufs[j].needs_remesh = true;
-        }
+        chunk->gl.needs_remesh_simple = true;
+        chunk->gl.needs_remesh_complex = true;
     }
 }
 
@@ -329,7 +326,51 @@ block_data world_get_block(int x, int y, int z)
     return EMPTY_BLOCK_DATA;
 }
 
-static void add_stair_bboxes(bbox_t *colliders, size_t *n_colliders, block_data block, int x, int y, int z)
+block_data world_get_block_fast(world_chunk *chunk, int x, int y, int z)
+{
+    if(y < 0) // below the world
+        return SOLID_BLOCK_DATA; // returning solid helps avoid creating mesh faces which won't be seen
+    if(y >= 128) // way up in the sky
+        return AIR_BLOCK_DATA;
+
+    if(chunk != NULL)
+        return chunk->data[IDX_FROM_COORDS(x, y, z)];
+    return EMPTY_BLOCK_DATA;
+}
+
+bool block_should_face_be_rendered_fast(world_chunk *chunk, int x, int y, int z, block_data self, block_face face)
+{
+    vec3_t face_offsets[6] = {
+            [BLOCK_FACE_Y_NEG] = vec3(0, -1, 0),
+            [BLOCK_FACE_Y_POS] = vec3(0, 1, 0),
+            [BLOCK_FACE_Z_NEG] = vec3(0, 0, -1),
+            [BLOCK_FACE_Z_POS] = vec3(0, 0, 1),
+            [BLOCK_FACE_X_NEG] = vec3(-1, 0, 0),
+            [BLOCK_FACE_X_POS] = vec3(1, 0, 0),
+    };
+
+    block_data other;
+    vec3_t pos2 = vec3(x, y, z);
+    pos2 = vec3_add(pos2, face_offsets[face]);
+
+    other = world_get_block_fast(chunk, (int) pos2.x, (int) pos2.y, (int) pos2.z);
+
+    if(block_is_semi_transparent(self) && block_is_semi_transparent(other))
+        return false;
+
+    if(self.id != BLOCK_LEAVES || r_smartleaves.integer)
+        if(other.id == self.id)
+            return false;
+
+    if(block_get_properties(self.id).render_type == RENDER_FLUID) {
+        if(face == BLOCK_FACE_Y_POS) {
+            return true;
+        }
+    }
+    return block_is_transparent(other);
+}
+
+void add_stair_bboxes(bbox_t *colliders, size_t *n_colliders, block_data block, int x, int y, int z)
 {
     int facing = block.metadata;
     switch(facing) {
@@ -346,12 +387,10 @@ static void add_stair_bboxes(bbox_t *colliders, size_t *n_colliders, block_data 
         colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z + 0.5f), vec3(x + 1, y + 1, z + 1)};
         break;
     case 3:
-
         colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z), vec3(x + 1, y + 1, z + 0.5f)};
         colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z + 0.5f), vec3(x + 1, y + 0.5f, z + 1)};
         break;
     default:
-        colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z), vec3(x + 1, y + 1, z + 1)};
         break;
     }
 
@@ -397,44 +436,35 @@ bbox_t *world_get_colliding_blocks(bbox_t box)
     return colliders;
 }
 
-
-static ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z)
+ubyte world_get_block_lighting_ex(int x, int y, int z, bool recurse);
+static ubyte chunk_get_block_lighting(world_chunk *c, int x, int y, int z, bool recurse)
 {
     int i = IDX_FROM_COORDS(x, y, z);
     block_data block = c->data[i];
     int sl, bl;
-    if(block.id == BLOCK_SLAB_SINGLE || block.id == BLOCK_FARMLAND || block.id == BLOCK_STAIRS_WOOD ||
-       block.id == BLOCK_STAIRS_STONE) {
-        // fixme?
-        int py = world_get_block_lighting(x, y + 1, z);
-        int px = world_get_block_lighting(x + 1, y, z);
-        int nx = world_get_block_lighting(x - 1, y, z);
-        int pz = world_get_block_lighting(x, y, z + 1);
-        int nz = world_get_block_lighting(x, y, z - 1);
-        if(px > py) {
-            py = px;
-        }
-
-        if(nx > py) {
-            py = nx;
-        }
-
-        if(pz > py) {
-            py = pz;
-        }
-
-        if(nz > py) {
-            py = nz;
-        }
-
-        return py;
+    if(recurse && (block.id == BLOCK_SLAB_SINGLE || block.id == BLOCK_FARMLAND ||
+       block.id == BLOCK_STAIRS_WOOD || block.id == BLOCK_STAIRS_STONE)) {
+        int y1 = world_get_block_lighting_ex((c->x << 4) + x, y + 1, (c->z << 4) + z, false);
+        int x1 = world_get_block_lighting_ex((c->x << 4) + x + 1, y, (c->z << 4) + z, false);
+        int x0 = world_get_block_lighting_ex((c->x << 4) + x - 1, y, (c->z << 4) + z, false);
+        int z1 = world_get_block_lighting_ex((c->x << 4) + x, y,     (c->z << 4) + z + 1, false);
+        int z0 = world_get_block_lighting_ex((c->x << 4) + x, y,     (c->z << 4) + z - 1, false);
+        if(x1 > y1)
+            y1 = x1;
+        if(x0 > y1)
+            y1 = x0;
+        if(z1 > y1)
+            y1 = z1;
+        if(z0 > y1)
+            y1 = z0;
+        return y1;
     }
     sl = block.skylight;
     bl = block.blocklight;
     return (bl > sl ? bl : sl) & 15;
 }
 
-ubyte world_get_block_lighting(int x, int y, int z)
+ubyte world_get_block_lighting_ex(int x, int y, int z, bool recurse)
 {
     world_chunk *cp;
     if(y < 0)
@@ -444,9 +474,25 @@ ubyte world_get_block_lighting(int x, int y, int z)
     cp = world_get_chunk(x >> 4, z >> 4);
     if(!cp)
         return 0;
-    return chunk_get_block_lighting(cp, x & 15, y, z & 15);
+    return chunk_get_block_lighting(cp, x & 15, y, z & 15, recurse);
 }
 
+ubyte world_get_block_lighting(int x, int y, int z)
+{
+    return world_get_block_lighting_ex(x, y, z, true);
+}
+
+ubyte world_get_block_lighting_fast(block_data block, int x, int y, int z)
+{
+    int sl, bl;
+    if(block.id == BLOCK_SLAB_SINGLE || block.id == BLOCK_FARMLAND ||
+       block.id == BLOCK_STAIRS_WOOD || block.id == BLOCK_STAIRS_STONE) {
+        return world_get_block_lighting_ex(x, y, z, true);
+    }
+    sl = block.skylight;
+    bl = block.blocklight;
+    return (bl > sl ? bl : sl) & 15;
+}
 
 void world_set_block(int x, int y, int z, block_data data)
 {

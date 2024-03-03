@@ -6,16 +6,20 @@
 #include "mathlib.h"
 
 typedef enum {
-    BLOCK_FACE_Y_NEG,
-    BLOCK_FACE_Y_POS,
-    BLOCK_FACE_Z_NEG,
-    BLOCK_FACE_Z_POS,
-    BLOCK_FACE_X_NEG,
-    BLOCK_FACE_X_POS
+    BLOCK_FACE_Y_NEG = 0,
+    BLOCK_FACE_Y_POS = 1,
+    BLOCK_FACE_Z_NEG = 2,
+    BLOCK_FACE_Z_POS = 3,
+    BLOCK_FACE_X_NEG = 4,
+    BLOCK_FACE_X_POS = 5
 } block_face;
 
-#define IS_SIDE_FACE(f)   ((f) != BLOCK_FACE_Y_NEG && (f) != BLOCK_FACE_Y_POS)
-#define IS_TOPBOT_FACE(f) ((f) == BLOCK_FACE_Y_NEG || (f) == BLOCK_FACE_Y_POS)
+#define IS_X_FACE(f)    ((f) == BLOCK_FACE_X_NEG || (f) == BLOCK_FACE_X_POS)
+#define IS_Y_FACE(f)    ((f) == BLOCK_FACE_Y_NEG || (f) == BLOCK_FACE_Y_POS)
+#define IS_Z_FACE(f)    ((f) == BLOCK_FACE_Z_NEG || (f) == BLOCK_FACE_Z_POS)
+#define IS_SIDE_FACE(f) (!(IS_Y_FACE((f))))
+#define IS_POS_FACE(f)  (((f) & 1) != 0)
+#define IS_NEG_FACE(f)  (((f) & 1) == 0)
 
 typedef enum {
     RENDER_CUBE,
@@ -74,20 +78,31 @@ typedef struct {
      (b).id == BLOCK_LAVA_STILL  || (b).id == BLOCK_LAVA_MOVING)
 
 
-#define block_is_transparent(b) (block_get_properties(b.id).opaque == 0)
+#define block_is_transparent(b) (block_get_properties((b).id).opaque == 0)
 
 #define block_is_semi_transparent(b)                                \
     ((b).id == BLOCK_WATER_STILL || (b).id == BLOCK_WATER_MOVING || \
      (b).id == BLOCK_ICE)
 
 block_properties block_get_properties(block_id id);
-ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int x, int y, int z);
-bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_face face);
+int block_get_texture_index(block_id id, block_face face, ubyte metadata, int x, int y, int z);
+bool block_should_render_face(int x, int y, int z, block_data self, block_face face);
 float block_fluid_get_percent_air(ubyte metadata);
 float block_fluid_get_height(int x, int y, int z, block_id self_id);
 vec3_t block_fluid_get_flow_direction(int x, int y, int z);
-bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode);
+bbox_t block_get_bbox(block_data self, int x, int y, int z, bool selectmode);
 bool block_is_collidable(block_data block);
 bool block_is_selectable(block_data block);
+bool block_is_flammable(block_id id);
+
+#define METADATA_DOOR_ROT (3)
+#define METADATA_DOOR_OPEN (4)
+#define METADATA_DOOR_BOTTOM (8)
+
+#define METADATA_BED_PILLOW (8)
+#define METADATA_BED_ROT (3)
+
+#define METADATA_REPEATER_ROT (3)
+#define METADATA_REPEATER_TICK (12)
 
 #endif

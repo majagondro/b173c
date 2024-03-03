@@ -117,7 +117,7 @@ errcode vid_init(void)
     int x = SDL_WINDOWPOS_CENTERED, y = SDL_WINDOWPOS_CENTERED;
 
     /* ----- SDL INIT ----- */
-    ok = SDL_Init(SDL_INIT_VIDEO);
+    ok = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
     if(ok < 0) {
         con_printf("SDL initialization failed: %s\n", SDL_GetError());
         goto err_sdl;
@@ -154,7 +154,8 @@ errcode vid_init(void)
     glDebugMessageCallback(gl_debug_message, 0);
 
     /* load shaders */
-    gl.shader_blocks = load_shader(blocks_v_glsl, blocks_f_glsl);
+    gl.shader_blocks_simple = load_shader(simpleblocks_v_glsl, simpleblocks_f_glsl);
+    gl.shader_blocks_complex = load_shader(complexblocks_v_glsl, complexblocks_f_glsl);
     gl.shader_model = load_shader(model_v_glsl, model_f_glsl);
     gl.shader_text = load_shader(text_v_glsl, text_f_glsl);
 
@@ -192,7 +193,8 @@ void vid_shutdown(void)
 {
     world_renderer_shutdown();
 
-    glDeleteProgram(gl.shader_blocks);
+    glDeleteProgram(gl.shader_blocks_complex);
+    glDeleteProgram(gl.shader_blocks_simple);
     glDeleteProgram(gl.shader_text);
     glDeleteProgram(gl.shader_model);
     
@@ -237,7 +239,6 @@ void vid_display_frame(void)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     /* draw 3d stuff */
-    glUseProgram(gl.shader_blocks);
     world_render();
     glUseProgram(gl.shader_model);
     entity_renderer_render();

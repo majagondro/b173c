@@ -95,4 +95,6 @@ enum block_id {
     BLOCK_REDSTONE_REPEATER_DISABLED = 93,
     BLOCK_REDSTONE_REPEATER_ENABLED =  94,
     BLOCK_TRAPDOOR =                   96,
+
+    BLOCK_GRASS_OVERLAY =             255, // hack
 };

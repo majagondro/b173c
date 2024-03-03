@@ -3,7 +3,7 @@
 #include "client/cvar.h"
 #include "world.h"
 
-ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int x, int y, int z)
+int block_get_texture_index(block_id id, block_face face, ubyte metadata, int x, int y, int z)
 {
     block_properties props = block_get_properties(id);
     int off = 0;
@@ -11,7 +11,11 @@ ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int 
     switch(id) {
         /* non-directional blocks */
     case BLOCK_SAPLING:
-        return props.texture_indices[face] + 16 * (metadata + 2);
+        if((metadata & 3) == 1)
+            return 63;
+        if((metadata & 3) == 1)
+            return 79;
+        break;
     case BLOCK_WOOD_LOG:
         if(IS_SIDE_FACE(face))
             return props.texture_indices[face] + (metadata == 0 ? 0 : (16 * 6 + (metadata - 1)));
@@ -35,7 +39,7 @@ ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int 
     case BLOCK_SLAB_DOUBLE:
         if(metadata == 0) {
             // smooth stone
-            if(IS_TOPBOT_FACE(face))
+            if(IS_Y_FACE(face))
                 return 6;
             return 5;
         } else if(metadata == 1) {
@@ -67,8 +71,35 @@ ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int 
             return props.texture_indices[BLOCK_FACE_Y_POS] - (int) (metadata != 0);
         break;
         /* directional blocks */
-    case BLOCK_BED: // todo
-        break;
+    case BLOCK_BED:
+        if(face == BLOCK_FACE_Y_NEG)
+            return block_get_properties(BLOCK_WOOD_PLANKS).texture_indices[face];
+        {
+            // refer to notes/metadata_bed.png
+            const int offsets[2][4][6] = {
+                    { // no pillow
+                            {2, 0, 15, 2,  16, -16},
+                            {2, 0, 16, -16, 2, 15},
+                            {2, 0, 2, 15, -16, 16},
+                            {2, 0, -16, 16, 15, 2}
+                    },
+                    { // pillow
+                            {2, 1, 2,  18, 17, -17},
+                            {2, 1, 17, -17, 18, 2},
+                            {2, 1, 18, 2, -17, 17},
+                            {2, 1, -17, 17, 2, 18}
+                    }
+            };
+            int rot = metadata & METADATA_BED_ROT;
+            bool is_pillow = (metadata & METADATA_BED_PILLOW) != 0;
+            int idx = props.texture_indices[face];
+            int offset = offsets[is_pillow][rot][face];
+            if(offset < 0) {
+                return -idx + offset;
+            } else {
+                return idx + offset;
+            }
+        }
     case BLOCK_PISTON_BASE: // todo am lazy
     case BLOCK_PISTON_BASE_STICKY:
         break;
@@ -87,12 +118,58 @@ ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int 
     case BLOCK_PUMPKIN:
         if(IS_SIDE_FACE(face)) {
             // bruh..
+            // fixme: add faceless pumpkins for metadata >= 5
             const block_face d[4] = {BLOCK_FACE_Z_POS, BLOCK_FACE_X_NEG, BLOCK_FACE_Z_NEG, BLOCK_FACE_X_POS};
-            if(d[metadata] == face) {
+            if(d[bound(0, metadata, 3)] == face) {
                 return props.texture_indices[face] + 1 + off;
             }
         }
         break;
+        /* other */
+    case BLOCK_DOOR_IRON:
+    case BLOCK_DOOR_WOOD:
+        if(IS_SIDE_FACE(face)) {
+            bool is_open = (metadata & METADATA_DOOR_OPEN) != 0;
+            bool is_top_half = (metadata & METADATA_DOOR_BOTTOM) != 0;
+            int rot = !is_open ? (int) ((metadata - 1) & 3) : (int) (metadata & 3);
+            if((rot == 0 || rot == 2) ^ IS_Z_FACE(face)) {
+                // short edge of the door
+                break;
+            } else {
+                // flip texture when
+                // 020_ f=4 (-x)
+                // 004_ f=2 (-z)
+                // 124_ f=4 (-x)
+                // 120_ f=2 (-z)
+
+                // 000_ f=5 (+x)
+                // 024_ f=3 (+z)
+                // 104_ f=5 (+x)
+                // 100_ f=3 (+z)
+                // ok whatever TODO: document this more
+                uint flags = ((rot >> 1) + (IS_POS_FACE(face) ^ rot)) + is_open;
+
+                int idx = props.texture_indices[face];
+                if(is_top_half)
+                    idx -= 16;
+
+                if((flags & 1) != 0)
+                    idx = -idx; // flip texture
+
+                return idx;
+            }
+        } else {
+            break;
+        }
+    case BLOCK_RAIL:
+        if(metadata >= 6 && metadata <= 9)
+            return props.texture_indices[face] - 16; // corner texture
+        /* fall through */
+    case BLOCK_RAIL_POWERED:
+    case BLOCK_RAIL_DETECTOR:
+        return props.texture_indices[face];
+    case BLOCK_GRASS_OVERLAY:
+        return 6 + 16 * 2;
     default:
         break;
     }
@@ -100,7 +177,7 @@ ubyte block_get_texture_index(block_id id, block_face face, ubyte metadata, int 
     return props.texture_indices[face];
 }
 
-bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
+bbox_t block_get_bbox(block_data self, int x, int y, int z, bool selectmode)
 {
     const bbox_t no_bbox = {vec3_1(-1), vec3_1(-1)};
 
@@ -121,7 +198,7 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
     const float _15 = 15.0f / 16.0f;
     const float _16 = 16.0f / 16.0f;
 
-    switch(block.id) {
+    switch(self.id) {
     case BLOCK_AIR:
     case BLOCK_WATER_MOVING:
     case BLOCK_WATER_STILL:
@@ -171,13 +248,17 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
         if(!selectmode) {
             return no_bbox;
         } else {
-            return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, _2, 1)}, vec3(x, y, z));
+            if(self.metadata >= 2 && self.metadata <= 5) {
+                return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, _10, 1)}, vec3(x, y, z));
+            } else {
+                return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, _2, 1)}, vec3(x, y, z));
+            }
         }
     case BLOCK_COBWEB:
         if(!selectmode) {
             return no_bbox;
         } else {
-            break; /* full block hitbox */
+            break; /* full self hitbox */
         }
     case BLOCK_TORCH:
     case BLOCK_TORCH_REDSTONE_DISABLED:
@@ -185,7 +266,7 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
         if(!selectmode) {
             return no_bbox;
         } else {
-            switch(block.metadata & 7) {
+            switch(self.metadata & 7) {
             case 1:
                 return bbox_offset((bbox_t) {vec3(0.00f, 0.20f, 0.35f), vec3(0.30f, 0.80f, 0.65f)}, vec3(x, y, z));
             case 2:
@@ -212,7 +293,7 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
             float _25_32 = 25.0f / 32.0f;
             float _4_32 = 4.0f / 32.0f;
             float _28_32 = 28.0f / 32.0f;
-            switch(block.metadata) {
+            switch(self.metadata) {
             case 2:
                 return bbox_offset((bbox_t) {vec3(0, _9_32, _28_32), vec3(1, _25_32, 1)}, vec3(x, y, z));
             case 3:
@@ -224,13 +305,13 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
             default:
                 break;
             }
-            break; /* full block hitbox */
+            break; /* full self hitbox */
         }
     case BLOCK_PORTAL:
         if(!selectmode) {
             return no_bbox;
         } else {
-            if(world_get_block(x - 1, y, z).id == block.id || world_get_block(x + 1, y, z).id == block.id) {
+            if(world_get_block(x - 1, y, z).id == self.id || world_get_block(x + 1, y, z).id == self.id) {
                 return bbox_offset((bbox_t) {vec3(0, 0, _6), vec3(1, 1, _10)}, vec3(x, y, z));
             } else {
                 return bbox_offset((bbox_t) {vec3(_6, 0, 0), vec3(_10, 1, 1)}, vec3(x, y, z));
@@ -243,7 +324,7 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
             return no_bbox;
         } else {
             float h = _1;
-            if(block.metadata != 0)
+            if(self.metadata != 0)
                 h *= 0.5f;
             return bbox_offset((bbox_t) {vec3(_1, 0, _1), vec3(_15, h, _15)}, vec3(x, y, z));
         }
@@ -252,7 +333,7 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
         if(!selectmode) {
             return no_bbox;
         } else {
-            switch(block.metadata & 7) {
+            switch(self.metadata & 7) {
             case 1:
                 return bbox_offset((bbox_t) {vec3(0.0f, 0.2f, _5), vec3(_6, 0.8f, _11)}, vec3(x, y, z));
             case 2:
@@ -270,8 +351,8 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
         if(!selectmode) {
             return no_bbox;
         } else {
-            int side = block.metadata & 7;
-            bool pressed = (block.metadata & 8) != 0;
+            int side = self.metadata & 7;
+            bool pressed = (self.metadata & 8) != 0;
             float d = pressed ? _1 : _2;
             switch(side) {
             case 1:
@@ -288,7 +369,7 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
             break;
         }
     case BLOCK_SLAB_SINGLE:
-        return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, 0.5f, 1)}, vec3(x, y, z));
+        return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, _8, 1)}, vec3(x, y, z));
 
     case BLOCK_BED:
         return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, _9, 1)}, vec3(x, y, z));
@@ -314,12 +395,12 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
         break;
 
     case BLOCK_SNOW_LAYER: {
-        if((block.metadata & 7) < 3)
+        if((self.metadata & 7) < 3)
             return no_bbox;
         return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, 0.5f, 1)}, vec3(x, y, z));
     }
     case BLOCK_LADDER: {
-        switch(block.metadata) {
+        switch(self.metadata) {
         case BLOCK_FACE_Z_NEG:
             return bbox_offset((bbox_t) {vec3(0, 0, _14), vec3(1, 1, 1)}, vec3(x, y, z));
         case BLOCK_FACE_Z_POS:
@@ -329,15 +410,15 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
         case BLOCK_FACE_X_POS:
             return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(_2, 1, 1)}, vec3(x, y, z));
         default:
-            break; /* full block hitbox */
+            break; /* full self hitbox */
         }
         break;
     }
     case BLOCK_DOOR_WOOD:
     case BLOCK_DOOR_IRON: {
-        bool open = (block.metadata & 4) != 0;
-        int rotation = block.metadata & 3;
-        int state = open ? rotation : rotation - 1;
+        bool open = (self.metadata & METADATA_DOOR_OPEN) != 0;
+        int rot = self.metadata;
+        int state = (open ? rot : rot - 1) & METADATA_DOOR_ROT;
 
         switch(state) {
         case 0:
@@ -354,8 +435,8 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
         }
     }
     case BLOCK_TRAPDOOR: {
-        bool open = (block.metadata & 4) != 0;
-        int rotation = block.metadata & 3;
+        bool open = (self.metadata & 4) != 0;
+        int rotation = self.metadata & 3;
 
         if(!open)
             return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, _3, 1)}, vec3(x, y, z));
@@ -381,16 +462,34 @@ bbox_t block_get_bbox(block_data block, int x, int y, int z, bool selectmode)
         if(!selectmode) {
             return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, 1.5f, 1)}, vec3(x, y, z));
         } else {
-            break; /* full block hitbox */
+            break; /* full self hitbox */
         }
     case BLOCK_CAKE: {
-        float size = _1 + (float) (block.metadata) / 8.0f;
+        float size = _1 + (float) (self.metadata) / 8.0f;
         return bbox_offset((bbox_t) {vec3(size, 0, _1), vec3(_15, _7, _15)}, vec3(x, y, z));
     }
     default:
         break;
     }
 
-    /* full block hitbox */
+    /* full self hitbox */
     return bbox_offset((bbox_t) {vec3(0, 0, 0), vec3(1, 1, 1)}, vec3(x, y, z));
+}
+
+bool block_is_flammable(block_id id)
+{
+    switch(id) {
+    case BLOCK_WOOD_PLANKS:
+    case BLOCK_FENCE:
+    case BLOCK_STAIRS_WOOD:
+    case BLOCK_WOOD_LOG:
+    case BLOCK_LEAVES:
+    case BLOCK_BOOKSHELF:
+    case BLOCK_TNT:
+    case BLOCK_TALLGRASS:
+    case BLOCK_CLOTH:
+        return true;
+    default:
+        return false;
+    }
 }

@@ -11,8 +11,6 @@
 #include "client/cvar.h"
 #include <math.h>
 
-#define TO_20_TPS(dt) ((dt) * 20.0f)
-
 static float calc_max_distance(bbox_t self, bbox_t other, float dist, int axis)
 {
     int axis2 = (axis + 1) % 3;
@@ -303,7 +301,6 @@ void entity_update(entity *ent)
         else
             accel = accel_in_air;
 
-        // fixme: this feels different
         ent->smooth_step_view_height_offset *= 0.4f;
 
         update_velocity(ent, accel);

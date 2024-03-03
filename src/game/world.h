@@ -22,30 +22,36 @@ typedef struct {
     block_data *data;
 
     /* rendering related */
-    bool needs_remesh;
-    // TODO: needs_remesh_simple (1x1x1 blocks)
-    // TODO: needs_remesh_complex (doors crops etc)
-    bool visible;
-    struct world_chunk_glbuf {
+    struct chunk_render_data {
         bool visible;
-        bool needs_remesh;
-        struct world_vertex {
-            // see TODOs above, this should be set back to 5 bits per coord
-            // and floats should be used for the complex mesh
-            float x; // ubyte x : 5;
-            float y; // ubyte y : 5;
-            float z; // ubyte z : 5;
-            // ubyte padding : 1 attr(unused);
+        bool needs_remesh_simple;
+        bool needs_remesh_complex;
+
+        struct vert_simple {
+            // XXXXXYYY
+            // YYZZZZZP
+            // THIS IS HOW THE COORDS ARE LAID OUT BECAUSE OF THE PACKED ATTR
+            // WRITING THIS INSTEAD OF THE UGLY GCC NOTE
+            ubyte x : 5;
+            ubyte y : 5;
+            ubyte z : 5;
+            ubyte padding : 1;
             ubyte texture_index;
             ubyte data;
-            ushort extradata;
-        } attr(packed) *vertices, *alpha_vertices;
-        ushort *indices, *alpha_indices;
-        size_t num_vertices, num_alpha_vertices;
-        size_t num_indices, num_alpha_indices;
-        uint basevertex, alpha_basevertex;
-        uint vbo, alpha_vbo;
-    } glbufs[8]; /* each glbuf covers 16x16x16 blocks */
+        } attr(packed) *verts_simple;
+
+        struct vert_complex {
+            vec3_t pos;
+            vec2_t uv;
+            ubyte texture_index;
+            ubyte data;
+            ubyte r,g,b;
+        } attr(packed) *verts_complex;
+
+        size_t n_verts_simple, n_verts_complex;
+        uint vbo_simple, vbo_complex;
+        uint light_tex;
+    } gl;
 } world_chunk;
 
 extern struct hashmap *world_chunk_map;
@@ -67,12 +73,15 @@ void world_load_compressed_chunk_data(int x, int y, int z, int sx, int sy, int s
 /* blocks */
 // todo: define in block.c maybe
 block_data world_get_block(int x, int y, int z);
+block_data world_get_block_fast(world_chunk *chunk, int x, int y, int z);
 block_data world_get_blockf(float x, float y, float z);
 void world_set_block(int x, int y, int z, block_data data);
 void world_set_block_id(int x, int y, int z, block_id id);
 void world_set_block_metadata(int x, int y, int z, ubyte new_metadata);
 ubyte world_get_block_lighting(int x, int y, int z);
+ubyte world_get_block_lighting_fast(block_data block, int x, int y, int z);
 bbox_t *world_get_colliding_blocks(bbox_t box);
+bool block_should_face_be_rendered_fast(world_chunk *chunk, int x, int y, int z, block_data self, block_face face);
 
 /* entities */
 entity *world_get_entity(int entity_id);
@@ -98,6 +107,5 @@ void world_renderer_shutdown(void);
 void world_render(void);
 void world_init_chunk_glbufs(world_chunk *c);
 void world_free_chunk_glbufs(world_chunk *c);
-struct world_vertex world_make_vertex(float x, float y, float z, ubyte texture_index, ubyte face, ubyte light);
 
 #endif

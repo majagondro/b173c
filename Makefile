@@ -3,6 +3,7 @@ CFLAGS := -ggdb3 -Iinclude -Isubmodules
 WARNINGS := -Wall -Wpedantic -Wextra
 WARNINGS += -Wdeclaration-after-statement # style
 WARNINGS += -Wno-missing-field-initializers # cvar issues
+WARNINGS += -Wno-packed-bitfield-compat # gcc was complaining about struct vert_simple in world.h
 LDFLAGS := -lm
 
 # add SDL2

@@ -69,22 +69,30 @@ bool cvar_set(const char *name, const char *value)
 void recalculate_projection_matrix(void); // in world_renderer.c
 void onchange_block_render_modes(void);   // in block.c
 void onchange_ui_scale(void);             // in ui.c
+void onchange_cl_freecamera(void);        // in input.c
 
-cvar vid_width = {"vid_width", "854"};
-cvar vid_height = {"vid_height", "480"};
-cvar fov = {"fov", "90", recalculate_projection_matrix};
 cvar r_zfar = {"r_zfar", "256", recalculate_projection_matrix};
 cvar r_znear = {"r_znear", "0.1", recalculate_projection_matrix};
 cvar r_max_remeshes = {"r_max_remeshes", "2"};
 cvar r_fancyleaves = {"r_fancyleaves", "1", onchange_block_render_modes};
+cvar r_fancygrass = {"r_fancygrass", "1", onchange_block_render_modes};
 cvar r_smartleaves = {"r_smartleaves", "0", onchange_block_render_modes};
+cvar r_redstone_dot = {"r_redstone_dot", "0", onchange_block_render_modes};
 cvar gl_polygon_mode = {"gl_polygon_mode", "GL_FILL"};
+
+cvar vid_width = {"vid_width", "854"};
+cvar vid_height = {"vid_height", "480"};
+
 cvar developer = {"developer", "0"};
 cvar cvar_name = {"name", "player"};
-cvar cl_2b2tmode = {"cl_2b2tmode", "0"};
-cvar ui_scale = {"ui_scale", "2", onchange_ui_scale};
 cvar sensitivity = {"sensitivity", "2.5"};
+cvar fov = {"fov", "90", recalculate_projection_matrix};
+
 cvar cl_smoothstep = {"cl_smoothstep", "1"};
+cvar cl_2b2tmode = {"cl_2b2tmode", "0"};
+cvar cl_freecamera = {"cl_freecamera", "0", onchange_cl_freecamera};
+
+cvar ui_scale = {"ui_scale", "2", onchange_ui_scale};
 
 errcode cvar_init(void)
 {
@@ -94,6 +102,7 @@ errcode cvar_init(void)
 	cvar_register(&r_zfar);
 	cvar_register(&r_znear);
 	cvar_register(&r_max_remeshes);
+	cvar_register(&r_fancygrass);
 	cvar_register(&r_fancyleaves);
 	cvar_register(&r_smartleaves);
 	cvar_register(&gl_polygon_mode);
@@ -103,6 +112,8 @@ errcode cvar_init(void)
 	cvar_register(&ui_scale);
 	cvar_register(&sensitivity);
 	cvar_register(&cl_smoothstep);
+	cvar_register(&r_redstone_dot);
+	cvar_register(&cl_freecamera);
 
     return ERR_OK;
 }

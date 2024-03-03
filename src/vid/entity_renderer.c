@@ -3,15 +3,13 @@
 #include "common.h"
 #include "client/client.h"
 #include "glad/glad.h"
-#include "game/world.h"
 #include "game/entity.h"
-#include "client/console.h"
 #include "hashmap.c/hashmap.h"
-#include "meshbuilder.h"
-#include "assets.h"
+#include "ui.h"
+#include "client/cvar.h"
 
 uint gl_vao, gl_vbo;
-uint gl_uniform_model, gl_uniform_view, gl_uniform_projection;
+GLint gl_uniform_model, gl_uniform_view, gl_uniform_projection;
 extern struct gl_state gl;
 extern mat4_t view_mat, proj_mat;
 
@@ -63,8 +61,9 @@ void entity_renderer_render(void)
     while(hashmap_iter(world_entity_map, &i, &it)) {
         entity *ent = it;
         mat4_t model, t, r;
+        vec3_t text_pos;
 
-        if(ent == cl.game.our_ent)
+        if(ent == cl.game.our_ent && cl_freecamera.integer == 0)
             continue;
 
         mat4_identity(t);
@@ -72,6 +71,13 @@ void entity_renderer_render(void)
         mat4_translation(t, ent->position);
         mat4_rotation(r, ent->rotation);
         mat4_multiply(model, r, t);
+
+        if(developer.integer >= 2) {
+            text_pos = cam_project_3d_to_2d(ent->position, proj_mat, view_mat, vec2(ui_w, ui_h));
+            if(text_pos.z < 1) {
+                ui_printf(text_pos.x, text_pos.y, "%d", ent->type);
+            }
+        }
 
         glUniformMatrix4fv(gl_uniform_model, 1, GL_FALSE, (const GLfloat *) model);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 3);

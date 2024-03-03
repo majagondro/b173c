@@ -2,6 +2,18 @@
 #include "common.h"
 #include <math.h>
 
+vec2_t vec2_rotate(vec2_t v, float angle, vec2_t o)
+{
+    float cosa = cosf(DEG2RAD(angle));
+    float sina = sinf(DEG2RAD(angle));
+    vec2_t ret;
+
+    ret.x = ((v.x - o.x) * cosa - (v.y - o.y) * sina) + o.x;
+    ret.y = ((v.x - o.x) * sina + (v.y - o.y) * cosa) + o.y;
+
+    return ret;
+}
+
 vec3_t vec3_normalize(vec3_t v)
 {
     return vec3_div(v, vec3_len(v));
@@ -39,6 +51,18 @@ void mat4_multiply(mat4_t dest, mat4_t a, mat4_t b)
     dest[3][1] = a[3][0] * b[0][1] + a[3][1] * b[1][1] + a[3][2] * b[2][1] + a[3][3] * b[3][1];
     dest[3][2] = a[3][0] * b[0][2] + a[3][1] * b[1][2] + a[3][2] * b[2][2] + a[3][3] * b[3][2];
     dest[3][3] = a[3][0] * b[0][3] + a[3][1] * b[1][3] + a[3][2] * b[2][3] + a[3][3] * b[3][3];
+}
+
+vec4_t mat4_multiply_vec4(mat4_t m, vec4_t v)
+{
+    vec4_t ret;
+
+    ret.x = m[0][0] * v.x + m[1][0] * v.y + m[2][0] * v.z + m[3][0] * v.w;
+    ret.y = m[0][1] * v.x + m[1][1] * v.y + m[2][1] * v.z + m[3][1] * v.w;
+    ret.z = m[0][2] * v.x + m[1][2] * v.y + m[2][2] * v.z + m[3][2] * v.w;
+    ret.w = m[0][3] * v.x + m[1][3] * v.y + m[2][3] * v.z + m[3][3] * v.w;
+
+    return ret;
 }
 
 void mat4_identity(mat4_t dest)
@@ -170,6 +194,20 @@ bbox_t bbox_offset(bbox_t bbox, vec3_t offset)
     return ret;
 }
 
+bbox_t bbox_join(bbox_t a, bbox_t b)
+{
+    bbox_t ret;
+
+    ret.mins.x = min(a.mins.x, b.mins.x);
+    ret.mins.y = min(a.mins.y, b.mins.y);
+    ret.mins.z = min(a.mins.z, b.mins.z);
+    ret.maxs.x = max(a.maxs.x, b.maxs.x);
+    ret.maxs.y = max(a.maxs.y, b.maxs.y);
+    ret.maxs.z = max(a.maxs.z, b.maxs.z);
+
+    return ret;
+}
+
 bool bbox_null(bbox_t bbox)
 {
     return bbox.mins.x == -1 && bbox.mins.y == -1 && bbox.mins.z == -1 &&
@@ -206,4 +244,27 @@ bool bbox_intersects_line(bbox_t bbox, vec3_t start, vec3_t end)
         return false;
 
     return true;
+}
+
+vec3_t cam_project_3d_to_2d(vec3_t pos, mat4_t proj, mat4_t modelview, vec2_t vp)
+{
+    vec4_t in = vec4_from(pos.x, pos.y, pos.z, 1);
+    vec4_t out;
+    vec3_t in3;
+    float viewport[4] = {0, 0, vp.x, vp.y};
+
+    out = mat4_multiply_vec4(modelview, in);
+    in = mat4_multiply_vec4(proj, out);
+
+    if (!in.w)
+        return vec3_1(0);
+
+    in3 = vec3_div(in, in.w);
+    in.x = in3.x, in.y = in3.y, in.z = in3.z;
+
+    out.x = viewport[0] + (1 + in.x) * viewport[2] / 2.0f;
+    out.y = viewport[3] - (viewport[1] + (1 + in.y) * viewport[3] / 2.0f);
+    out.z = (1 + in.z) / 2.0f;
+
+    return vec3(out.x, out.y, out.z);
 }

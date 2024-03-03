@@ -14,6 +14,7 @@ extern struct client_state {
         long time;
         struct trace_result look_trace;
         bool unstuck;
+        vec3_t cam_pos;
     } game;
 
     enum { cl_disconnected, cl_connecting, cl_connected } state;
@@ -23,7 +24,7 @@ extern struct client_state {
 
     ulong fps;
     float frametime;
-    bool is_physframe;
+    volatile bool is_physframe;
 } cl;
 
 #endif

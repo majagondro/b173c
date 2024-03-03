@@ -277,9 +277,9 @@ void net_handle_pkt_entity_painting(pkt_entity_painting pkt)
     entity ent = {0};
     ent.id = pkt.entity_id;
     ent.type = ENTITY_PAINTING;
-    ent.position.x = (float) pkt.x / 32.0f;
-    ent.position.y = (float) pkt.y / 32.0f;
-    ent.position.z = (float) pkt.z / 32.0f;
+    ent.position.x = (float) pkt.x;
+    ent.position.y = (float) pkt.y;
+    ent.position.z = (float) pkt.z;
 
     title = utf16toutf8(pkt.title.data, pkt.title.length);
     for(ent.painting.type = 0; ent.painting.type < PAINTING_TYPE_COUNT; ent.painting.type++)

@@ -6,7 +6,7 @@
 
 struct gl_state {
     int w, h;
-    uint shader_blocks, shader_text, shader_model;
+    uint shader_blocks_simple, shader_blocks_complex, shader_text, shader_model;
 };
 
 errcode vid_init(void);

@@ -78,12 +78,12 @@ static block_properties blocks[256] = {
         [BLOCK_FARMLAND] = {"farmland", TEXTURE_TOP_BOT_SIDE(87, 2, 2), TRANSPARENT, RENDER_CUBE_SPECIAL},
         [BLOCK_FURNACE_IDLE] = {"furnace", TEXTURE_TOPBOT_SIDE(45 + 17, 45), OPAQUE, RENDER_CUBE},
         [BLOCK_FURNACE_ACTIVE] = {"furnace_lit", TEXTURE_TOPBOT_SIDE(45 + 17, 45), OPAQUE, RENDER_CUBE},
-        [BLOCK_SIGN_POST] = {"sign_post", TEXTURE_ALL(4), TRANSPARENT, RENDER_NONE}, // todo
+        [BLOCK_SIGN_POST] = {"sign_post", TEXTURE_ALL(4), TRANSPARENT, RENDER_NONE},
         [BLOCK_DOOR_WOOD] = {"door_wood", TEXTURE_ALL(97), TRANSPARENT, RENDER_DOOR},
         [BLOCK_LADDER] = {"ladder", TEXTURE_ALL(83), TRANSPARENT, RENDER_LADDER},
         [BLOCK_RAIL] = {"rail", TEXTURE_ALL(128), TRANSPARENT, RENDER_RAIL},
         [BLOCK_STAIRS_STONE] = {"stair_stone", TEXTURE_ALL(16), TRANSPARENT, RENDER_STAIRS},
-        [BLOCK_SIGN_WALL] = {"sign_wall", TEXTURE_ALL(4), TRANSPARENT, RENDER_NONE}, // todo
+        [BLOCK_SIGN_WALL] = {"sign_wall", TEXTURE_ALL(4), TRANSPARENT, RENDER_NONE},
         [BLOCK_LEVER] = {"lever", TEXTURE_ALL(96), TRANSPARENT, RENDER_LEVER},
         [BLOCK_PRESSURE_PLATE_STONE] = {"pressureplate_stone", TEXTURE_ALL(1), TRANSPARENT, RENDER_CUBE_SPECIAL},
         [BLOCK_DOOR_IRON] = {"door_iron", TEXTURE_ALL(98), TRANSPARENT, RENDER_DOOR},
@@ -105,7 +105,7 @@ static block_properties blocks[256] = {
         [BLOCK_NETTHERRACK] = {"netherrack", TEXTURE_ALL(103), OPAQUE, RENDER_CUBE},
         [BLOCK_SOUL_SAND] = {"soulsand", TEXTURE_ALL(104), TRANSPARENT, RENDER_CUBE},
         [BLOCK_GLOWSTONE] = {"glowstone", TEXTURE_ALL(105), OPAQUE, RENDER_CUBE},
-        [BLOCK_PORTAL] = {"portal", TEXTURE_ALL(240), TRANSPARENT, RENDER_CUBE_SPECIAL},
+        [BLOCK_PORTAL] = {"portal", TEXTURE_ALL(224), TRANSPARENT, RENDER_CUBE_SPECIAL},
         [BLOCK_PUMPKIN_LANTERN] = {"pumpkin_lit", TEXTURE_TOPBOT_SIDE(102, 102 + 16), OPAQUE, RENDER_CUBE},
         [BLOCK_CAKE] = {"cake", TEXTURE_TOP_BOT_SIDE(121, 121 + 3, 121 + 1), TRANSPARENT, RENDER_CUBE_SPECIAL},
         [BLOCK_REDSTONE_REPEATER_DISABLED] = {"redstone_repeater", TEXTURE_ALL(131), TRANSPARENT, RENDER_REPEATER},
@@ -118,7 +118,7 @@ block_properties block_get_properties(block_id id)
     return blocks[id & 255];
 }
 
-bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_face face)
+bool block_should_render_face(int x, int y, int z, block_data self, block_face face)
 {
     vec3_t face_offsets[6] = {
             [BLOCK_FACE_Y_NEG] = vec3(0, -1, 0),
@@ -133,20 +133,56 @@ bool block_should_face_be_rendered(int x, int y, int z, block_data self, block_f
     vec3_t pos2 = vec3(x, y, z);
     pos2 = vec3_add(pos2, face_offsets[face]);
 
-    other = world_get_block(pos2.x, pos2.y, pos2.z);
+    other = world_get_block((int) pos2.x, (int) pos2.y, (int) pos2.z);
 
     if(block_is_semi_transparent(self) && block_is_semi_transparent(other))
         return false;
 
-    if(self.id != BLOCK_LEAVES || r_smartleaves.integer)
-        if(other.id == self.id)
+    if(block_is_transparent(self)) {
+        if(self.id == BLOCK_BED) {
+            switch(self.metadata & METADATA_BED_ROT) {
+            case 0:
+                if(self.metadata & METADATA_BED_PILLOW)
+                    return face != BLOCK_FACE_Z_NEG;
+                else
+                    return face != BLOCK_FACE_Z_POS;
+            case 1:
+                if(self.metadata & METADATA_BED_PILLOW)
+                    return face != BLOCK_FACE_X_POS;
+                else
+                    return face != BLOCK_FACE_X_NEG;
+            case 2:
+                if(self.metadata & METADATA_BED_PILLOW)
+                    return face != BLOCK_FACE_Z_POS;
+                else
+                    return face != BLOCK_FACE_Z_NEG;
+            case 3:
+                if(self.metadata & METADATA_BED_PILLOW)
+                    return face != BLOCK_FACE_X_NEG;
+                else
+                    return face != BLOCK_FACE_X_POS;
+            default:
+                return true;
+            }
+        }
+        if(self.id == BLOCK_CACTUS && other.id == BLOCK_CACTUS && IS_Y_FACE(face)) {
             return false;
+        }
+        if(self.id == BLOCK_SLAB_SINGLE)
+            return true;
+        if(self.id != BLOCK_LEAVES || r_smartleaves.integer) {
+            if(other.id == self.id) {
+                return false;
+            }
+        }
+    }
 
     if(block_get_properties(self.id).render_type == RENDER_FLUID) {
         if(face == BLOCK_FACE_Y_POS) {
             return true;
         }
     }
+
     return block_is_transparent(other);
 }
 

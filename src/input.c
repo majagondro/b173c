@@ -284,37 +284,70 @@ static void handle_keys(void)
     }
 
     if(cl.state == cl_connected) {
-        vec3_t fwd, side, up;
+        if(cl_freecamera.integer == 0) {
+            vec3_t fwd, side, up;
 
-        cam_angles(&fwd, &side, &up, cl.game.our_ent->rotation.yaw, 0.0f);
+            cam_angles(&fwd, &side, &up, cl.game.our_ent->rotation.yaw, 0.0f);
 
-        fwd.y = 0.0f;
-        side.y = 0.0f;
+            fwd.y = 0.0f;
+            side.y = 0.0f;
 
-        cl.game.our_ent->move_forward = 0;
-        if(gamekeys.forward)
-            cl.game.our_ent->move_forward++;
-        if(gamekeys.back)
-            cl.game.our_ent->move_forward--;
+            cl.game.our_ent->move_forward = 0;
+            if(gamekeys.forward)
+                cl.game.our_ent->move_forward++;
+            if(gamekeys.back)
+                cl.game.our_ent->move_forward--;
 
-        cl.game.our_ent->move_side = 0;
-        if(gamekeys.right)
-            cl.game.our_ent->move_side++;
-        if(gamekeys.left)
-            cl.game.our_ent->move_side--;
+            cl.game.our_ent->move_side = 0;
+            if(gamekeys.right)
+                cl.game.our_ent->move_side++;
+            if(gamekeys.left)
+                cl.game.our_ent->move_side--;
 
-        if(gamekeys.sneak) {
-            cl.game.our_ent->move_forward *= 0.3f;
-            cl.game.our_ent->move_side *= 0.3f;
-        }
-
-
-        if(gamekeys.jump) {
-            if(entity_in_water(cl.game.our_ent) || entity_in_lava(cl.game.our_ent)) {
-                cl.game.our_ent->velocity.y += 0.04f * cl.frametime * 20.0f;
-            } else if(cl.game.our_ent->onground) {
-                cl.game.our_ent->velocity.y = 0.42f;
+            if(gamekeys.sneak) {
+                cl.game.our_ent->move_forward *= 0.3f;
+                cl.game.our_ent->move_side *= 0.3f;
             }
+
+
+            if(gamekeys.jump) {
+                if(entity_in_water(cl.game.our_ent) || entity_in_lava(cl.game.our_ent)) {
+                    cl.game.our_ent->velocity.y += 0.04f * cl.frametime * 20.0f;
+                } else if(cl.game.our_ent->onground) {
+                    cl.game.our_ent->velocity.y = 0.42f;
+                }
+            }
+        } else {
+            vec3_t fwd, side, up;
+            float m_fwd, m_side, m_up;
+            float spd = 20.0f;
+
+            cam_angles(&fwd, &side, &up, cl.game.our_ent->rotation.yaw, 0.0f);
+
+            fwd.y = 0.0f;
+            side.y = 0.0f;
+
+            m_fwd = 0;
+            if(gamekeys.forward)
+                m_fwd++;
+            if(gamekeys.back)
+                m_fwd--;
+
+            m_side = 0;
+            if(gamekeys.right)
+                m_side++;
+            if(gamekeys.left)
+                m_side--;
+
+            m_up = 0;
+            if(gamekeys.jump)
+                m_up++;
+            if(gamekeys.sneak)
+                m_up--;
+
+            cl.game.cam_pos = vec3_add(cl.game.cam_pos, vec3_mul(fwd, m_fwd * cl.frametime * spd));
+            cl.game.cam_pos = vec3_add(cl.game.cam_pos, vec3_mul(side, m_side * cl.frametime * spd));
+            cl.game.cam_pos = vec3_add(cl.game.cam_pos, vec3_mul(vec3(0,1,0), m_up * cl.frametime * spd));
         }
 
     }
@@ -444,4 +477,9 @@ void key_bind(int key, char *bind)
         mem_free(input_keys[key].binding);
 
     input_keys[key].binding = tmp;
+}
+
+void onchange_cl_freecamera(void)
+{
+    cl.game.cam_pos = cl.game.our_ent->position;
 }

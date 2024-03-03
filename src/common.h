@@ -10,6 +10,18 @@
 
 #define attr(a) __attribute__((__##a##__))
 
+#define BIN_FMT "%c%c%c%c%c%c%c%c"
+#define BIN_BYTE(b)         \
+  ((b) & 0x80 ? '1' : '0'), \
+  ((b) & 0x40 ? '1' : '0'), \
+  ((b) & 0x20 ? '1' : '0'), \
+  ((b) & 0x10 ? '1' : '0'), \
+  ((b) & 0x08 ? '1' : '0'), \
+  ((b) & 0x04 ? '1' : '0'), \
+  ((b) & 0x02 ? '1' : '0'), \
+  ((b) & 0x01 ? '1' : '0')
+
+
 typedef char byte;
 typedef unsigned char ubyte;
 
@@ -19,7 +31,7 @@ void *_mem_alloc_impl(size_t sz, const char *file, int line);
     do {             \
         if(p)        \
             free(p); \
-        p = NULL;    \
+        (p) = NULL;  \
     } while(0)
 
 void con_printf(char *text, ...);
@@ -34,6 +46,12 @@ typedef enum {
     ERR_OK,
     ERR_FATAL,
     ERR_NETWORK
-} errcode;    
+} errcode;
+
+#define swap(a, b) do {             \
+    __typeof__(a) __swap_tmp = (a); \
+    (a) = (b);                      \
+    (b) = __swap_tmp;               \
+} while(0)
 
 #endif

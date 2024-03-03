@@ -51,12 +51,17 @@ typedef struct entity {
     char *name; // for named entities (players)
 
     vec3_t position;
-    vec3_t position_old;
-    vec3_t velocity;
-    float move_side, move_forward;
-    float smooth_step_view_height_offset, eye_offset;
     vec3_t rotation;
+    vec3_t velocity;
+    vec3_t position_old;
+
     bbox_t bbox;
+
+    // input
+    float move_side, move_forward;
+
+    float smooth_step_view_height_offset, eye_offset;
+
     bool onground;
     bool collided_horizontally;
     bool collided_vertically;

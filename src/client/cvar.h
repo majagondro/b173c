@@ -23,20 +23,28 @@ bool cvar_set(const char *name, const char *value);
 // silent set doesn't call onchange functions
 bool cvar_set_silent(const char *name, const char *value);
 
-extern cvar vid_width;
-extern cvar vid_height;
 extern cvar fov;
+extern cvar developer;
+extern cvar cvar_name;
+extern cvar sensitivity;
+
 extern cvar r_zfar;
 extern cvar r_znear;
 extern cvar r_max_remeshes;
 extern cvar r_fancyleaves;
+extern cvar r_fancygrass;
 extern cvar r_smartleaves;
+extern cvar r_redstone_dot;
+
 extern cvar gl_polygon_mode;
-extern cvar developer;
-extern cvar cvar_name;
+
+extern cvar vid_width;
+extern cvar vid_height;
+
 extern cvar cl_2b2tmode;
-extern cvar ui_scale;
-extern cvar sensitivity;
 extern cvar cl_smoothstep;
+extern cvar cl_freecamera;
+
+extern cvar ui_scale;
 
 #endif

@@ -21,5 +21,5 @@ Our project is minecraft client which aims to be fully compatible with mc beta 1
 
 ## License
 
-[GNU GPLv3](LICENSE) © (https://www.gnu.org/licenses/gpl-3.0.txt)).
+[GNU GPLv3](LICENSE) © (https://www.gnu.org/licenses/gpl-3.0.txt).
 

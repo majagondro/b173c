@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <uchar.h>
+#include <sys/types.h>
 
 #define attr(a) __attribute__((__##a##__))
 
@@ -53,5 +54,8 @@ typedef enum {
     (a) = (b);                      \
     (b) = __swap_tmp;               \
 } while(0)
+
+size_t strlcpy(char *dst, const char *src, size_t dsize);
+size_t strlcat(char *dst, const char *src, size_t dsize);
 
 #endif

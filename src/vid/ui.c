@@ -37,8 +37,8 @@ vec2_t glyph_vertices[] = {
 float char_widths[256] = {0};
 vec4_t text_data[MAX_CON_CHARS] = {0};
 int text_char_count = 0;
-uint gl_ui_font_texture, gl_uniform_con_char_size;
-uint gl_text_vao, gl_text_glyph_vbo = 0, gl_text_data_buffer;
+uint32_t gl_ui_font_texture, gl_uniform_con_char_size;
+uint32_t gl_text_vao, gl_text_glyph_vbo = 0, gl_text_data_buffer;
 asset_image *asset_font_image = NULL;
 
 extern struct gl_state gl;
@@ -156,6 +156,14 @@ errcode ui_init(void)
 
     calculate_char_widths();
 
+    { // print some cool opengl info
+        con_printf("OpenGL\n");
+        con_printf("  Vendor: %s\n", glGetString(GL_VENDOR));
+        con_printf("  Renderer: %s\n", glGetString(GL_RENDERER));
+        con_printf("  GLSL: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+        con_printf("  Version: %s\n", glGetString(GL_VERSION));
+    }
+
     if(glGetError() != GL_NO_ERROR)
         return ERR_FATAL;
     return ERR_OK;
@@ -212,7 +220,7 @@ void ui_render(void)
 
 int ui_charwidth(ubyte c)
 {
-    return char_widths[c];
+    return (int)char_widths[c];
 }
 
 int ui_strwidth(const char *text)

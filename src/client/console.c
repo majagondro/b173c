@@ -4,7 +4,7 @@
 #include "input.h"
 #include "vid/vid.h"
 #include "common.h"
-#include <bsd/string.h>
+#include <ctype.h>
 
 #define CONSOLE_MAX_LINES 512
 #define CONSOLE_MAX_LINE 256
@@ -259,7 +259,7 @@ void con_printf(char *fmt, ...)
 static void draw_input_line(int y)
 {
 	// todo: always show cursor while the user is typing
-	static ulong blink_tick = 0;
+	static uint64_t blink_tick = 0;
 	static ubyte blink_char = '|';
 	static bool blink = false;
 
@@ -356,7 +356,8 @@ void ui_draw_console(void)
 	for(int i = 0; i < num_lines_that_fit + con_scroll; i++) {
 		while(p > conbuf && *p)
 			p--;
-		p++;
+		if(p != conbuf)
+			p++;
 		if(ui_strwidth(p) >= ui_w - 8) {
 			drawwrap(1, &y, p, &scroll);
 		} else if(scroll <= 0) {
@@ -364,7 +365,7 @@ void ui_draw_console(void)
 			y -= LINE_HEIGHT_PX;
 		}
 		scroll--;
-		if(p == conbuf) {
+		if(p <= conbuf) {
 			break;
 		}
 		if(y <= -LINE_HEIGHT_PX) {

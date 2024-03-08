@@ -54,8 +54,8 @@ const char *utf16toutf8(const char16_t *str, size_t len)
 
 float calc_frametime(void)
 {
-    static ulong now = 0;
-    static ulong then = 0;
+    static uint64_t now = 0;
+    static uint64_t then = 0;
 
     then = now;
     now = SDL_GetPerformanceCounter();
@@ -106,7 +106,7 @@ void cl_end_game(void)
     cl.game.our_ent = &dummy_ent;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     float phys_timeout = 0.0f;
     
@@ -119,8 +119,8 @@ int main(void)
 
     INIT(assets_init);
     INIT(in_init);
-    INIT(net_init);
-    INIT(vid_init);
+    INIT(vid_init); // video first because SDL_Init is in there
+    INIT(net_init); // and it is needed by SDLNet_init
     INIT(ui_init);
     INIT(entity_renderer_init);
     INIT(world_init);

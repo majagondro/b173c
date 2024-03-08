@@ -10,8 +10,8 @@ extern struct client_state {
         bool rotated, moved;
         entity *our_ent;
         int our_id;
-        long seed;
-        long time;
+        int64_t seed;
+        int64_t time;
         struct trace_result look_trace;
         bool unstuck;
         vec3_t cam_pos;
@@ -22,7 +22,7 @@ extern struct client_state {
     bool done;   // used in the main loop
     bool active; // whether the window is focused
 
-    ulong fps;
+    uint64_t fps;
     float frametime;
     bool is_physframe;
 } cl;

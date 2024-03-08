@@ -16,14 +16,14 @@ SDL_Window *window_handle;
 SDL_GLContext glcontext;
 
 // for fps because its a little more stable and looks nicer :)
-ulong frames_drawn = 0;
-ulong last_check_tick = 0;
+uint64_t frames_drawn = 0;
+uint64_t last_check_tick = 0;
 
 struct gl_state gl;
 
 #define check_shader_compile(shader) check_shader_compile_impl(shader, #shader)
 
-static bool check_shader_compile_impl(uint h, const char *name)
+static bool check_shader_compile_impl(uint32_t h, const char *name)
 {
     int ok = true, loglen;
     char *log;
@@ -42,7 +42,7 @@ static bool check_shader_compile_impl(uint h, const char *name)
     return ok;
 }
 
-static uint check_program_compile(uint h, uint h_vs, uint h_fs)
+static uint32_t check_program_compile(uint32_t h, uint32_t h_vs, uint32_t h_fs)
 {
     int ok = true, loglen;
     char *log;
@@ -72,9 +72,9 @@ static uint check_program_compile(uint h, uint h_vs, uint h_fs)
     return h;
 }
 
-static uint load_shader(const char *vs, const char *fs)
+static uint32_t load_shader(const char *vs, const char *fs)
 {
-    uint h_vs, h_fs, h_prog;
+    uint32_t h_vs, h_fs, h_prog;
 
     // vertex shader
     h_vs = glCreateShader(GL_VERTEX_SHADER);
@@ -123,10 +123,9 @@ errcode vid_init(void)
         goto err_sdl;
     }
     
-    SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, true);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
     
     flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL | SDL_WINDOW_INPUT_FOCUS;
     window_handle = SDL_CreateWindow("b173c", x, y, vid_width.integer, vid_height.integer, flags);
@@ -150,8 +149,8 @@ errcode vid_init(void)
     }
 
     /* enable debug output */
-    glEnable(GL_DEBUG_OUTPUT);
-    glDebugMessageCallback(gl_debug_message, 0);
+    // glEnable(GL_DEBUG_OUTPUT);
+    // glDebugMessageCallback(gl_debug_message, 0);
 
     /* load shaders */
     gl.shader_blocks_simple = load_shader(simpleblocks_v_glsl, simpleblocks_f_glsl);

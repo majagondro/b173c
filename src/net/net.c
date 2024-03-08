@@ -1,23 +1,20 @@
 #include <SDL2/SDL_endian.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
 #include "common.h"
+#include <SDL2/SDL_net.h>
+#include <errno.h>
 #include "net.h"
 #include "net_internal.h"
 #include "client/client.h"
 #include "client/console.h"
 #include "vid/vid.h"
-#include <setjmp.h>
 #include <uchar.h>
 #include "packets.h"
-#include <bsd/string.h>
 #include <SDL_timer.h>
-#include <netinet/tcp.h>
+
+#define ERR(desc1, desc2) do {                            \
+    con_printf("(%s) network error: %s\n", desc1, desc2); \
+    net_shutdown();                                       \
+} while(0)
 
 #define PACKET(id, name, stuff) [id] = #name,
 const char *packet_names[256] = {
@@ -28,34 +25,8 @@ const char *packet_names[256] = {
 static bool init_ok = false;
 static bool should_disconnect = false;
 
-static bool read_ok = false;
-static size_t total_read = 0;
-static byte read_buffer[32 * 1024] = {0};
-jmp_buf read_abort;
-
-static int sockfd = -1;
-
-#define perror(desc) con_printf("%s: %s\n", desc, strerror(errno))
-
-static void setblocking(int fd, bool blocking)
-{
-    int flags;
-
-    /* get old flags */
-    if((flags = fcntl(fd, F_GETFL)) < 0) {
-        perror("fcntl1");
-        return;
-    }
-
-    /* add or remove nonblocking flag */
-    flags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
-
-    /* apply new flags */
-    if(fcntl(fd, F_SETFL, flags) < 0) {
-        perror("fcntl2");
-        return;
-    }
-}
+static TCPsocket socket = NULL;
+static SDLNet_SocketSet socket_set = NULL;
 
 void disconnect_f(void);
 void connect_f(void);
@@ -64,53 +35,41 @@ void respawn_f(void);
 
 errcode net_init(void)
 {
-    /* do not reinitialize */
-    if(init_ok)
-        return ERR_OK;
-
-    /* open ipv4 tcp stream socket */
-    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket");
-        net_shutdown();
+    if(SDLNet_Init() != 0) {
+        ERR("0", SDLNet_GetError());
         return ERR_NETWORK;
     }
-
-    /* set socket to nonblocking */
-    setblocking(sockfd, false);
-
     init_ok = true;
-
     return ERR_OK;
 }
 
-void net_connect(struct sockaddr_in *sockaddr, int port)
+void net_connect(IPaddress *addr)
 {
-    struct sockaddr_in addr = {0};
-    if(sockaddr != NULL) {
-        addr = *sockaddr;
-        addr.sin_port = htons(port);
-    } else {
-        // disconnect
-        addr.sin_family = AF_UNSPEC;
-    }
-
-    if(!init_ok)
-        net_init();
-
     cl.state = cl_disconnected;
 
-    // connect to server
-    // set socket to blocking for this because its easier this way
-    setblocking(sockfd, true);
-    if(connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-        perror("connect");
-        net_shutdown(); // deinit
-        return;
-    }
-    setblocking(sockfd, false);
+    if(addr != NULL) {
+        socket = SDLNet_TCP_Open(addr);
+        if(socket == NULL) {
+            ERR("1", SDLNet_GetError());
+            return;
+        }
 
-    if(sockaddr != NULL) {
+        socket_set = SDLNet_AllocSocketSet(1);
+        if(socket_set == NULL) {
+            ERR("2", SDLNet_GetError());
+            SDLNet_TCP_Close(socket);
+            return;
+        }
+
+        // should not error unless REALLY really bad stuff happens
+        SDLNet_TCP_AddSocket(socket_set, socket);
+
         cl.state = cl_connecting;
+    } else {
+        if(socket != NULL) {
+            SDLNet_FreeSocketSet(socket_set);
+            SDLNet_TCP_Close(socket);
+        }
     }
 }
 
@@ -124,14 +83,6 @@ void net_process(void)
 
     // read and handle incoming packets
     if(cl.state > cl_disconnected) {
-        if(setjmp(read_abort)) {
-            // longjmp to here means that recv failed, which usually
-            // means we did not receive enough data to read an entire packet
-
-            net_write_packets();
-            return;
-        }
-
         while(net_read_packet());
 
         net_write_packets();
@@ -140,7 +91,6 @@ void net_process(void)
     // disconnect if requested
     if(should_disconnect) {
         cl.state = cl_disconnected;
-        setblocking(sockfd, true);
 
         // reset handshake flag and send disconnect packet
         net_write_packets();
@@ -148,9 +98,9 @@ void net_process(void)
         // wait a bit before closing the socket, didn't find a way to wait
         // for the writes to finish :/
         // fixme!
-        SDL_Delay(250);
+        // SDL_Delay(250);
 
-        net_connect(NULL, 0);
+        net_connect(NULL);
         should_disconnect = false;
     }
 
@@ -160,7 +110,7 @@ void net_process(void)
 void read_entity_metadata(void)
 {
     byte field_id;
-    while((field_id = net_read_byte()) != 0x7F && read_ok) {
+    while((field_id = net_read_byte()) != 0x7F) {
         switch((field_id >> 5) & 7) {
         case 0:
             net_read_byte();
@@ -206,16 +156,11 @@ static bool net_read_packet(void)
 {
     ubyte packet_id;
 
-    // consume the old bytes
-    if(read_ok)
-        read(sockfd, read_buffer, total_read);
-    total_read = 0;
+    if(!SDLNet_CheckSockets(socket_set, 0))
+        return false; // no data available
 
     // try to read a packet
     packet_id = net_read_byte();
-    if(!read_ok) {
-        return false;
-    }
 
 #define UBYTE(name)                this.name = (ubyte) net_read_byte();
 #define BYTE(name)                 this.name = net_read_byte();
@@ -232,11 +177,12 @@ static bool net_read_packet(void)
 
 #define OPT(cond, stuff) if(cond) { stuff }
 // todo: wrapper for alloca in case of bad size
-#define BUF(type, name, size) this.name = alloca((size) * sizeof(*this.name)); for(size_t i = 0; i < (size_t) (size); i++) type(name[i])
+#define BUF(type, name, size) this.name = alloca((size) * sizeof(*this.name)); for(size_t i = 0; i < (size_t) (size); i++) { type(name[i]) }
 
 #define PACKET(id, name, stuff) case id: { pkt_ ## name this = {0}; stuff; net_handle_pkt_ ## name(this); return true; }
 
     switch(packet_id) {
+
 #include "packets_def.h"
     case 0x00: { // keep alive packet
         net_write_byte(0x00);
@@ -248,62 +194,31 @@ static bool net_read_packet(void)
         return false;
     }
     }
-
-    return true;
 }
 
 void net_shutdown(void)
 {
+    if(!init_ok)
+        return;
+
     init_ok = false;
-    con_printf("net shutting down...\n");
 
-    // close socket
-    setblocking(sockfd, true);
-    if(sockfd != -1) {
-        if(close(sockfd) < 0) {
-            perror("close");
-            // bruh :|
-        }
-        sockfd = -1;
-    }
+    net_connect(NULL);
 
-    cl.state = cl_disconnected;
-    vid_lock_fps();
+    SDLNet_Quit();
 }
 
-void net_read_buf(void *dest, size_t n)
+void net_read_buf(void *dest, int n)
 {
-    ssize_t n_read;
+    int n_read;
 
     if(!init_ok || !dest || n == 0)
         return;
 
-    // peek does not consume the bytes
-    // we save them in a buffer in case we are missing some for an entire packet
-    // if we are missing some then we can try to read them during the next frame
-    n_read = recv(sockfd, read_buffer, total_read + n, MSG_PEEK);
+    n_read = SDLNet_TCP_Recv(socket, dest, n);
 
-    if(n_read == 0) {
-        // EOF - todo: disonnect here? read recv man page and see return value 0
-        read_ok = false;
-        longjmp(read_abort, 1);
-    } else if(n_read == -1) {
-        read_ok = false;
-        // EAGAIN is a common when using non-blocking sockets
-        // it just means no data is currently available
-        if(errno != EAGAIN)
-            con_printf("net_read_buf: %s (error %d)\n", strerror(errno), errno);
-        longjmp(read_abort, 1);
-    } else if((size_t) n_read - total_read != n) {
-        // read some, but not everything
-        // delay until next frame
-        read_ok = false;
-        total_read = n_read;
-        longjmp(read_abort, 1);
-    } else {
-        read_ok = true;
-        memcpy(dest, read_buffer + total_read, n);
-        total_read = n_read;
+    if(n_read <= 0) {
+        ERR("3", SDLNet_GetError());
     }
 }
 
@@ -328,9 +243,9 @@ int net_read_int(void)
     return SDL_SwapBE32(i);
 }
 
-long net_read_long(void)
+int64_t net_read_long(void)
 {
-    long l;
+    int64_t l;
     net_read_buf(&l, 8);
     return SDL_SwapBE64(l);
 }
@@ -349,7 +264,7 @@ double net_read_double(void)
 {
     union {
         double d;
-        long l;
+        int64_t l;
     } u;
     u.l = net_read_long();
     return u.d;
@@ -379,7 +294,7 @@ string16 net_read_string16(void)
     int i;
 
     s.length = net_read_short();
-    size = (s.length + 1) * sizeof(*s.data);
+    size = (short)((s.length + 1) * sizeof(*s.data));
     s.data = mem_alloc(size);
     for(i = 0; i < s.length; i++)
         s.data[i] = net_read_short();
@@ -401,7 +316,7 @@ void net_free_string16(string16 v)
 string8 net_make_string8(const char *text)
 {
     string8 str;
-    str.length = strlen(text);
+    str.length = (short)strlen(text);
     str.data = mem_alloc(str.length + 1);
     strlcpy(str.data, text, str.length);
     return str;
@@ -411,7 +326,7 @@ string16 net_make_string16(const char *text)
 {
     string16 str;
     int i;
-    str.length = strlen(text);
+    str.length = (short)strlen(text);
     str.data = mem_alloc((str.length + 1) * sizeof(*str.data));
     for(i = 0; i < str.length; i++) {
         str.data[i] = (char16_t) text[i];
@@ -420,32 +335,22 @@ string16 net_make_string16(const char *text)
     return str;
 }
 
-void net_write_buf(const void *buf, size_t n)
+void net_write_buf(const void *buf, int n)
 {
-    ssize_t n_written;
+    int n_written;
 
     if(!init_ok || !buf || n == 0 || (cl.state == cl_disconnected && !should_disconnect))
         return;
 
-    n_written = send(sockfd, buf, n, MSG_NOSIGNAL);
+    n_written = SDLNet_TCP_Send(socket, buf, n);
     if(n_written == -1) {
-        if(errno == EAGAIN || errno == EWOULDBLOCK) {
-            // is this right?
-            con_printf("net_write_buf: operation WILL block\n");
-            setblocking(sockfd, true);
-            net_write_buf(buf, n);
-            setblocking(sockfd, false);
-        } else {
-            perror("net_write_buf");
-            net_shutdown();
-            return;
-        }
-    } else if((size_t) n_written != n) {
-        // is this right?
-        con_printf("net_write_buf: wrote only %ld/%lu bytes, gonna block\n", n_written, n);
-        setblocking(sockfd, true);
-        write(sockfd, (byte *) buf + n_written, n - n_written);
-        setblocking(sockfd, false);
+        // invalid usage
+        // prevent further writes?
+        ERR("5", "invalid usage");
+        init_ok = false;
+        return;
+    } else if(n_written < n) {
+        ERR("4", SDLNet_GetError());
     }
 }
 
@@ -466,7 +371,7 @@ void net_write_int(int v)
     net_write_buf(&v, 4);
 }
 
-void net_write_long(long v)
+void net_write_long(int64_t v)
 {
     v = SDL_SwapBE64(v);
     net_write_buf(&v, 8);
@@ -486,7 +391,7 @@ void net_write_double(double v)
 {
     union {
         double d;
-        long l;
+        int64_t l;
     } u;
     u.d = v;
     net_write_long(u.l);
@@ -514,9 +419,9 @@ void net_write_string16(string16 v)
 
 void connect_f(void)
 {
-    struct addrinfo hints = {0}, *info;
     char *addrstr, *p;
     int port, err;
+    IPaddress addr;
 
     if(cmd_argc() != 2) {
         con_printf("usage: %s <ip>[:<port>]\n", cmd_argv(0));
@@ -539,26 +444,21 @@ void connect_f(void)
     } else {
         port = strtol(p, NULL, 10);
         if(errno == EINVAL) {
-            con_printf("invalid ip\n");
+            con_printf("invalid ip address port\n");
             return;
         }
         *p = 0; // set to 0 for ip address parsing (idk if needed)
     }
 
-    // todo: ipv6 support if you can even use that with a beta server
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    if((err = getaddrinfo(addrstr, "http", &hints, &info))) {
-        con_printf("error: %s\n", gai_strerror(err));
+    err = SDLNet_ResolveHost(&addr, addrstr, port);
+
+    if(err != 0) {
+        ERR("6", SDLNet_GetError());
         return;
     }
 
-    if(info != NULL) {
-        net_init();
-        net_connect((struct sockaddr_in *) info->ai_addr, port);
-    }
-
-    freeaddrinfo(info);
+    net_init();
+    net_connect(&addr);
 }
 
 void disconnect_f(void)

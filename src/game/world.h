@@ -49,8 +49,8 @@ typedef struct {
         } attr(packed) *verts_complex;
 
         size_t n_verts_simple, n_verts_complex;
-        uint vbo_simple, vbo_complex;
-        uint light_tex;
+        uint32_t vbo_simple, vbo_complex;
+        uint32_t light_tex;
     } gl;
 } world_chunk;
 

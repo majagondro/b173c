@@ -1,5 +1,5 @@
-CC := gcc
-CFLAGS := -ggdb3 -Iinclude -Isubmodules
+CC ?= gcc
+CFLAGS := -ggdb -Iinclude -Isubmodules
 WARNINGS := -Wall -Wpedantic -Wextra
 WARNINGS += -Wdeclaration-after-statement # style
 WARNINGS += -Wno-missing-field-initializers # cvar issues
@@ -9,12 +9,11 @@ LDFLAGS := -lm
 # add SDL2
 CFLAGS += $(shell pkg-config --cflags sdl2)
 LDFLAGS += $(shell pkg-config --libs sdl2)
+# add SDL2_net (todo: does this have a pkg-config thing)
+LDFLAGS += -lSDL2_net
 # add zlib
 CFLAGS += $(shell pkg-config --cflags zlib)
 LDFLAGS += $(shell pkg-config --libs zlib)
-# add libbsd
-CFLAGS += $(shell pkg-config --cflags libbsd)
-LDFLAGS += $(shell pkg-config --libs libbsd)
 
 SRC_DIR := src
 OBJ_DIR := obj
@@ -27,6 +26,16 @@ CFLAGS += -I$(SRC_DIR)
 SRC_FILES := $(shell find $(SRC_DIR)/ -type f -name "*.c")
 HDR_FILES := $(shell find $(SRC_DIR)/ -type f -name "*.h")
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
+
+ifneq ($(CC),gcc)
+	LDFLAGS += -L$(SRC_DIR)/mingw-libs/
+	LDFLAGS += -lmingw32 -lSDL2main -lSDL2 -mwindows  -Wl,--dynamicbase
+	LDFLAGS += -Wl,--nxcompat -Wl,--high-entropy-va -lm -ldinput8 -ldxguid
+	LDFLAGS += -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32
+	LDFLAGS += -lshell32 -lsetupapi -lversion -luuid
+	LDFLAGS += -lopengl32 -lws2_32 -lwinmm -lpthread -liphlpapi
+	LDFLAGS += -static
+endif
 
 PY := python
 

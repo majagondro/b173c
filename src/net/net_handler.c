@@ -58,6 +58,7 @@ void net_handle_pkt_login_request(pkt_login_request pkt)
     cl.state = cl_connected;
     cl.game.our_id = pkt.entity_id_or_protocol_version;
     cl.game.our_ent = world_get_entity(pkt.entity_id_or_protocol_version);
+
     if(!cl.game.our_ent) {
         // create
         net_handle_pkt_named_entity_spawn((pkt_named_entity_spawn) {
@@ -66,11 +67,14 @@ void net_handle_pkt_login_request(pkt_login_request pkt)
         });
         cl.game.our_ent = world_get_entity(pkt.entity_id_or_protocol_version);
     }
+    con_printf("2\n");
 
     vid_unlock_fps();
     con_printf(CON_STYLE_DARK_GREEN"connected!\n");
 
     net_free_string16(pkt.username);
+
+    con_printf("done\n");
 }
 
 void net_handle_pkt_handshake(pkt_handshake pkt)

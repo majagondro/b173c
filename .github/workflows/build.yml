@@ -5,8 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Install dependencies
-      run: sudo apt-get -qy update && sudo apt-get -qy install git make libsdl2-dev libbsd-dev libz-dev python3-pip && pip install pillow
-      
+      run: sudo apt-get -qy update && sudo apt-get -qy install git make libsdl2-dev libsdl2-net-dev libz-dev python3-pip && pip install pillow
 
     - name: Check out code
       uses: actions/checkout@v4
@@ -14,10 +13,33 @@ jobs:
         submodules: true
 
     - name: Build
-      run: make all
+      run: CC=gcc make all
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: b173c
         path: build/b173c
+
+  windows-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get -qy update && sudo apt-get -qy install git make mingw-w64 binutils-mingw-w64-x86-64 gcc-mingw-w64-x86-64 libsdl2-dev libsdl2-net-dev libz-dev python3-pip && pip install pillow
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build
+        run: CC=x86_64-w64-mingw32-gcc make all
+
+      - name: Strip
+        run: x86_64-w64-mingw32-strip build/b173c.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: b173c.exe
+          path: build/b173c.exe

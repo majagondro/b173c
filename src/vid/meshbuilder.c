@@ -62,14 +62,14 @@ void meshbuilder_start(size_t vtx_size)
 void meshbuilder_finish(void **verts_dest, size_t *num_verts_dest, MESHBUILDER_INDEX_TYPE **indices_dest, size_t *num_indices_dest)
 {
     if(vertices.count > 0)
-        *verts_dest = reallocarray(vertices.data, vertices.count, vertices.elem_size);
+        *verts_dest = realloc(vertices.data, vertices.count * vertices.elem_size);
     else
         *verts_dest = NULL;
     *num_verts_dest = vertices.count;
 
     if(indices_dest) {
         if(indices.count > 0) {
-            *indices_dest = reallocarray(indices.data, indices.count, sizeof(MESHBUILDER_INDEX_TYPE));
+            *indices_dest = realloc(indices.data, indices.count * sizeof(MESHBUILDER_INDEX_TYPE));
         } else {
             *indices_dest = NULL;
         }
@@ -91,7 +91,7 @@ void meshbuilder_add_index(MESHBUILDER_INDEX_TYPE idx)
 
     if(indices.count >= indices.capacity) {
         indices.capacity += DEFAULT_CAPACITY;
-        indices.data = reallocarray(indices.data, indices.capacity, sizeof(MESHBUILDER_INDEX_TYPE));
+        indices.data = realloc(indices.data, indices.capacity * sizeof(MESHBUILDER_INDEX_TYPE));
     }
 }
 
@@ -112,7 +112,7 @@ void meshbuilder_add_vert(void *v)
 
     if(vertices.count >= vertices.capacity) {
         vertices.capacity += DEFAULT_CAPACITY;
-        vertices.data = reallocarray(vertices.data, vertices.capacity, vertices.elem_size);
+        vertices.data = realloc(vertices.data, vertices.capacity * vertices.elem_size);
     }
 }
 

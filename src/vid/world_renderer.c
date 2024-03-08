@@ -13,9 +13,9 @@
 
 mat4_t view_mat = {0};
 mat4_t proj_mat = {0};
-static uint gl_world_vao_simple, gl_world_vao_complex;
-static uint gl_world_texture; // fixme
-static uint gl_block_selection_vbo;
+static uint32_t gl_world_vao_simple, gl_world_vao_complex;
+static uint32_t gl_world_texture; // fixme
+static uint32_t gl_block_selection_vbo;
 static GLint loc_chunkpos, loc_proj, loc_view, loc_nightlightmod;
 static GLint loc_chunkpos2, loc_proj2, loc_view2, loc_nightlightmod2, loc_lighttex, loc_terraintex;
 

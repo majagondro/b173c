@@ -8,7 +8,7 @@
 #include "ui.h"
 #include "client/cvar.h"
 
-uint gl_vao, gl_vbo;
+uint32_t gl_vao, gl_vbo;
 GLint gl_uniform_model, gl_uniform_view, gl_uniform_projection;
 extern struct gl_state gl;
 extern mat4_t view_mat, proj_mat;

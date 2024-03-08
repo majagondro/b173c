@@ -147,7 +147,7 @@ int block_get_texture_index(block_id id, block_face face, ubyte metadata, int x,
                 // 104_ f=5 (+x)
                 // 100_ f=3 (+z)
                 // ok whatever TODO: document this more
-                uint flags = ((rot >> 1) + (IS_POS_FACE(face) ^ rot)) + is_open;
+                uint32_t flags = ((rot >> 1) + (IS_POS_FACE(face) ^ rot)) + is_open;
 
                 int idx = props.texture_indices[face];
                 if(is_top_half)

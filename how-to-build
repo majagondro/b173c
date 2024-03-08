@@ -1,9 +1,22 @@
-for now, b173c can only be built on linux. windows support will be added later via mingw.
-
 required packages:
-  pkgconf sdl2 libbsd zlib python3 python-pillow
+  pkgconf sdl2 sdl2_net zlib python3 python-pillow
 
-simply run
-  make all
-in the project's root directory. the binary should be placed at
-  build/b173c
+LINUX:
+run
+  CC=gcc make all
+binary should be placed at build/b173c
+(why explicitly set CC? i dont know but for me it defaults to cc for some reason, gotta figure it out later)
+
+LINUX TO WINDOWS:
+run
+  CC=x86_64-w64-mingw32-gcc make all
+binary should be placed at build/b173c.exe
+run
+  x86_64-w64-mingw32-strip b173c.exe
+so it takes up 3mbs instead of 20
+
+WINDOWS:
+idk figure it out yourself
+
+warning: running this on windows natively results in shit performance???
+might be because of the amd drivers? someone with nvidia please test

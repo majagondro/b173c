@@ -574,7 +574,7 @@ float world_calculate_sun_angle(void)
 float world_calculate_sky_light_modifier(void)
 {
     float lmod;
-    long t = cl.game.time % 24000;
+    int64_t t = cl.game.time % 24000;
     if(is_between(t, 14000, 22000)) {
         // darkest night
         lmod = 1.0f;

@@ -57,7 +57,8 @@ typedef struct {
 extern struct hashmap *world_chunk_map;
 
 errcode world_init(void);
-void world_shutdown(void); // todo: rename me to cleanup or something?
+void world_shutdown(void);
+void world_cleanup(void);
 // fixme
 #define world_is_init() (cl.state == cl_connected && world_chunk_map != NULL)
 

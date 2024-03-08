@@ -3,38 +3,46 @@
 #include "client/client.h"
 #include "client/console.h"
 #include "client/cvar.h"
-#include "../client/client.h"
 
 void net_write_packets(void)
 {
-	static bool sent_handshake = false;
+    static bool sent_handshake = false;
 
-	if(cl.state == cl_disconnected && sent_handshake) {
-		// this is executed at the end of net_process (in net.c)
-		// used to reset this handshake flag
-		sent_handshake = false;
-		return;
-	}
+    if(cl.state == cl_disconnected && sent_handshake) {
+		string16 msg;
 
-	if(cl.state == cl_connecting && !sent_handshake) {
-		// send handshake to the server
+        // this is executed at the end of net_process (in net.c)
+        // used to reset this handshake flag
+        sent_handshake = false;
+
+		msg = net_make_string16("Quitting");
+		net_write_pkt_disconnect((pkt_disconnect) {
+			.reason = msg
+		});
+		net_free_string16(msg);
+
+        return;
+    }
+
+    if(cl.state == cl_connecting && !sent_handshake) {
+        // send handshake to the server
         string16 username = net_make_string16(cvar_name.string);
         net_write_pkt_handshake((pkt_handshake) {
             .connection_hash_or_username = username
         });
         net_free_string16(username);
 
-		sent_handshake = true;
-		con_printf(CON_STYLE_GRAY "awaiting handshake...\n");
-	}
+        sent_handshake = true;
+        con_printf(CON_STYLE_GRAY "awaiting handshake...\n");
+    }
 
-	if(cl.state != cl_connected)
-		return;
+    if(cl.state != cl_connected)
+        return;
 
-	// write movement packet depending on what the user did
-	if(cl.game.moved && cl.game.rotated) {
-		cl.game.moved = false;
-		cl.game.rotated = false;
+    // write movement packet depending on what the user did
+    if(cl.game.moved && cl.game.rotated) {
+        cl.game.moved = false;
+        cl.game.rotated = false;
         net_write_pkt_player_look_move((pkt_player_look_move) {
             .x = cl.game.our_ent->position.x,
             .stance_or_y = cl.game.our_ent->bbox.mins.y,
@@ -44,27 +52,27 @@ void net_write_packets(void)
             .pitch = cl.game.our_ent->rotation.pitch,
             .on_ground = cl.game.our_ent->onground
         });
-	} else if(cl.game.moved) {
+    } else if(cl.game.moved) {
         net_write_pkt_player_move((pkt_player_move) {
-			.x = cl.game.our_ent->position.x,
-			.y = cl.game.our_ent->bbox.mins.y,
-			.stance = cl.game.our_ent->position.y,
-			.z = cl.game.our_ent->position.z,
-			.on_ground = cl.game.our_ent->onground
+            .x = cl.game.our_ent->position.x,
+            .y = cl.game.our_ent->bbox.mins.y,
+            .stance = cl.game.our_ent->position.y,
+            .z = cl.game.our_ent->position.z,
+            .on_ground = cl.game.our_ent->onground
         });
-		cl.game.moved = false;
-	} else if(cl.game.rotated) {
+        cl.game.moved = false;
+    } else if(cl.game.rotated) {
         net_write_pkt_player_look((pkt_player_look) {
-			.yaw = -cl.game.our_ent->rotation.yaw,
-			.pitch = cl.game.our_ent->rotation.pitch,
-			.on_ground = cl.game.our_ent->onground
+            .yaw = -cl.game.our_ent->rotation.yaw,
+            .pitch = cl.game.our_ent->rotation.pitch,
+            .on_ground = cl.game.our_ent->onground
         });
-		cl.game.rotated = false;
-	} else {
+        cl.game.rotated = false;
+    } else {
         net_write_pkt_flying((pkt_flying) {
-			.on_ground = cl.game.our_ent->onground
-		});
-	}
+            .on_ground = cl.game.our_ent->onground
+        });
+    }
 }
 
 void write_window_items_payload(struct ni_wi_payload data)

@@ -16,6 +16,8 @@
 #include <uchar.h>
 #include "packets.h"
 #include <bsd/string.h>
+#include <SDL_timer.h>
+#include <netinet/tcp.h>
 
 #define PACKET(id, name, stuff) [id] = #name,
 const char *packet_names[256] = {
@@ -28,7 +30,7 @@ static bool should_disconnect = false;
 
 static bool read_ok = false;
 static size_t total_read = 0;
-static byte read_buffer[32*1024] = {0};
+static byte read_buffer[32 * 1024] = {0};
 jmp_buf read_abort;
 
 static int sockfd = -1;
@@ -100,7 +102,7 @@ void net_connect(struct sockaddr_in *sockaddr, int port)
     // connect to server
     // set socket to blocking for this because its easier this way
     setblocking(sockfd, true);
-    if(connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    if(connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
         perror("connect");
         net_shutdown(); // deinit
         return;
@@ -130,18 +132,25 @@ void net_process(void)
             return;
         }
 
-        while(net_read_packet())
-            ;
+        while(net_read_packet());
 
         net_write_packets();
     }
 
     // disconnect if requested
     if(should_disconnect) {
-        net_connect(NULL, 0);
         cl.state = cl_disconnected;
-        vid_lock_fps(); // no need to exhaust the cpu by drawing the menu in 1 billion fps
-        net_write_packets(); // reset handshake flag
+        setblocking(sockfd, true);
+
+        // reset handshake flag and send disconnect packet
+        net_write_packets();
+
+        // wait a bit before closing the socket, didn't find a way to wait
+        // for the writes to finish :/
+        // fixme!
+        SDL_Delay(250);
+
+        net_connect(NULL, 0);
         should_disconnect = false;
     }
 
@@ -153,31 +162,31 @@ void read_entity_metadata(void)
     byte field_id;
     while((field_id = net_read_byte()) != 0x7F && read_ok) {
         switch((field_id >> 5) & 7) {
-            case 0:
-                net_read_byte();
-                break;
-            case 1:
-                net_read_short();
-                break;
-            case 2:
-                net_read_int();
-                break;
-            case 3:
-                net_read_float();
-                break;
-            case 4:
-                net_free_string16(net_read_string16());
-                break;
-            case 5:
-                net_read_short();
-                net_read_byte();
-                net_read_short();
-                break;
-            case 6:
-                net_read_int();
-                net_read_int();
-                net_read_int();
-                break;
+        case 0:
+            net_read_byte();
+            break;
+        case 1:
+            net_read_short();
+            break;
+        case 2:
+            net_read_int();
+            break;
+        case 3:
+            net_read_float();
+            break;
+        case 4:
+            net_free_string16(net_read_string16());
+            break;
+        case 5:
+            net_read_short();
+            net_read_byte();
+            net_read_short();
+            break;
+        case 6:
+            net_read_int();
+            net_read_int();
+            net_read_int();
+            break;
         }
     }
 }
@@ -229,15 +238,15 @@ static bool net_read_packet(void)
 
     switch(packet_id) {
 #include "packets_def.h"
-        case 0x00: { // keep alive packet
-            net_write_byte(0x00);
-            return true;
-        }
-        default: {
-            con_printf("unknown packet_id %hhd (0x%hhx)! disconnecting\n", packet_id, packet_id);
-            net_shutdown();
-            return false;
-        }
+    case 0x00: { // keep alive packet
+        net_write_byte(0x00);
+        return true;
+    }
+    default: {
+        con_printf("unknown packet_id %hhd (0x%hhx)! disconnecting\n", packet_id, packet_id);
+        net_shutdown();
+        return false;
+    }
     }
 
     return true;
@@ -272,7 +281,7 @@ void net_read_buf(void *dest, size_t n)
     // peek does not consume the bytes
     // we save them in a buffer in case we are missing some for an entire packet
     // if we are missing some then we can try to read them during the next frame
-    n_read = recv(sockfd, read_buffer, total_read+n, MSG_PEEK);
+    n_read = recv(sockfd, read_buffer, total_read + n, MSG_PEEK);
 
     if(n_read == 0) {
         // EOF - todo: disonnect here? read recv man page and see return value 0
@@ -415,7 +424,7 @@ void net_write_buf(const void *buf, size_t n)
 {
     ssize_t n_written;
 
-    if(!init_ok || !buf || n == 0 || cl.state == cl_disconnected)
+    if(!init_ok || !buf || n == 0 || (cl.state == cl_disconnected && !should_disconnect))
         return;
 
     n_written = send(sockfd, buf, n, MSG_NOSIGNAL);
@@ -435,7 +444,7 @@ void net_write_buf(const void *buf, size_t n)
         // is this right?
         con_printf("net_write_buf: wrote only %ld/%lu bytes, gonna block\n", n_written, n);
         setblocking(sockfd, true);
-        write(sockfd, (byte *)buf + n_written, n - n_written);
+        write(sockfd, (byte *) buf + n_written, n - n_written);
         setblocking(sockfd, false);
     }
 }
@@ -499,7 +508,7 @@ void net_write_string16(string16 v)
     short len = v.length;
     net_write_short(len);
     for(int i = 0; i < len; i++) {
-        net_write_short(v.data[i]);
+        net_write_short((short) v.data[i]);
     }
 }
 
@@ -533,7 +542,7 @@ void connect_f(void)
             con_printf("invalid ip\n");
             return;
         }
-        *p = 0; // set to 0 for ip address parsing (probably needed but idk)
+        *p = 0; // set to 0 for ip address parsing (idk if needed)
     }
 
     // todo: ipv6 support if you can even use that with a beta server
@@ -550,32 +559,17 @@ void connect_f(void)
     }
 
     freeaddrinfo(info);
-    return;
 }
 
 void disconnect_f(void)
 {
     if(cl.state != cl_disconnected) {
-        if(cl.state == cl_connected) {
-            // set to blocking so the pkt packet gets sent
-            // before the socket is closed
-            setblocking(sockfd, true);
-
-            net_write_pkt_disconnect((pkt_disconnect) {
-                .reason = net_make_string16("Quitting")
-            });
-
-            setblocking(sockfd, false);
-        }
-
-        // todo: world_cleanup() or something
-        // or just move world vars to cl.game
-        memset(&cl.game, 0, sizeof(cl.game));
-
-        // net_update will disconnect next update
-        cl.state = cl_disconnected;
         vid_lock_fps();
+        cl_end_game();
+
+        // net_update will actually disconnect next update
         should_disconnect = true;
+        cl.state = cl_disconnected;
 
         con_show();
     }
@@ -613,6 +607,6 @@ void respawn_f(void)
         return;
     }
     net_write_pkt_respawn((pkt_respawn) {
-            .dimension = 0
-        });
+        .dimension = 0
+    });
 }

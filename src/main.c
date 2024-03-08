@@ -99,6 +99,13 @@ void check_stuck(void)
     }
 }
 
+void cl_end_game(void)
+{
+    world_cleanup();
+    memset(&cl.game, 0, sizeof(cl.game));
+    cl.game.our_ent = &dummy_ent;
+}
+
 int main(void)
 {
     float phys_timeout = 0.0f;
@@ -147,6 +154,7 @@ int main(void)
         }
     }
 
+    world_shutdown();
     net_shutdown();
     in_shutdown();
     entity_renderer_shutdown();

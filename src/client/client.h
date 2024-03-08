@@ -24,7 +24,9 @@ extern struct client_state {
 
     ulong fps;
     float frametime;
-    volatile bool is_physframe;
+    bool is_physframe;
 } cl;
+
+void cl_end_game(void);
 
 #endif

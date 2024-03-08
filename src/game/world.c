@@ -73,7 +73,12 @@ void world_shutdown(void)
     hashmap_free(world_entity_map);
     world_chunk_map = NULL;
     world_entity_map = NULL;
-    cl.game.time = 0;
+}
+
+void world_cleanup(void)
+{
+    hashmap_clear(world_chunk_map, true);
+    hashmap_clear(world_entity_map, true);
 }
 
 void world_alloc_chunk(int chunk_x, int chunk_z)

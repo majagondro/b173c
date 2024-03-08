@@ -183,6 +183,7 @@ void cfg_save_f(void)
     con_printf("wrote %s\n", name);
 }
 
+// in input.c
 void bind_f(void);
 void unbind_f(void);
 void bindlist_f(void);

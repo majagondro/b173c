@@ -161,7 +161,11 @@ void bind_f(void)
         cmd = cmd_argv(2);
         key_bind(key, cmd);
     } else {
-        con_printf("%s : \"%s\"\n", cmd_argv(1), input_keys[key].binding);
+        if(input_keys[key].binding == NULL) {
+            con_printf("%s is not bound\n", cmd_argv(1));
+        } else {
+            con_printf("%s : \"%s\"\n", cmd_argv(1), input_keys[key].binding);
+        }
     }
 }
 

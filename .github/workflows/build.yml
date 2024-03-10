@@ -18,7 +18,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: b173c
+        name: b173c-linux
         path: build/b173c
 
   windows-build:
@@ -41,5 +41,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: b173c.exe
+          name: b173c-windows
           path: build/b173c.exe

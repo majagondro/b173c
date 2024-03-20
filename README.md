@@ -11,8 +11,6 @@ Required packages:
   
 b173c can run on both Linux and Windows, but can only be built from Linux [(see the related issue)](https://github.com/krizej/b173c/issues/5)
 
-Run `make all` in the project's root directory. The executable should be placed at `build/b173c`
-
 # Linux
 `CC=gcc make all`
 The executable should be at build/b173c

@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Install dependencies
-      run: sudo apt-get -qy update && sudo apt-get -qy install git make libsdl2-dev libsdl2-net-dev libz-dev python3-pip && pip install pillow
+      run: sudo apt-get -qy update && sudo apt-get -qy install git make libsdl2-dev libz-dev python3-pip && pip install pillow
 
     - name: Check out code
       uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install dependencies
-        run: sudo apt-get -qy update && sudo apt-get -qy install git make mingw-w64 binutils-mingw-w64-x86-64 gcc-mingw-w64-x86-64 libsdl2-dev libsdl2-net-dev libz-dev python3-pip && pip install pillow
+        run: sudo apt-get -qy update && sudo apt-get -qy install git make mingw-w64 binutils-mingw-w64-x86-64 gcc-mingw-w64-x86-64 libsdl2-dev libz-dev python3-pip && pip install pillow
 
       - name: Check out code
         uses: actions/checkout@v4

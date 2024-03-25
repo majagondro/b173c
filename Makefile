@@ -9,8 +9,6 @@ LDFLAGS := -lm
 # add SDL2
 CFLAGS += $(shell pkg-config --cflags sdl2)
 LDFLAGS += $(shell pkg-config --libs sdl2)
-# add SDL2_net (todo: does this have a pkg-config thing)
-LDFLAGS += -lSDL2_net
 # add zlib
 CFLAGS += $(shell pkg-config --cflags zlib)
 LDFLAGS += $(shell pkg-config --libs zlib)

@@ -6,9 +6,9 @@
 #include <ws2tcpip.h>
 #define MSG_NOSIGNAL 0
 #define net_errno WSAGetLastError()
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define EAGAIN WSAEALREADY
-#define EINPROGRESS WSAEINPROGRESS
+#define ERR_WOULDBLOCK WSAEWOULDBLOCK
+#define ERR_TRYAGAIN WSAEALREADY
+#define ERR_INPROGRESS WSAEINPROGRESS
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -20,6 +20,9 @@
 #define INVALID_SOCKET (-1)
 #define closesocket close
 #define net_errno errno
+#define ERR_WOULDBLOCK EWOULDBLOCK
+#define ERR_TRYAGAIN EAGAIN
+#define ERR_INPROGRESS EINPROGRESS
 #endif
 
 #include <SDL2/SDL_endian.h>
@@ -131,7 +134,7 @@ void net_connect(struct sockaddr_in *sockaddr, int port)
     cl.state = cl_disconnected;
 
     if(connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-        if(net_errno != EAGAIN && net_errno != EWOULDBLOCK && net_errno != EINPROGRESS) {
+        if(net_errno != ERR_TRYAGAIN && net_errno != ERR_WOULDBLOCK && net_errno != ERR_INPROGRESS) {
             perror("connect");
             net_shutdown(); // deinit
             return;
@@ -317,9 +320,9 @@ void net_read_buf(void *dest, size_t n)
         longjmp(read_abort, 1);
     } else if(n_read == -1) {
         read_ok = false;
-        // EAGAIN is a common when using non-blocking sockets
+        // ERR_TRYAGAIN is a common when using non-blocking sockets
         // it just means no data is currently available
-        if(net_errno != EAGAIN && net_errno != EWOULDBLOCK)
+        if(net_errno != ERR_TRYAGAIN && net_errno != ERR_WOULDBLOCK)
             perror("net_read_buf");
         longjmp(read_abort, 1);
     } else if((size_t) n_read - total_read != n) {
@@ -457,7 +460,7 @@ void net_write_buf(const void *buf, size_t n)
 
     n_written = send(sockfd, buf, n, MSG_NOSIGNAL);
     if(n_written == -1) {
-        if(net_errno == EAGAIN || net_errno == EWOULDBLOCK) {
+        if(net_errno == ERR_TRYAGAIN || net_errno == ERR_WOULDBLOCK) {
             // is this right?
             con_printf("net_write_buf: operation WILL block\n");
             setblocking(sockfd, true);

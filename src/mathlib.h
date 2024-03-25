@@ -9,6 +9,8 @@
 #define SQRT_3 1.7321f
 #define PI     3.1415f
 
+#define fequ(a, b) (fabsf((a) - (b)) < 0.0001f)
+
 #define deg2rad(d) ((d) * (PI / 180.0f))
 #define rad2deg(r) ((r) * (180.0f / PI))
 
@@ -69,7 +71,7 @@ vec2_t vec2_rotate(vec2_t v, float angle, vec2_t origin);
 #define vec3_invert(v) vec3_sub(vec3_1(0), (v))
 #define vec3_dot(a, b) ((a).x * (b).x + (a).y * (b).y + (a).z * (b).z)
 #define vec3_len(a)    sqrtf(vec3_dot((a), (a)))
-#define vec3_equ(a, b) ((a).x == (b).x && (a).y == (b).y && (a).z == (b).z)
+#define vec3_equ(a, b) (fequ((a).x, (b).x) && fequ((a).y, (b).y) && fequ((a).z, (b).z))
 // these are not macros because clion could not handle them lololol
 vec3_t vec3_normalize(vec3_t v);
 vec3_t vec3_cross(vec3_t a, vec3_t b);

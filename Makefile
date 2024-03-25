@@ -21,8 +21,8 @@ TARGET := $(BUILD_DIR)/b173c
 
 CFLAGS += -I$(SRC_DIR)
 
-SRC_FILES := $(shell find $(SRC_DIR)/ -type f -name "*.c")
-HDR_FILES := $(shell find $(SRC_DIR)/ -type f -name "*.h")
+SRC_FILES := $(shell find $(SRC_DIR)/ -type f -name "*.c" -not -path "src/test/*")
+HDR_FILES := $(shell find $(SRC_DIR)/ -type f -name "*.h" -not -path "src/test/*")
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
 
 ifneq ($(CC),gcc)
@@ -115,3 +115,11 @@ $(ASSET_SOURCES_OBJ): $(ASSET_SOURCES)
 # final binary
 $(TARGET): $(OBJ_FILES)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# tests
+# {
+tests:
+	$(CC) $(CFLAGS) -o test src/test/test_mathlib.c -lm
+	./test
+	rm test
+# }

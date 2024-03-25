@@ -1,4 +1,3 @@
-#include <SDL.h>
 #include "player.h"
 #include "client/cvar.h"
 #include "client/client.h"

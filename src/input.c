@@ -5,30 +5,29 @@
 #include "client/client.h"
 #include "vid/ui.h"
 #include "client/cvar.h"
-#include "client/cvar.h"
+#include "game/player.h"
 
 struct key_status input_keys[512] = {0};
 
 static int capslock_keymod = 0;
 
-struct gamekeys gamekeys = {0};
+gamekeys_t gamekeys = {0};
 
-void forwarddown_f(void) { gamekeys.forward = 1; }
-void forwardup_f(void) { gamekeys.forward = 0; }
-void backdown_f(void) { gamekeys.back = 1; }
-void backup_f(void) { gamekeys.back = 0; }
-void leftdown_f(void) { gamekeys.left = 1; }
-void leftup_f(void) { gamekeys.left = 0; }
-void rightdown_f(void) { gamekeys.right = 1; }
-void rightup_f(void) { gamekeys.right = 0; }
-void jumpdown_f(void) { gamekeys.jump = 1; }
-void jumpup_f(void) { gamekeys.jump = 0; }
-void sneakdown_f(void) { gamekeys.sneak = 1; }
-void sneakup_f(void) { gamekeys.sneak = 0; }
-void attackdown_f(void) { gamekeys.attack = 1; }
-void attackup_f(void) { gamekeys.attack = 0; }
-void attack2down_f(void) { gamekeys.attack2 = 1; }
-void attack2up_f(void) { gamekeys.attack2 = 0; }
+#define ACTIONCMDS \
+actioncmd(forward) \
+actioncmd(back)    \
+actioncmd(left)    \
+actioncmd(right)   \
+actioncmd(jump)    \
+actioncmd(sneak)   \
+actioncmd(attack)  \
+actioncmd(attack2)
+
+#define actioncmd(name)                                                                 \
+void name ## up_f(void) { gamekeys.name.just_released = 1; gamekeys.name.pressed = 0; } \
+void name ## down_f(void) { gamekeys.name.just_pressed = gamekeys.name.pressed = 1; }
+
+ACTIONCMDS
 
 struct keyname {
     char *name;
@@ -211,22 +210,13 @@ void unbind_f(void)
 
 errcode in_init(void)
 {
-    cmd_register("+forward", forwarddown_f);
-    cmd_register("-forward", forwardup_f);
-    cmd_register("+back", backdown_f);
-    cmd_register("-back", backup_f);
-    cmd_register("+left", leftdown_f);
-    cmd_register("-left", leftup_f);
-    cmd_register("+right", rightdown_f);
-    cmd_register("-right", rightup_f);
-    cmd_register("+attack", attackdown_f);
-    cmd_register("-attack", attackup_f);
-    cmd_register("+attack2", attack2down_f);
-    cmd_register("-attack2", attack2up_f);
-    cmd_register("+jump", jumpdown_f);
-    cmd_register("-jump", jumpup_f);
-    cmd_register("+sneak", sneakdown_f);
-    cmd_register("-sneak", sneakup_f);
+#undef actioncmd
+#define actioncmd(name)                  \
+cmd_register("+" #name, name ## down_f); \
+cmd_register("-" #name, name ## up_f);
+
+    ACTIONCMDS
+
 
     key_bind(KEY_ESCAPE, "toggleconsole");
 
@@ -288,72 +278,7 @@ static void handle_keys(void)
     }
 
     if(cl.state == cl_connected) {
-        if(cl_freecamera.integer == 0) {
-            vec3_t fwd, side, up;
-
-            cam_angles(&fwd, &side, &up, cl.game.our_ent->rotation.yaw, 0.0f);
-
-            fwd.y = 0.0f;
-            side.y = 0.0f;
-
-            cl.game.our_ent->move_forward = 0;
-            if(gamekeys.forward)
-                cl.game.our_ent->move_forward++;
-            if(gamekeys.back)
-                cl.game.our_ent->move_forward--;
-
-            cl.game.our_ent->move_side = 0;
-            if(gamekeys.right)
-                cl.game.our_ent->move_side++;
-            if(gamekeys.left)
-                cl.game.our_ent->move_side--;
-
-            if(gamekeys.sneak) {
-                cl.game.our_ent->move_forward *= 0.3f;
-                cl.game.our_ent->move_side *= 0.3f;
-            }
-
-
-            if(gamekeys.jump) {
-                if(entity_in_water(cl.game.our_ent) || entity_in_lava(cl.game.our_ent)) {
-                    cl.game.our_ent->velocity.y += 0.04f * cl.frametime * 20.0f;
-                } else if(cl.game.our_ent->onground) {
-                    cl.game.our_ent->velocity.y = 0.42f;
-                }
-            }
-        } else {
-            vec3_t fwd, side, up;
-            float m_fwd, m_side, m_up;
-            float spd = 20.0f;
-
-            cam_angles(&fwd, &side, &up, cl.game.our_ent->rotation.yaw, 0.0f);
-
-            fwd.y = 0.0f;
-            side.y = 0.0f;
-
-            m_fwd = 0;
-            if(gamekeys.forward)
-                m_fwd++;
-            if(gamekeys.back)
-                m_fwd--;
-
-            m_side = 0;
-            if(gamekeys.right)
-                m_side++;
-            if(gamekeys.left)
-                m_side--;
-
-            m_up = 0;
-            if(gamekeys.jump)
-                m_up++;
-            if(gamekeys.sneak)
-                m_up--;
-
-            cl.game.cam_pos = vec3_add(cl.game.cam_pos, vec3_mul(fwd, m_fwd * cl.frametime * spd));
-            cl.game.cam_pos = vec3_add(cl.game.cam_pos, vec3_mul(side, m_side * cl.frametime * spd));
-            cl.game.cam_pos = vec3_add(cl.game.cam_pos, vec3_mul(vec3(0,1,0), m_up * cl.frametime * spd));
-        }
-
+        player_update(cl.game.our_ent, gamekeys);
     }
 
 }
@@ -361,6 +286,10 @@ static void handle_keys(void)
 void in_update(void)
 {
     SDL_Event e;
+
+#undef actioncmd
+#define actioncmd(name) gamekeys.name.just_pressed = gamekeys.name.just_released = 0;
+    ACTIONCMDS
 
     for (int key = 0; key < KEY_NUM; key++) {
         if(key == KEY_MOUSEWHEELUP || key == KEY_MOUSEWHEELDOWN) {

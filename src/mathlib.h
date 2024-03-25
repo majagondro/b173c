@@ -9,13 +9,20 @@
 #define SQRT_3 1.7321f
 #define PI     3.1415f
 
-#define DEG2RAD(d) ((d) * (PI / 180.0f))
-#define RAD2DEG(r) ((r) * (180.0f / PI))
+#define deg2rad(d) ((d) * (PI / 180.0f))
+#define rad2deg(r) ((r) * (180.0f / PI))
 
+#ifndef max // stupid win32
 #define max(a, b) ((a) > (b) ? (a) : (b))
+#endif
+
+#ifndef min // stupid win32
 #define min(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 #define bound(low, x, up) max((low), min((x), (up)))
+
+#define sign(f) ((f) < 0 ? -1 : 1)
 
 #define X 0
 #define Y 1
@@ -46,6 +53,8 @@ typedef struct {
     vec3_t mins, maxs;
 } bbox_t;
 
+#define not0(v) ((v) == 0 ? 0.001f : (v))
+
 #define vec2(x, y) ((vec2_t){{x, y}})
 vec2_t vec2_rotate(vec2_t v, float angle, vec2_t origin);
 
@@ -65,7 +74,7 @@ vec2_t vec2_rotate(vec2_t v, float angle, vec2_t origin);
 vec3_t vec3_normalize(vec3_t v);
 vec3_t vec3_cross(vec3_t a, vec3_t b);
 
-#define vec4_from(x, y, z, w) ((vec4_t){{x, y, z, w}})
+#define vec4(x, y, z, w) ((vec4_t){{x, y, z, w}})
 
 void mat4_multiply(mat4_t dest, mat4_t a, mat4_t b);
 vec4_t mat4_multiply_vec4(mat4_t m, vec4_t v);
@@ -86,7 +95,8 @@ vec3_t cam_project_3d_to_2d(vec3_t pos, mat4_t proj, mat4_t modelview, vec2_t vp
 
 bbox_t bbox_offset(bbox_t bbox, vec3_t offset);
 bool bbox_null(bbox_t bbox);
-bool bbox_intersects_line(bbox_t bbox, vec3_t start, vec3_t end);
+bool bbox_intersects(bbox_t self, bbox_t other);
+bool bbox_intersects_line(bbox_t bbox, vec3_t start, vec3_t end, int *face);
 bbox_t bbox_join(bbox_t a, bbox_t b);
 
 #endif

@@ -45,6 +45,7 @@ typedef enum {
 
 extern entity_type nonliving_type_lookup[256];
 
+// todo: move some struct members to per-type data for the player type
 typedef struct entity {
     int id;
     entity_type type;
@@ -60,8 +61,9 @@ typedef struct entity {
     // input
     float move_side, move_forward;
 
-    float smooth_step_view_height_offset, eye_offset;
+    float height_offset, eye_offset;
 
+    bool sneaking;
     bool onground;
     bool collided_horizontally;
     bool collided_vertically;

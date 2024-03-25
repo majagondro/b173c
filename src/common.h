@@ -23,7 +23,11 @@
   ((b) & 0x01 ? '1' : '0')
 
 
+#ifdef _WIN32
+#define byte char
+#else
 typedef char byte;
+#endif
 typedef unsigned char ubyte;
 
 void *_mem_alloc_impl(size_t sz, const char *file, int line);

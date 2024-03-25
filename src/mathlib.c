@@ -4,8 +4,8 @@
 
 vec2_t vec2_rotate(vec2_t v, float angle, vec2_t o)
 {
-    float cosa = cosf(DEG2RAD(angle));
-    float sina = sinf(DEG2RAD(angle));
+    float cosa = cosf(deg2rad(angle));
+    float sina = sinf(deg2rad(angle));
     vec2_t ret;
 
     ret.x = ((v.x - o.x) * cosa - (v.y - o.y) * sina) + o.x;
@@ -85,12 +85,12 @@ void mat4_rotation(mat4_t dest, vec3_t rotation)
     // https://en.wikipedia.org/wiki/Rotation_matrix#General_3D_rotations
     // THX
 
-    float sina = sinf(DEG2RAD(rotation.pitch));
-    float cosa = cosf(DEG2RAD(rotation.pitch));
-    float sinb = sinf(DEG2RAD(rotation.yaw));
-    float cosb = cosf(DEG2RAD(rotation.yaw));
-    float siny = sinf(DEG2RAD(rotation.roll));
-    float cosy = cosf(DEG2RAD(rotation.roll));
+    float sina = sinf(deg2rad(rotation.pitch));
+    float cosa = cosf(deg2rad(rotation.pitch));
+    float sinb = sinf(deg2rad(rotation.yaw));
+    float cosb = cosf(deg2rad(rotation.yaw));
+    float siny = sinf(deg2rad(rotation.roll));
+    float cosy = cosf(deg2rad(rotation.roll));
 
     dest[0][0] = cosb * cosy;
     dest[0][1] = cosb * siny;
@@ -115,10 +115,10 @@ void mat4_scale(mat4_t dest, vec3_t scale)
 void cam_angles(vec3_t *fwd, vec3_t *side, vec3_t *up, float yaw, float pitch)
 {
     float cp, sp, cy, sy;
-    cp = cosf(DEG2RAD(pitch));
-    sp = sinf(DEG2RAD(pitch));
-    cy = cosf(DEG2RAD(yaw));
-    sy = sinf(DEG2RAD(yaw));
+    cp = cosf(deg2rad(pitch));
+    sp = sinf(deg2rad(pitch));
+    cy = cosf(deg2rad(yaw));
+    sy = sinf(deg2rad(yaw));
 
     if(side != NULL) {
         side->x = -cy;
@@ -181,7 +181,7 @@ void mat4_frustrum(mat4_t dest, float l, float r, float b, float t, float n, flo
 void mat4_projection(mat4_t dest, float fov, float aspect, float znear, float zfar)
 {
     float ymax, xmax;
-    ymax = znear * tanf(DEG2RAD(fov) * 0.5f);
+    ymax = znear * tanf(deg2rad(fov) * 0.5f);
     xmax = ymax * aspect;
     mat4_frustrum(dest, -xmax, xmax, -ymax, ymax, znear, zfar);
 }
@@ -214,41 +214,74 @@ bool bbox_null(bbox_t bbox)
            bbox.maxs.x == -1 && bbox.maxs.y == -1 && bbox.maxs.z == -1;
 }
 
-bool bbox_intersects_line(bbox_t bbox, vec3_t start, vec3_t end)
+bool bbox_intersects(bbox_t self, bbox_t other)
 {
-    // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection.html
-    // THX
+    bool overlap_x = other.maxs.x > self.mins.x && other.mins.x < self.maxs.x;
+    bool overlap_y = other.maxs.y > self.mins.y && other.mins.y < self.maxs.y;
+    bool overlap_z = other.maxs.z > self.mins.z && other.mins.z < self.maxs.z;
+    return overlap_x && overlap_y && overlap_z;
+}
 
-    float tmin, tmax, tymin, tymax, tzmin, tzmax;
-    vec3_t bounds[] = {bbox.mins, bbox.maxs};
-    vec3_t invdir = vec3_invdiv(1, vec3_normalize(vec3_sub(end, start)));
-    int sign[3] = {(invdir.x < 0), (invdir.y < 0), (invdir.z < 0)};
+bool bbox_intersects_line(bbox_t bbox, vec3_t start, vec3_t end, int *face)
+{
+    // https://gamedev.stackexchange.com/questions/18436/most-efficient-aabb-vs-ray-collision-algorithms/18459#18459
+    // https://computergraphics.stackexchange.com/questions/9504/ray-vs-aabb-algorithm-that-also-gives-which-side-was-hit
+    // yeah, i am bad at math
 
-    tmin = (bounds[sign[0]].x - start.x) * invdir.x;
-    tmax = (bounds[1 - sign[0]].x - start.x) * invdir.x;
-    tymin = (bounds[sign[1]].y - start.y) * invdir.y;
-    tymax = (bounds[1 - sign[1]].y - start.y) * invdir.y;
+    vec3_t dir = vec3_normalize(vec3_sub(end, start));
+    vec3_t dirfrac = vec3(1.0f / not0(dir.x), 1.0f / not0(dir.y), 1.0f / not0(dir.z));
+    float t1 = (bbox.mins.x - start.x) * dirfrac.x;
+    float t2 = (bbox.maxs.x - start.x) * dirfrac.x;
+    float t3 = (bbox.mins.y - start.y) * dirfrac.y;
+    float t4 = (bbox.maxs.y - start.y) * dirfrac.y;
+    float t5 = (bbox.mins.z - start.z) * dirfrac.z;
+    float t6 = (bbox.maxs.z - start.z) * dirfrac.z;
 
-    if((tmin > tymax) || (tymin > tmax))
+    float tmin = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
+    float tmax = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
+
+    if(tmax < 0) {
         return false;
+    }
 
-    if(tymin > tmin)
-        tmin = tymin;
-    if(tymax < tmax)
-        tmax = tymax;
-
-    tzmin = (bounds[sign[2]].z - start.z) * invdir.z;
-    tzmax = (bounds[1 - sign[2]].z - start.z) * invdir.z;
-
-    if((tmin > tzmax) || (tzmin > tmax))
+    if(tmin > tmax) {
         return false;
+    }
+
+    if(face != NULL) {
+        /*
+        BLOCK_FACE_Y_NEG = 0,
+        BLOCK_FACE_Y_POS = 1,
+        BLOCK_FACE_Z_NEG = 2,
+        BLOCK_FACE_Z_POS = 3,
+        BLOCK_FACE_X_NEG = 4,
+        BLOCK_FACE_X_POS = 5
+        */
+        float tminx = min(t1, t2);
+        float tminy = min(t3, t4);
+        int axis = 2;
+        *face = 2;
+
+        tmin = max(max(tminx, tminy), min(t5, t6));
+        if (tmin == tminx) {
+            axis = 0;
+            *face = 4;
+        }
+        if (tmin == tminy) {
+            axis = 1;
+            *face = 0;
+        }
+        if(dir.array[axis] < 0.0f) {
+            (*face)++;
+        }
+    }
 
     return true;
 }
 
 vec3_t cam_project_3d_to_2d(vec3_t pos, mat4_t proj, mat4_t modelview, vec2_t vp)
 {
-    vec4_t in = vec4_from(pos.x, pos.y, pos.z, 1);
+    vec4_t in = vec4(pos.x, pos.y, pos.z, 1);
     vec4_t out;
     vec3_t in3;
     float viewport[4] = {0, 0, vp.x, vp.y};
@@ -256,7 +289,7 @@ vec3_t cam_project_3d_to_2d(vec3_t pos, mat4_t proj, mat4_t modelview, vec2_t vp
     out = mat4_multiply_vec4(modelview, in);
     in = mat4_multiply_vec4(proj, out);
 
-    if (!in.w)
+    if(!in.w)
         return vec3_1(0);
 
     in3 = vec3_div(in, in.w);

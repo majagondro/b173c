@@ -116,7 +116,7 @@ void world_renderer_update_chunk_visibility(world_chunk *chunk);
 
 static void update_view_matrix_and_frustum(void)
 {
-    float half_h = r_zfar.value * tanf(DEG2RAD(fov.value) * 0.5f);
+    float half_h = r_zfar.value * tanf(deg2rad(fov.value) * 0.5f);
     float half_w = half_h * (vid_width.value / vid_height.value);
     vec3_t right, up, forward;
     vec3_t fwdFar, fwdNear;
@@ -1015,13 +1015,13 @@ void render_rail(int x, int y, int z, block_data self)
     meshbuilder_add_quad(&tr, &tl, &br, &bl); // bottom face
 }
 
-void add_stair_bboxes(bbox_t *colliders, size_t *n_colliders, block_data block, int x, int y, int z);
+void add_stair_bboxes(bbox_t *colliders, size_t *n_colliders, block_data block, int x, int y, int z, bbox_t box);
 
 void render_stairs(int x, int y, int z, block_data self)
 {
     bbox_t bboxes[2] = {0};
     size_t n = 0;
-    add_stair_bboxes(bboxes, &n, self, 0, 0, 0);
+    add_stair_bboxes(bboxes, &n, self, 0, 0, 0, (bbox_t){vec3_1(-1), vec3_1(1)});
     render_box(x, y, z, bboxes[0], self, SIDE_ALL);
     render_box(x, y, z, bboxes[1], self, SIDE_ALL);
 }

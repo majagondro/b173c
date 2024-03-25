@@ -192,8 +192,9 @@ void ui_render(void)
                   cl.game.our_ent->collided_horizontally, cl.game.our_ent->collided_vertically,
                   entity_in_water(cl.game.our_ent) || entity_in_lava(cl.game.our_ent),
                   cl.game.our_ent->velocity.x, cl.game.our_ent->velocity.y, cl.game.our_ent->velocity.z);
-        ui_printf(x, y+=8, "looking at: %d %d %d / %d / %d ("BIN_FMT")", vec3_unpack(cl.game.look_trace),
-                  cl.game.look_trace.block.id, cl.game.look_trace.block.metadata, BIN_BYTE(cl.game.look_trace.block.metadata));
+        ui_printf(x, y+=8, "looking at: %d %d %d / %d / %d ("BIN_FMT") / %s", vec3_unpack(cl.game.look_trace),
+                  cl.game.look_trace.block.id, cl.game.look_trace.block.metadata, BIN_BYTE(cl.game.look_trace.block.metadata),
+                  block_face_to_str(cl.game.look_trace.hit_face));
         ui_printf(x, y+=24, "Seed: %ld", cl.game.seed);
         ui_printf(x, y+=8, "Time: %lu (day %lu)", cl.game.time, cl.game.time / 24000);
     }

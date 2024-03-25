@@ -375,25 +375,42 @@ bool block_should_face_be_rendered_fast(world_chunk *chunk, int x, int y, int z,
     return block_is_transparent(other);
 }
 
-void add_stair_bboxes(bbox_t *colliders, size_t *n_colliders, block_data block, int x, int y, int z)
+void add_stair_bboxes(bbox_t *colliders, size_t *n_colliders, block_data block, int x, int y, int z, bbox_t box)
 {
     int facing = block.metadata;
+    bbox_t bb;
     switch(facing) {
     case 0:
-        colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z), vec3(x + 0.5f, y + 0.5f, z + 1)};
-        colliders[(*n_colliders)++] = (bbox_t) {vec3(x + 0.5f, y, z), vec3(x + 1, y + 1, z + 1)};
+        bb = (bbox_t) {vec3(x, y, z), vec3(x + 0.5f, y + 0.5f, z + 1)};
+        if(bbox_intersects(bb, box))
+            colliders[(*n_colliders)++] = bb;
+        bb = (bbox_t) {vec3(x + 0.5f, y, z), vec3(x + 1, y + 1, z + 1)};
+        if(bbox_intersects(bb, box))
+            colliders[(*n_colliders)++] = bb;
         break;
     case 1:
-        colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z), vec3(x + 0.5f, y + 1, z + 1)};
-        colliders[(*n_colliders)++] = (bbox_t) {vec3(x + 0.5f, y, z), vec3(x + 1, y + 0.5f, z + 1)};
+        bb = (bbox_t) {vec3(x, y, z), vec3(x + 0.5f, y + 1, z + 1)};
+        if(bbox_intersects(bb, box))
+            colliders[(*n_colliders)++] = bb;
+        bb = (bbox_t) {vec3(x + 0.5f, y, z), vec3(x + 1, y + 0.5f, z + 1)};
+        if(bbox_intersects(bb, box))
+            colliders[(*n_colliders)++] = bb;
         break;
     case 2:
-        colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z), vec3(x + 1, y + 0.5f, z + 0.5f)};
-        colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z + 0.5f), vec3(x + 1, y + 1, z + 1)};
+        bb = (bbox_t) {vec3(x, y, z), vec3(x + 1, y + 0.5f, z + 0.5f)};
+        if(bbox_intersects(bb, box))
+            colliders[(*n_colliders)++] = bb;
+        bb = (bbox_t) {vec3(x, y, z + 0.5f), vec3(x + 1, y + 1, z + 1)};
+        if(bbox_intersects(bb, box))
+            colliders[(*n_colliders)++] = bb;
         break;
     case 3:
-        colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z), vec3(x + 1, y + 1, z + 0.5f)};
-        colliders[(*n_colliders)++] = (bbox_t) {vec3(x, y, z + 0.5f), vec3(x + 1, y + 0.5f, z + 1)};
+        bb = (bbox_t) {vec3(x, y, z), vec3(x + 1, y + 1, z + 0.5f)};
+        if(bbox_intersects(bb, box))
+            colliders[(*n_colliders)++] = bb;
+        bb = (bbox_t) {vec3(x, y, z + 0.5f), vec3(x + 1, y + 0.5f, z + 1)};
+        if(bbox_intersects(bb, box))
+            colliders[(*n_colliders)++] = bb;
         break;
     default:
         break;
@@ -407,7 +424,7 @@ bbox_t *world_get_colliding_blocks(bbox_t box)
     size_t n_colliders = 0;
 
     int x0 = (int) floorf(box.mins.x);
-    int y0 = (int) floorf(box.mins.y - 0.01f);
+    int y0 = (int) floorf(box.mins.y);
     int z0 = (int) floorf(box.mins.z);
     int x1 = (int) floorf(box.maxs.x + 1.0f);
     int y1 = (int) floorf(box.maxs.y + 1.0f);
@@ -421,10 +438,10 @@ bbox_t *world_get_colliding_blocks(bbox_t box)
                 block_data block = world_get_block(x, y, z);
                 if(block_is_collidable(block)) {
                     if((block.id == BLOCK_STAIRS_STONE || block.id == BLOCK_STAIRS_WOOD) && n_colliders < 62) {
-                        add_stair_bboxes(colliders, &n_colliders, block, x, y, z);
+                        add_stair_bboxes(colliders, &n_colliders, block, x, y, z, box);
                     } else {
                         bbox_t bb = block_get_bbox(block, x, y, z, false);
-                        if(!bbox_null(bb)) {
+                        if(!bbox_null(bb) && bbox_intersects(box, bb)) {
                             colliders[n_colliders++] = bb;
                         }
                     }
@@ -648,8 +665,10 @@ struct trace_result world_trace_ray(vec3_t origin, vec3_t dir, float maxlen)
         res.block = world_get_block(res.x, res.y, res.z);
         if(block_is_selectable(res.block)) {
             bbox_t bbox = block_get_bbox(res.block, res.x, res.y, res.z, true);
-            if(bbox_intersects_line(bbox, origin, end)) {
+            int face = res.hit_face;
+            if(bbox_intersects_line(bbox, origin, end, &face)) {
                 res.reached_end = false;
+                res.hit_face = face;
                 break;
             }
         }

@@ -5,6 +5,8 @@
 #include "vid/ui.h"
 #include "cvar.h"
 #include <SDL2/SDL.h>
+#include <errno.h>
+#include "net/packets.h"
 
 extern cvar *cvarlist;
 extern struct cmd *cmdlist;
@@ -111,8 +113,10 @@ void exec_f(void)
 
     data = (char *) SDL_LoadFile(file, NULL);
 
-    if(data == NULL)
+    if(data == NULL) {
+        con_printf("could not exec %s.cfg\n", cmd_argv(1));
         return;
+    }
 
     for(line = strtok(data, "\n"); line != NULL; line = strtok(NULL, "\n"))
         cmd_exec(line);
@@ -192,6 +196,42 @@ void connect_f(void);
 void say_f(void);
 void respawn_f(void);
 
+void dropitem_f(void)
+{
+    net_write_pkt_block_dig((pkt_block_dig) {.status = 4});
+}
+
+void slot_f(void)
+{
+    static int16_t slot;
+    int olderrno = errno;
+
+    if(cmd_argc() != 2)
+        return;
+
+    if(!strcmp(cmd_argv(1), "next")) {
+        slot++;
+        if(slot > 9)
+            slot = 0;
+    } else if(!strcmp(cmd_argv(1), "prev")) {
+        slot--;
+        if(slot < 0)
+            slot = 9;
+    } else {
+        slot = (int16_t) strtol(cmd_argv(1), NULL, 10);
+
+        // from strtol man page:
+        // This function does not modify errno on success.
+        if(errno != olderrno)
+            return;
+        if(slot > 9 || slot < 0) {
+            return;
+        }
+    }
+
+    net_write_pkt_holding_change((pkt_holding_change) {slot});
+}
+
 void cmds_register(void)
 {
     cmd_register("cmdlist", cmdlist_f);
@@ -213,4 +253,6 @@ void cmds_register(void)
     cmd_register("disconnect", disconnect_f);
     cmd_register("say", say_f);
     cmd_register("respawn", respawn_f);
+    cmd_register("dropitem", dropitem_f);
+    cmd_register("slot", slot_f);
 }

@@ -56,6 +56,7 @@ typedef struct {
 
 typedef struct {
     char *name;
+    float hardness;
     ubyte texture_indices[6];
     bool opaque;
     block_render_type render_type;
@@ -94,6 +95,7 @@ bbox_t block_get_bbox(block_data self, int x, int y, int z, bool selectmode);
 bool block_is_collidable(block_data block);
 bool block_is_selectable(block_data block);
 bool block_is_flammable(block_id id);
+const char *block_face_to_str(block_face f);
 
 #define METADATA_DOOR_ROT (3)
 #define METADATA_DOOR_OPEN (4)

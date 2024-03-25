@@ -22,14 +22,14 @@ static float calc_max_distance(bbox_t self, bbox_t other, float dist, int axis)
 
             float off;
             if(dist > 0.0f && other.maxs.array[axis] <= self.mins.array[axis]) {
-                off = self.mins.array[axis] - other.maxs.array[axis] - 0.001f;
+                off = self.mins.array[axis] - other.maxs.array[axis];
                 if(off < dist) {
                     dist = off;
                 }
             }
 
             if(dist < 0.0f && other.mins.array[axis] >= self.maxs.array[axis]) {
-                off = self.maxs.array[axis] - other.mins.array[axis] + 0.001f;
+                off = self.maxs.array[axis] - other.mins.array[axis];
                 if(off > dist) {
                     dist = off;
                 }
@@ -50,9 +50,35 @@ static void move_entity(entity *ent, vec3_t vel)
 {
     const float step_height = 0.5f;
     bool onground2; // used for stepping code
+    bool sneaking_on_ground = ent->sneaking && ent->onground;
     vec3_t oldvel = vel;
     bbox_t *colliders;
     bbox_t bbox_pre_move = ent->bbox;
+
+    if(sneaking_on_ground) {
+#define no_colliding_bboxes() (bbox_null(*world_get_colliding_blocks(bbox_offset(ent->bbox, vec3(vel.x, -1.0f, 0.0f)))))
+        float f = 0.05f;
+
+        while(vel.x != 0.0f && no_colliding_bboxes()) {
+            if(vel.x < f && vel.x >= -f) {
+                vel.x = 0.0f;
+            } else {
+                vel.x -= sign(vel.x) * f;
+            }
+            oldvel.x = vel.x;
+        }
+#undef no_colliding_bboxes
+#define no_colliding_bboxes() (bbox_null(*world_get_colliding_blocks(bbox_offset(ent->bbox, vec3(0.0f, -1.0f, vel.z)))))
+        while(vel.z != 0.0f && no_colliding_bboxes()) {
+            if(vel.z < f && vel.z >= -f) {
+                vel.z = 0.0f;
+            } else {
+                vel.z -= sign(vel.z) * f;
+            }
+            oldvel.z = vel.z;
+        }
+#undef no_colliding_bboxes
+    }
 
     colliders = world_get_colliding_blocks(bbox_offset(ent->bbox, vel));
 
@@ -68,18 +94,19 @@ static void move_entity(entity *ent, vec3_t vel)
     ent->bbox = bbox_offset(ent->bbox, vec3(0.0f, 0.0f, vel.z));
 
     // stepping code
-    if(onground2 && (ent->smooth_step_view_height_offset < 0.05f) && (oldvel.x != vel.x || oldvel.z != vel.z)) {
+    if(onground2 && (sneaking_on_ground || ent->height_offset < 0.05f)
+       && (oldvel.x != vel.x || oldvel.z != vel.z)) {
         vec3_t vel_pre_step = vel;
         bbox_t bbox_after_move = ent->bbox;
         float l1, l2;
 
         vel.x = oldvel.x;
-        vel.y = step_height;
         vel.z = oldvel.z;
+        vel.y = step_height;
 
         ent->bbox = bbox_pre_move;
 
-        colliders = world_get_colliding_blocks(bbox_offset(ent->bbox, vel));
+        colliders = world_get_colliding_blocks(bbox_offset(ent->bbox, vec3(oldvel.x, vel.y - 0.01f, oldvel.z)));
 
         vel.y = testmove(colliders, ent, vel.y, Y);
         ent->bbox = bbox_offset(ent->bbox, vec3(0.0f, vel.y, 0.0f));
@@ -110,7 +137,7 @@ static void move_entity(entity *ent, vec3_t vel)
             if(dy > 0.001f) {
                 if(developer.integer) // leaving this here because of a nasty bug.....
                     con_printf("step %f\n", dy);
-                ent->smooth_step_view_height_offset += dy + 0.01f;
+                ent->height_offset += dy + 0.01f;
             }
         }
     }
@@ -123,7 +150,7 @@ static void move_entity(entity *ent, vec3_t vel)
     ent->position.z = (ent->bbox.mins.z + ent->bbox.maxs.z) / 2.0f;
 
     if(cl_smoothstep.integer)
-        ent->position.y -= ent->smooth_step_view_height_offset;
+        ent->position.y -= ent->height_offset;
 
     if(oldvel.x != vel.x)
         ent->velocity.x = 0.0f;
@@ -225,7 +252,7 @@ static bool handle_water_accel(entity *ent)
                 for(int z = z0; z < z1; z++) {
                     block_data block = world_get_block(x, y, z);
                     if(block.id == BLOCK_WATER_STILL || block.id == BLOCK_WATER_MOVING) {
-                        float threshold = ((float)(y + 1) - block_fluid_get_percent_air(block.metadata));
+                        float threshold = ((float) (y + 1) - block_fluid_get_percent_air(block.metadata));
                         if((float) y1 >= threshold) {
                             vec3_t vel_add = block_fluid_get_flow_direction(x, y, z);
                             vel = vec3_add(vel, vel_add);
@@ -301,7 +328,7 @@ void entity_update(entity *ent)
         else
             accel = accel_in_air;
 
-        ent->smooth_step_view_height_offset *= 0.4f;
+        ent->height_offset *= 0.4f;
 
         update_velocity(ent, accel);
 
@@ -317,7 +344,9 @@ void entity_update(entity *ent)
             if(ent->velocity.y < -ladder_speed_base)
                 ent->velocity.y = -ladder_speed_base;
 
-            // todo: if sneaking and going down: vel.y = 0
+            if(ent->sneaking && ent->velocity.y < 0) {
+                ent->velocity.y = 0;
+            }
         }
 
         move_entity(ent, ent->velocity);

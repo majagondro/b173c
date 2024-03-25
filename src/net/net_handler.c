@@ -67,14 +67,11 @@ void net_handle_pkt_login_request(pkt_login_request pkt)
         });
         cl.game.our_ent = world_get_entity(pkt.entity_id_or_protocol_version);
     }
-    con_printf("2\n");
 
     vid_unlock_fps();
     con_printf(CON_STYLE_DARK_GREEN"connected!\n");
 
     net_free_string16(pkt.username);
-
-    con_printf("done\n");
 }
 
 void net_handle_pkt_handshake(pkt_handshake pkt)
@@ -132,21 +129,19 @@ void net_handle_pkt_player_look_move(pkt_player_look_move pkt)
 {
     // server tp'd us back so we made a mistake - correct our position
 
-    cl.game.our_ent->smooth_step_view_height_offset = 0;
+    cl.game.our_ent->height_offset = 0;
     cl.game.our_ent->velocity = vec3_1(0);
 
-    if(!cl.game.unstuck) {
-        entity_set_position(cl.game.our_ent, vec3(pkt.x, pkt.stance_or_y, pkt.z));
-    } else {
-        cl.game.unstuck = false;
-    }
+    entity_set_position(cl.game.our_ent, vec3(pkt.x, pkt.stance_or_y, pkt.z));
 
 	cl.game.our_ent->rotation.yaw = -pkt.yaw;
 	cl.game.our_ent->rotation.pitch = pkt.pitch;
 
 	// now apologize
-    pkt.stance_or_y = cl.game.our_ent->position.y;
-    pkt.y_or_stance = cl.game.our_ent->position.y + 0.2f;
+    pkt.x = cl.game.our_ent->position.x;
+    pkt.stance_or_y = cl.game.our_ent->bbox.mins.y;
+    pkt.z = cl.game.our_ent->position.z;
+    pkt.y_or_stance = cl.game.our_ent->position.y;
 
     net_write_pkt_player_look_move(pkt);
 }

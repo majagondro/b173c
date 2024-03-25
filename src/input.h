@@ -12,17 +12,6 @@ errcode in_init(void);
 void in_update(void);
 void in_shutdown(void);
 
-struct gamekeys {
-    ubyte forward : 1;
-    ubyte back    : 1;
-    ubyte left    : 1;
-    ubyte right   : 1;
-    ubyte attack  : 1;
-    ubyte attack2 : 1;
-    ubyte jump    : 1;
-    ubyte sneak   : 1;
-};
-
 struct key_status {
     bool pressed       : 1; // this is true while the key is pressed
     bool just_pressed  : 1; // this is only true for 1 frame
@@ -32,6 +21,30 @@ struct key_status {
 };
 
 extern struct key_status input_keys[512]; // use KEY_* as the index
+
+#define GAMEKEY_PRESSED_BIT       1
+#define GAMEKEY_JUST_PRESSED_BIT  2
+#define GAMEKEY_JUST_RELEASED_BIT 4
+
+#define GAMEKEY_PRESSED(gk)       ((gk) & GAMEKEY_PRESSED_BIT)
+#define GAMEKEY_JUST_PRESSED(gk)  ((gk) & GAMEKEY_JUST_PRESSED_BIT)
+#define GAMEKEY_JUST_RELEASED(gk) ((gk) & GAMEKEY_JUST_RELEASED_BIT)
+
+typedef struct {
+    struct gamekey {
+        ubyte pressed : 1;
+        ubyte just_pressed : 1;
+        ubyte just_released : 1;
+    } forward, back, left, right, attack, attack2, jump, sneak;
+    // ubyte forward;
+    // ubyte back;
+    // ubyte left;
+    // ubyte right;
+    // ubyte attack;
+    // ubyte attack2;
+    // ubyte jump;
+    // ubyte sneak;
+} gamekeys_t;
 
 void key_bind(int key, char *bind);
 

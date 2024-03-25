@@ -36,10 +36,11 @@ void entity_set_position(entity *ent, vec3_t pos)
     float w = 0.6f / 2.0f;
     float h = 1.8f;
 
+    ent->position_old = pos; // yes
     ent->position = pos;
     ent->bbox = (bbox_t) {
-        .mins = vec3(pos.x - w, pos.y - ent->eye_offset + ent->smooth_step_view_height_offset, pos.z - w),
-        .maxs = vec3(pos.x + w, pos.y - ent->eye_offset + ent->smooth_step_view_height_offset + h, pos.z + w)
+        .mins = vec3(pos.x - w, pos.y - ent->eye_offset + ent->height_offset, pos.z - w),
+        .maxs = vec3(pos.x + w, pos.y - ent->eye_offset + ent->height_offset + h, pos.z + w)
     };
 }
 

@@ -21,7 +21,7 @@ The executable should be at build/b173c.exe
 Additionally you can run `x86_64-w64-mingw32-strip build/b173c.exe` to reduce the size of the binary.  
 
 ### Windows
-No instructions yet. Grab the latest binary from [here](https://github.com/krizej/b173c/actions).
+No instructions yet. Grab the latest binary from [here](https://github.com/krizej/b173c/actions/workflows/build.yml).
 
 ## Usage
 

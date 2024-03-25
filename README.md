@@ -5,7 +5,7 @@ b173c is a Minecraft client which aims to be fully compatible with Minecraft Bet
 ## Requirements
 
 Required packages:
-`pkgconf sdl2 sdl2_net zlib python3 python-pillow` (naming for Arch Linux)
+`pkgconf sdl2 zlib python3 python-pillow` (naming for Arch Linux)
 
 ## Building
   

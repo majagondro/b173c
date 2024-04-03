@@ -9,9 +9,26 @@
 #define SQRT_3 1.7321f
 #define PI     3.1415f
 
+/**
+ * Checks if two floating-point numbers are approximately equal within a given tolerance.
+ * @param a First floating-point number
+ * @param b Second floating-point number
+ * @returns true if a is approximately equal to b, false otherwise
+ */
 #define fequ(a, b) (fabsf((a) - (b)) < 0.0001f)
 
+/**
+ * Converts degrees to radians.
+ * @param d Angle in degrees
+ * @returns Angle in radians
+ */
 #define deg2rad(d) ((d) * (PI / 180.0f))
+
+/**
+ * Converts radians to degrees.
+ * @param r Angle in radians
+ * @returns Angle in degrees
+ */
 #define rad2deg(r) ((r) * (180.0f / PI))
 
 #ifndef max // stupid win32

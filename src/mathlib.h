@@ -212,23 +212,102 @@ vec3_t vec3_normalize(vec3_t v);
  */
 vec3_t vec3_cross(vec3_t a, vec3_t b);
 
-#define vec4(x, y, z, w) ((vec4_t){{x, y, z, w}})
+#define vec4(x, y, z, w) ((vec4_t){{x, y, z, w}}) // Create and return a vec4_t object with given coordinates
 
+/**
+ * Multiply two matrices and store the result in dest.
+ * @param dest Destination matrix
+ * @param a First matrix
+ * @param b Second matrix
+ */
 void mat4_multiply(mat4_t dest, mat4_t a, mat4_t b);
+
+/**
+ * Multiply a matrix by a vector and return the result as a vector.
+ * @param m Matrix
+ * @param v Vector
+ * @return Resulting vector
+ */
 vec4_t mat4_multiply_vec4(mat4_t m, vec4_t v);
+
+/**
+ * Initialize the matrix as an identity matrix.
+ * @param dest Destination matrix
+ */
 void mat4_identity(mat4_t dest);
+
+/**
+ * Create a translation matrix.
+ * @param dest Destination matrix
+ * @param translation Translation vector
+ */
 void mat4_translation(mat4_t dest, vec3_t translation);
+
+/**
+ * Create a rotation matrix.
+ * @param dest Destination matrix
+ * @param rotation Rotation vector
+ */
 void mat4_rotation(mat4_t dest, vec3_t rotation);
+
+/**
+ * Create a scaling matrix.
+ * @param dest Destination matrix
+ * @param scale Scaling vector
+ */
 void mat4_scale(mat4_t dest, vec3_t scale);
+
+/**
+ * Create a view matrix for a camera.
+ * @param dest Destination matrix
+ * @param pos Camera position
+ * @param ang Camera angle
+ */
 void mat4_view(mat4_t dest, vec3_t pos, vec3_t ang);
-void mat4_frustrum(mat4_t dest, float l, float r, float b, float t, float n,
-                   float f);
-void mat4_projection(mat4_t dest, float fov, float aspect, float znear,
-                     float zfar);
+
+/**
+ * Create a frustum projection matrix.
+ * @param dest Destination matrix
+ * @param l Left
+ * @param r Right
+ * @param b Bottom
+ * @param t Top
+ * @param n Near plane distance
+ * @param f Far plane distance
+ */
+void mat4_frustrum(mat4_t dest, float l, float r, float b, float t, float n, float f);
+
+/**
+ * Create a perspective projection matrix.
+ * @param dest Destination matrix
+ * @param fov Field of view
+ * @param aspect Aspect ratio
+ * @param znear Near plane distance
+ * @param zfar Far plane distance
+ */
+void mat4_projection(mat4_t dest, float fov, float aspect, float znear, float zfar);
 
 // todo: roll? (and in mat_view as well)
 // todo replace with vec3_t
+
+/**
+ * Calculate camera angles.
+ * @param forward Pointer to store the forward vector
+ * @param right Pointer to store the right vector
+ * @param up Pointer to store the up vector
+ * @param yaw Yaw angle
+ * @param pitch Pitch angle
+ */
 void cam_angles(vec3_t *forward, vec3_t *right, vec3_t *up, float yaw, float pitch);
+
+/**
+ * Project a 3D point to a 2D point on the screen.
+ * @param pos 3D position to project
+ * @param proj Projection matrix
+ * @param modelview Modelview matrix
+ * @param vp Viewport dimensions
+ * @return Projected 2D point
+ */
 vec3_t cam_project_3d_to_2d(vec3_t pos, mat4_t proj, mat4_t modelview, vec2_t vp);
 
 bbox_t bbox_offset(bbox_t bbox, vec3_t offset);

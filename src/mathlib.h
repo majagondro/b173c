@@ -105,20 +105,111 @@ typedef struct {
 #define vec2(x, y) ((vec2_t){{x, y}})
 vec2_t vec2_rotate(vec2_t v, float angle, vec2_t origin);
 
-#define vec3_unpack(v) (v).x, (v).y, (v).z
+/**
+ * Unpack vec3_t components
+ * @param v the vec3_t to unpack
+ */
+#define vec3_unpack(v) (v).x, (v).y, (v).z 
+
+/**
+ * Create and return a vec3_t object with components (x, y, z).
+ * @param x X-coordinate
+ * @param y Y-coordinate
+ * @param z Z-coordinate
+ * @return vec3_t object with specified coordinates
+ */
 #define vec3(x, y, z) ((vec3_t){{x, y, z}})
+
+/**
+ * Create and return a vec3_t object with all components set to x.
+ * @param x Value to set all components to
+ * @return vec3_t object with all components set to x
+ */
 #define vec3_1(x)  vec3((x), (x), (x))
+
+/**
+ * Add two vectors.
+ * @param a First vector
+ * @param b Second vector
+ * @returns Sum of vectors a and b
+ */
 #define vec3_add(a, b) vec3((a).x + (b).x, (a).y + (b).y, (a).z + (b).z)
+
+/**
+ * Subtract two vectors.
+ * @param a First vector
+ * @param b Second vector
+ * @returns Difference between vectors a and b
+ */
 #define vec3_sub(a, b) vec3((a).x - (b).x, (a).y - (b).y, (a).z - (b).z)
-#define vec3_mul(v, s) vec3((v).x * (s)  , (v).y * (s)  , (v).z * (s)  )
-#define vec3_div(v, s) vec3((v).x / (s)  , (v).y / (s)  , (v).z / (s)  )
+
+/**
+ * Multiply vector by scalar.
+ * @param v Vector
+ * @param s Scalar value
+ * @returns Result of vector v multiplied by scalar s
+ */
+#define vec3_mul(v, s) vec3((v).x * (s), (v).y * (s), (v).z * (s))
+
+/**
+ * Divide vector by scalar.
+ * @param v Vector
+ * @param s Scalar value
+ * @returns Result of vector v divided by scalar s
+ */
+#define vec3_div(v, s) vec3((v).x / (s), (v).y / (s), (v).z / (s))
+
+/**
+ * Inverse divide scalar by vector.
+ * @param s Scalar value
+ * @param v Vector
+ * @returns Result of scalar s divided by vector v
+ */
 #define vec3_invdiv(s, v) vec3((s) / (v).x, (s) / (v).y, (s) / (v).z)
+
+/**
+ * Invert vector components.
+ * @param v Vector to invert
+ * @returns Inverted vector
+ */
 #define vec3_invert(v) vec3_sub(vec3_1(0), (v))
+
+/**
+ * Compute dot product of two vectors.
+ * @param a First vector
+ * @param b Second vector
+ * @returns Dot product of vectors a and b
+ */
 #define vec3_dot(a, b) ((a).x * (b).x + (a).y * (b).y + (a).z * (b).z)
+
+/**
+ * Compute length of a vector.
+ * @param the Vector
+ * @returns Length of vector a
+ */
 #define vec3_len(a)    sqrtf(vec3_dot((a), (a)))
+
+/**
+ * Check if two vectors are equal.
+ * @param a First vector
+ * @param b Second vector
+ * @returns true if vectors a and b are approximately equal, false otherwise
+ */
 #define vec3_equ(a, b) (fequ((a).x, (b).x) && fequ((a).y, (b).y) && fequ((a).z, (b).z))
-// these are not macros because clion could not handle them lololol
+
+/**
+ * Normalize a vector.
+ * @param v Vector to normalize
+ * @returns Normalized vector
+ */
 vec3_t vec3_normalize(vec3_t v);
+
+/**
+ * Compute cross product of two vectors.
+ * @param a First vector
+ * @param b Second vector
+ * @returns Cross product of vectors a and b
+ */
 vec3_t vec3_cross(vec3_t a, vec3_t b);
 
 #define vec4(x, y, z, w) ((vec4_t){{x, y, z, w}})

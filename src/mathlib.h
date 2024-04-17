@@ -310,10 +310,47 @@ void cam_angles(vec3_t *forward, vec3_t *right, vec3_t *up, float yaw, float pit
  */
 vec3_t cam_project_3d_to_2d(vec3_t pos, mat4_t proj, mat4_t modelview, vec2_t vp);
 
+
+/**
+ * Offset a bounding box by a specified vector.
+ * @param bbox Original bounding box
+ * @param offset Offset vector
+ * @returns Offset bounding box
+ */
 bbox_t bbox_offset(bbox_t bbox, vec3_t offset);
+
+/**
+ * Check if a bounding box is null.
+ * @param bbox Bounding box to check
+ * @returns true if the bounding box is null, false otherwise
+ */
 bool bbox_null(bbox_t bbox);
-bool bbox_intersects(bbox_t self, bbox_t other);
+
+/**
+ * Check if two bounding boxes intersect.
+ * @param a First bounding box
+ * @param b Second bounding box
+ * @returns true if the bounding boxes intersect, false otherwise
+ */
+bool bbox_intersects(bbox_t a, bbox_t b);
+
+/**
+ * Check if a line intersects a bounding box.
+ * @param bbox Bounding box
+ * @param start Starting point of the line
+ * @param end Ending point of the line
+ * @param face If not NULL, the face id will be stored here
+ * @returns true if the line intersects the bounding box, false otherwise
+ * @see block_face enum in src/game/block.h
+ */
 bool bbox_intersects_line(bbox_t bbox, vec3_t start, vec3_t end, int *face);
+
+/**
+ * Join two bounding boxes into one that contains both.
+ * @param a First bounding box
+ * @param b Second bounding box
+ * @returns Bounding box containing both a and b
+ */
 bbox_t bbox_join(bbox_t a, bbox_t b);
 
-#endif
+#endif 

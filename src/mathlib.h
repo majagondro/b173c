@@ -1,11 +1,11 @@
 #ifndef B173C_MATHLIB_H
 #define B173C_MATHLIB_H
 
-#include "mathlib.h"
+#include "mathlib.h" 
 #include "common.h"
-#include <math.h>
+#include <math.h> 
 
-#define SQRT_2 1.4142f
+#define SQRT_2 1.4142f 
 #define SQRT_3 1.7321f
 #define PI     3.1415f
 
@@ -15,32 +15,60 @@
  * @param b Second floating-point number
  * @returns true if a is approximately equal to b, false otherwise
  */
-#define fequ(a, b) (fabsf((a) - (b)) < 0.0001f)
+#define fequ(a, b) (fabsf((a) - (b)) < 0.0001f) 
 
 /**
- * Converts degrees to radians.
+ * Convert degrees to radians.
  * @param d Angle in degrees
  * @returns Angle in radians
  */
 #define deg2rad(d) ((d) * (PI / 180.0f))
 
 /**
- * Converts radians to degrees.
+ * Convert radians to degrees.
  * @param r Angle in radians
  * @returns Angle in degrees
  */
 #define rad2deg(r) ((r) * (180.0f / PI))
 
+
 #ifndef max // stupid win32
+
+/**
+ * Return the maximum of two values.
+ * @param a First value
+ * @param b Second value
+ * @returns The greater of two values a and b
+ */
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
 #ifndef min // stupid win32
+
+/**
+ * Return the minimum of two values.
+ * @param a First value
+ * @param b Second value
+ * @returns The lesser of two values a and b
+ */
 #define min(a, b) ((a) < (b) ? (a) : (b))
+
 #endif
 
+/**
+ * Bound x within the range [low, up].
+ * @param low Lower bound
+ * @param x Value to bound
+ * @param up Upper bound
+ * @returns bounded value
+ */
 #define bound(low, x, up) max((low), min((x), (up)))
 
+/**
+ * Return the sign of a number (1 for positive or zero, -1 for negative).
+ * @param f Number to determine the sign of
+ * @returns 1 if f is positive or zero, -1 if f is negative
+ */
 #define sign(f) ((f) < 0 ? -1 : 1)
 
 #define X 0

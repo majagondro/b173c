@@ -2,6 +2,12 @@
 
 b173c is a Minecraft client which aims to be fully compatible with Minecraft Beta 1.7.3 servers, file formats etc. with plans to feature very high customizability and advanced scripting capabilities.
 
+![image of the game running](.github/images/b173c.png)
+*current state of b173c*
+
+## Usage
+See the wiki page for [Usage](https://github.com/krizej/b173c/wiki/Usage)
+
 ## Requirements
 
 Required packages:
